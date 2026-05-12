@@ -12,3 +12,6 @@ gen
 go.work
 go.work.sum
 .env
+
+# Local planning notes for development and mentoring
+.local-docs/
