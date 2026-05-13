@@ -6,305 +6,305 @@ option go_package = "github.com/squaredbusinessman/gophkeeper-authenticator/inte
 
 import "google/protobuf/timestamp.proto";
 
-// AuthService описывает регистрацию и аутентификацию пользователей.
+// AuthService описывает регистрацию и аутентификацию пользователей
 service AuthService {
-  // Register создает нового пользователя и возвращает данные авторизованной сессии.
+  // Register создает нового пользователя и возвращает данные авторизованной сессии
   rpc Register(RegisterRequest) returns (RegisterResponse);
 
-  // Login аутентифицирует существующего пользователя и возвращает данные авторизованной сессии.
+  // Login аутентифицирует существующего пользователя и возвращает данные авторизованной сессии
   rpc Login(LoginRequest) returns (LoginResponse);
 }
 
-// VaultService описывает операции с зашифрованным хранилищем пользователя.
+// VaultService описывает операции с зашифрованным хранилищем пользователя
 service VaultService {
-  // CreateItem создает новую запись в хранилище пользователя.
+  // CreateItem создает новую запись в хранилище пользователя
   rpc CreateItem(CreateItemRequest) returns (CreateItemResponse);
 
-  // GetItem возвращает одну запись хранилища по идентификатору.
+  // GetItem возвращает одну запись хранилища по идентификатору
   rpc GetItem(GetItemRequest) returns (GetItemResponse);
 
-  // ListItems возвращает страницу записей хранилища пользователя.
+  // ListItems возвращает страницу записей хранилища пользователя
   rpc ListItems(ListItemsRequest) returns (ListItemsResponse);
 
-  // UpdateItem обновляет существующую запись с проверкой ожидаемой версии.
+  // UpdateItem обновляет существующую запись с проверкой ожидаемой версии
   rpc UpdateItem(UpdateItemRequest) returns (UpdateItemResponse);
 
-  // DeleteItem помечает запись как удаленную с проверкой ожидаемой версии.
+  // DeleteItem помечает запись как удаленную с проверкой ожидаемой версии
   rpc DeleteItem(DeleteItemRequest) returns (DeleteItemResponse);
 
-  // Sync возвращает изменения хранилища для синхронизации клиента.
+  // Sync возвращает изменения хранилища для синхронизации клиента
   rpc Sync(SyncRequest) returns (SyncResponse);
 }
 
-// ItemType задает тип приватных данных в хранилище.
+// ItemType задает тип приватных данных в хранилище
 enum ItemType {
-  // ITEM_TYPE_UNSPECIFIED используется, когда тип записи не задан.
+  // ITEM_TYPE_UNSPECIFIED используется, когда тип записи не задан
   ITEM_TYPE_UNSPECIFIED = 0;
 
-  // ITEM_TYPE_LOGIN_PASSWORD хранит пару логин и пароль.
+  // ITEM_TYPE_LOGIN_PASSWORD хранит пару логин и пароль
   ITEM_TYPE_LOGIN_PASSWORD = 1;
 
-  // ITEM_TYPE_TEXT хранит произвольные текстовые данные.
+  // ITEM_TYPE_TEXT хранит произвольные текстовые данные
   ITEM_TYPE_TEXT = 2;
 
-  // ITEM_TYPE_BINARY хранит произвольные бинарные данные.
+  // ITEM_TYPE_BINARY хранит произвольные бинарные данные
   ITEM_TYPE_BINARY = 3;
 
-  // ITEM_TYPE_BANK_CARD хранит данные банковской карты.
+  // ITEM_TYPE_BANK_CARD хранит данные банковской карты
   ITEM_TYPE_BANK_CARD = 4;
 }
 
-// KDFParams описывает параметры функции формирования ключа из мастер-пароля.
+// KDFParams описывает параметры функции формирования ключа из мастер-пароля
 message KDFParams {
-  // algorithm содержит название алгоритма KDF.
+  // algorithm содержит название алгоритма KDF
   string algorithm = 1;
 
-  // salt содержит соль для формирования ключа.
+  // salt содержит соль для формирования ключа
   bytes salt = 2;
 
-  // time_cost задает вычислительную стоимость KDF.
+  // time_cost задает вычислительную стоимость KDF
   uint32 time_cost = 3;
 
-  // memory_kib задает объем памяти для KDF в KiB.
+  // memory_kib задает объем памяти для KDF в KiB
   uint32 memory_kib = 4;
 
-  // parallelism задает уровень параллелизма KDF.
+  // parallelism задает уровень параллелизма KDF
   uint32 parallelism = 5;
 
-  // key_length задает длину результирующего ключа в байтах.
+  // key_length задает длину результирующего ключа в байтах
   uint32 key_length = 6;
 }
 
-// VaultKeyEnvelope хранит зашифрованный ключ пользовательского хранилища.
+// VaultKeyEnvelope хранит зашифрованный ключ пользовательского хранилища
 message VaultKeyEnvelope {
-  // encrypted_vault_key содержит ключ хранилища, зашифрованный ключом из мастер-пароля.
+  // encrypted_vault_key содержит ключ хранилища, зашифрованный ключом из мастер-пароля
   bytes encrypted_vault_key = 1;
 
-  // nonce содержит одноразовое значение для расшифровки ключа хранилища.
+  // nonce содержит одноразовое значение для расшифровки ключа хранилища
   bytes nonce = 2;
 
-  // encryption_alg содержит название алгоритма шифрования ключа хранилища.
+  // encryption_alg содержит название алгоритма шифрования ключа хранилища
   string encryption_alg = 3;
 
-  // kdf_params содержит параметры получения ключа из мастер-пароля.
+  // kdf_params содержит параметры получения ключа из мастер-пароля
   KDFParams kdf_params = 4;
 }
 
-// RegisterResponse содержит результат успешной регистрации пользователя.
+// RegisterResponse содержит результат успешной регистрации пользователя
 message RegisterResponse {
-  // access_token содержит токен доступа к API.
+  // access_token содержит токен доступа к API
   string access_token = 1;
 
-  // access_token_expires_at содержит момент истечения токена доступа.
+  // access_token_expires_at содержит момент истечения токена доступа
   google.protobuf.Timestamp access_token_expires_at = 2;
 
-  // vault_key содержит зашифрованный ключ хранилища пользователя.
+  // vault_key содержит зашифрованный ключ хранилища пользователя
   VaultKeyEnvelope vault_key = 3;
 }
 
-// LoginResponse содержит результат успешной аутентификации пользователя.
+// LoginResponse содержит результат успешной аутентификации пользователя
 message LoginResponse {
-  // access_token содержит токен доступа к API.
+  // access_token содержит токен доступа к API
   string access_token = 1;
 
-  // access_token_expires_at содержит момент истечения токена доступа.
+  // access_token_expires_at содержит момент истечения токена доступа
   google.protobuf.Timestamp access_token_expires_at = 2;
 
-  // vault_key содержит зашифрованный ключ хранилища пользователя.
+  // vault_key содержит зашифрованный ключ хранилища пользователя
   VaultKeyEnvelope vault_key = 3;
 }
 
-// RegisterRequest содержит данные для регистрации нового пользователя.
+// RegisterRequest содержит данные для регистрации нового пользователя
 message RegisterRequest {
-  // login содержит уникальный логин пользователя.
+  // login содержит уникальный логин пользователя
   string login = 1;
 
-  // login_password содержит пароль входа, который не используется для шифрования секретов.
+  // login_password содержит пароль входа, который не используется для шифрования секретов
   string login_password = 2;
 
-  // vault_key содержит зашифрованный ключ хранилища, подготовленный клиентом.
+  // vault_key содержит зашифрованный ключ хранилища, подготовленный клиентом
   VaultKeyEnvelope vault_key = 3;
 }
 
-// LoginRequest содержит данные для аутентификации пользователя.
+// LoginRequest содержит данные для аутентификации пользователя
 message LoginRequest {
-  // login содержит логин пользователя.
+  // login содержит логин пользователя
   string login = 1;
 
-  // login_password содержит пароль входа пользователя.
+  // login_password содержит пароль входа пользователя
   string login_password = 2;
 }
 
-// EncryptedData описывает зашифрованный блок данных.
+// EncryptedData описывает зашифрованный блок данных
 message EncryptedData {
-  // ciphertext содержит зашифрованные данные.
+  // ciphertext содержит зашифрованные данные
   bytes ciphertext = 1;
 
-  // nonce содержит одноразовое значение для расшифровки данных.
+  // nonce содержит одноразовое значение для расшифровки данных
   bytes nonce = 2;
 }
 
-// VaultItem описывает одну запись зашифрованного хранилища пользователя.
+// VaultItem описывает одну запись зашифрованного хранилища пользователя
 message VaultItem {
-  // id содержит уникальный идентификатор записи.
+  // id содержит уникальный идентификатор записи
   string id = 1;
 
-  // type содержит тип приватных данных.
+  // type содержит тип приватных данных
   ItemType type = 2;
 
-  // metadata содержит зашифрованную произвольную метаинформацию записи.
+  // metadata содержит зашифрованную произвольную метаинформацию записи
   EncryptedData metadata = 3;
 
-  // payload содержит зашифрованное содержимое записи.
+  // payload содержит зашифрованное содержимое записи
   EncryptedData payload = 4;
 
-  // encryption_alg содержит название алгоритма шифрования записи.
+  // encryption_alg содержит название алгоритма шифрования записи
   string encryption_alg = 5;
 
-  // payload_schema_version содержит версию схемы зашифрованного содержимого.
+  // payload_schema_version содержит версию схемы зашифрованного содержимого
   uint32 payload_schema_version = 6;
 
-  // version содержит версию записи для оптимистичной блокировки.
+  // version содержит версию записи для оптимистичной блокировки
   int64 version = 7;
 
-  // created_at содержит момент создания записи на сервере.
+  // created_at содержит момент создания записи на сервере
   google.protobuf.Timestamp created_at = 8;
 
-  // updated_at содержит момент последнего обновления записи на сервере.
+  // updated_at содержит момент последнего обновления записи на сервере
   google.protobuf.Timestamp updated_at = 9;
 
-  // deleted_at содержит момент мягкого удаления записи, если запись удалена.
+  // deleted_at содержит момент мягкого удаления записи, если запись удалена
   google.protobuf.Timestamp deleted_at = 10;
 }
 
-// CreateItemRequest содержит данные для создания новой записи хранилища.
+// CreateItemRequest содержит данные для создания новой записи хранилища
 message CreateItemRequest {
-  // type содержит тип создаваемых приватных данных.
+  // type содержит тип создаваемых приватных данных
   ItemType type = 1;
 
-  // metadata содержит зашифрованную метаинформацию записи.
+  // metadata содержит зашифрованную метаинформацию записи
   EncryptedData metadata = 2;
 
-  // payload содержит зашифрованное содержимое записи.
+  // payload содержит зашифрованное содержимое записи
   EncryptedData payload = 3;
 
-  // encryption_alg содержит название алгоритма шифрования записи.
+  // encryption_alg содержит название алгоритма шифрования записи
   string encryption_alg = 4;
 
-  // payload_schema_version содержит версию схемы зашифрованного содержимого.
+  // payload_schema_version содержит версию схемы зашифрованного содержимого
   uint32 payload_schema_version = 5;
 }
 
-// UpdateItemRequest содержит данные для обновления существующей записи.
+// UpdateItemRequest содержит данные для обновления существующей записи
 message UpdateItemRequest {
-  // id содержит идентификатор обновляемой записи.
+  // id содержит идентификатор обновляемой записи
   string id = 1;
 
-  // expected_version содержит версию записи, которую клиент ожидает изменить.
+  // expected_version содержит версию записи, которую клиент ожидает изменить
   int64 expected_version = 2;
 
-  // type содержит новый тип приватных данных.
+  // type содержит новый тип приватных данных
   ItemType type = 3;
 
-  // metadata содержит новую зашифрованную метаинформацию записи.
+  // metadata содержит новую зашифрованную метаинформацию записи
   EncryptedData metadata = 4;
 
-  // payload содержит новое зашифрованное содержимое записи.
+  // payload содержит новое зашифрованное содержимое записи
   EncryptedData payload = 5;
 
-  // encryption_alg содержит название алгоритма шифрования записи.
+  // encryption_alg содержит название алгоритма шифрования записи
   string encryption_alg = 6;
 
-  // payload_schema_version содержит версию схемы зашифрованного содержимого.
+  // payload_schema_version содержит версию схемы зашифрованного содержимого
   uint32 payload_schema_version = 7;
 }
 
-// DeleteItemRequest содержит данные для мягкого удаления записи.
+// DeleteItemRequest содержит данные для мягкого удаления записи
 message DeleteItemRequest {
-  // id содержит идентификатор удаляемой записи.
+  // id содержит идентификатор удаляемой записи
   string id = 1;
 
-  // expected_version содержит версию записи, которую клиент ожидает удалить.
+  // expected_version содержит версию записи, которую клиент ожидает удалить
   int64 expected_version = 2;
 }
 
-// GetItemRequest содержит данные для получения одной записи.
+// GetItemRequest содержит данные для получения одной записи
 message GetItemRequest {
-  // id содержит идентификатор запрашиваемой записи.
+  // id содержит идентификатор запрашиваемой записи
   string id = 1;
 }
 
-// ListItemsRequest содержит параметры постраничного получения записей.
+// ListItemsRequest содержит параметры постраничного получения записей
 message ListItemsRequest {
-  // page_size задает максимальное количество записей в ответе.
+  // page_size задает максимальное количество записей в ответе
   int32 page_size = 1;
 
-  // page_token содержит токен следующей страницы.
+  // page_token содержит токен следующей страницы
   string page_token = 2;
 
-  // include_deleted указывает, нужно ли возвращать мягко удаленные записи.
+  // include_deleted указывает, нужно ли возвращать мягко удаленные записи
   bool include_deleted = 3;
 }
 
-// ListItemsResponse содержит страницу записей хранилища.
+// ListItemsResponse содержит страницу записей хранилища
 message ListItemsResponse {
-  // items содержит записи текущей страницы.
+  // items содержит записи текущей страницы
   repeated VaultItem items = 1;
 
-  // next_page_token содержит токен следующей страницы.
+  // next_page_token содержит токен следующей страницы
   string next_page_token = 2;
 }
 
-// CreateItemResponse содержит созданную запись хранилища.
+// CreateItemResponse содержит созданную запись хранилища
 message CreateItemResponse {
-  // item содержит созданную запись с серверными полями.
+  // item содержит созданную запись с серверными полями
   VaultItem item = 1;
 }
 
-// GetItemResponse содержит найденную запись хранилища.
+// GetItemResponse содержит найденную запись хранилища
 message GetItemResponse {
-  // item содержит найденную запись.
+  // item содержит найденную запись
   VaultItem item = 1;
 }
 
-// UpdateItemResponse содержит обновленную запись хранилища.
+// UpdateItemResponse содержит обновленную запись хранилища
 message UpdateItemResponse {
-  // item содержит обновленную запись с новой версией.
+  // item содержит обновленную запись с новой версией
   VaultItem item = 1;
 }
 
-// DeleteItemResponse содержит результат мягкого удаления записи.
+// DeleteItemResponse содержит результат мягкого удаления записи
 message DeleteItemResponse {
-  // id содержит идентификатор удаленной записи.
+  // id содержит идентификатор удаленной записи
   string id = 1;
 
-  // version содержит новую версию удаленной записи.
+  // version содержит новую версию удаленной записи
   int64 version = 2;
 
-  // deleted_at содержит момент мягкого удаления записи.
+  // deleted_at содержит момент мягкого удаления записи
   google.protobuf.Timestamp deleted_at = 3;
 }
 
-// SyncRequest содержит параметры синхронизации клиентского хранилища.
+// SyncRequest содержит параметры синхронизации клиентского хранилища
 message SyncRequest {
-  // changed_after задает нижнюю границу времени изменения записей.
+  // changed_after задает нижнюю границу времени изменения записей
   google.protobuf.Timestamp changed_after = 1;
 
-  // page_size задает максимальное количество изменений в ответе.
+  // page_size задает максимальное количество изменений в ответе
   int32 page_size = 2;
 
-  // page_token содержит токен следующей страницы изменений.
+  // page_token содержит токен следующей страницы изменений
   string page_token = 3;
 }
 
-// SyncResponse содержит страницу изменений для синхронизации клиента.
+// SyncResponse содержит страницу изменений для синхронизации клиента
 message SyncResponse {
-  // items содержит измененные записи, включая мягко удаленные.
+  // items содержит измененные записи, включая мягко удаленные
   repeated VaultItem items = 1;
 
-  // next_changed_after содержит новую границу времени для следующей синхронизации.
+  // next_changed_after содержит новую границу времени для следующей синхронизации
   google.protobuf.Timestamp next_changed_after = 2;
 
-  // next_page_token содержит токен следующей страницы изменений.
+  // next_page_token содержит токен следующей страницы изменений
   string next_page_token = 3;
 }
