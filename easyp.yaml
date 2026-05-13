@@ -1,0 +1,76 @@
+# EasyP configuration file.
+# Documentation: https://easyp.tech/docs/guide/introduction/what-is
+version: v1alpha
+
+generate:
+  inputs:
+    - directory: api/proto
+  plugins:
+    - name: go
+      out: .
+      opts:
+        module: github.com/squaredbusinessman/gophkeeper-authenticator
+    - name: go-grpc
+      out: .
+      opts:
+        module: github.com/squaredbusinessman/gophkeeper-authenticator
+
+lint:
+  use:
+    # Minimal
+    - DIRECTORY_SAME_PACKAGE
+    - PACKAGE_DEFINED
+    - PACKAGE_DIRECTORY_MATCH
+    - PACKAGE_SAME_DIRECTORY
+
+    # Basic
+    - ENUM_FIRST_VALUE_ZERO
+    - ENUM_NO_ALLOW_ALIAS
+    - ENUM_PASCAL_CASE
+    - ENUM_VALUE_UPPER_SNAKE_CASE
+    - FIELD_LOWER_SNAKE_CASE
+    - IMPORT_NO_PUBLIC
+    - IMPORT_NO_WEAK
+    - IMPORT_USED
+    - MESSAGE_PASCAL_CASE
+    - ONEOF_LOWER_SNAKE_CASE
+    - PACKAGE_LOWER_SNAKE_CASE
+    - PACKAGE_SAME_CSHARP_NAMESPACE
+    - PACKAGE_SAME_GO_PACKAGE
+    - PACKAGE_SAME_JAVA_MULTIPLE_FILES
+    - PACKAGE_SAME_JAVA_PACKAGE
+    - PACKAGE_SAME_PHP_NAMESPACE
+    - PACKAGE_SAME_RUBY_PACKAGE
+    - PACKAGE_SAME_SWIFT_PREFIX
+    - RPC_PASCAL_CASE
+    - SERVICE_PASCAL_CASE
+
+    # Default
+    - ENUM_VALUE_PREFIX
+    - ENUM_ZERO_VALUE_SUFFIX
+    - FILE_LOWER_SNAKE_CASE
+    - RPC_REQUEST_RESPONSE_UNIQUE
+    - RPC_REQUEST_STANDARD_NAME
+    - RPC_RESPONSE_STANDARD_NAME
+    - PACKAGE_VERSION_SUFFIX
+    - SERVICE_SUFFIX
+
+    # Comments
+    - COMMENT_ENUM
+    - COMMENT_ENUM_VALUE
+    - COMMENT_FIELD
+    - COMMENT_MESSAGE
+    - COMMENT_ONEOF
+    - COMMENT_RPC
+    - COMMENT_SERVICE
+
+  # Suffix for the zero value of enums (e.g. MY_ENUM_UNSPECIFIED, MY_ENUM_NONE).
+  enum_zero_value_suffix: UNSPECIFIED
+
+  # Suffix that all services must have (e.g. UserAPI, OrderAPI).
+  service_suffix: Service
+
+# Breaking change detection settings.
+breaking:
+  # Git ref (branch, tag, commit) to compare against.
+  against_git_ref: main
