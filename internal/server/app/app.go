@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/server/database"
+	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/server/migrations"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 
@@ -29,6 +31,30 @@ func Run(parent context.Context) error {
 	if err != nil {
 		log.Error("failed to load server config", zap.Error(err))
 		return fmt.Errorf("load server config: %w", err)
+	}
+
+	db, err := database.Open(parent, cfg)
+	if err != nil {
+		log.Error("failed to open database", zap.Error(err))
+		return fmt.Errorf("connect database: %w", err)
+	}
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Error("failed to close database", zap.Error(err))
+		}
+	}()
+
+	log.Info("database connection established")
+
+	if cfg.MigrationsEnabled {
+		log.Info("database migrations started", zap.String("dir", cfg.MigrationsDir))
+
+		if err = migrations.Up(parent, db, cfg.MigrationsDir); err != nil {
+			log.Error("failed to apply database migrations", zap.Error(err))
+			return fmt.Errorf("apply database migrations: %w", err)
+		}
+
+		log.Info("database migrations applied", zap.String("dir", cfg.MigrationsDir))
 	}
 
 	server, err := grpcserver.New(cfg, log)
