@@ -34,6 +34,10 @@ func TestLoadReturnsServerConfigWithDefaults(t *testing.T) {
 	if cfg.AccessTokenSecret == "" {
 		t.Fatalf("AccessTokenSecret is empty")
 	}
+
+	if cfg.LogMode != "dev" {
+		t.Fatalf("LogMode = %q, want %q", cfg.LogMode, "dev")
+	}
 }
 
 func TestLoadReturnsServerConfigFromEnv(t *testing.T) {
@@ -44,6 +48,7 @@ func TestLoadReturnsServerConfigFromEnv(t *testing.T) {
 	t.Setenv("GOPHKEEPER_DATABASE_DSN", "postgres://custom")
 	t.Setenv("GOPHKEEPER_ACCESS_TOKEN_SECRET", "custom-secret")
 	t.Setenv("GOPHKEEPER_ACCESS_TOKEN_TTL", "30m")
+	t.Setenv("GOPHKEEPER_LOG_MODE", "prod")
 
 	cfg, err := Load()
 	if err != nil {
@@ -76,6 +81,10 @@ func TestLoadReturnsServerConfigFromEnv(t *testing.T) {
 
 	if cfg.AccessTokenTTL != 30*time.Minute {
 		t.Fatalf("AccessTokenTTL = %s, want %s", cfg.AccessTokenTTL, 30*time.Minute)
+	}
+
+	if cfg.LogMode != "prod" {
+		t.Fatalf("LogMode = %q, want %q", cfg.LogMode, "prod")
 	}
 }
 
@@ -164,6 +173,21 @@ func TestLoadReturnsErrorWhenDurationInvalid(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "GOPHKEEPER_ACCESS_TOKEN_TTL") {
 		t.Fatalf("Load() error = %q, want mention GOPHKEEPER_ACCESS_TOKEN_TTL", err.Error())
+	}
+}
+
+func TestLoadReturnsErrorWhenLogModeInvalid(t *testing.T) {
+	t.Setenv("GOPHKEEPER_DATABASE_DSN", "postgres://custom")
+	t.Setenv("GOPHKEEPER_ACCESS_TOKEN_SECRET", "secret")
+	t.Setenv("GOPHKEEPER_LOG_MODE", "pretty")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatalf("Load() error = nil, want error")
+	}
+
+	if !strings.Contains(err.Error(), "log mode") {
+		t.Fatalf("Load() error = %q, want mention log mode", err.Error())
 	}
 }
 

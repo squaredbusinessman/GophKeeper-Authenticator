@@ -225,9 +225,15 @@ POSTGRES_PASSWORD=gophkeeper
 POSTGRES_PORT=5432
 
 GOPHKEEPER_DATABASE_DSN=postgres://gophkeeper:gophkeeper@localhost:5432/gophkeeper?sslmode=disable
+GOPHKEEPER_LOG_MODE=dev
 ```
 
 Файл `deploy/.env` предназначен для локальной машины и не должен содержать production secrets.
+
+`GOPHKEEPER_LOG_MODE` управляет форматом логов сервера:
+
+- `dev` - цветной console output для локальной разработки;
+- `prod` - JSON output для CI и production-like запуска.
 
 ## Локальный PostgreSQL через Docker Compose
 
@@ -284,6 +290,7 @@ docker compose -f deploy/docker-compose.yml down -v
 ```bash
 GOPHKEEPER_DATABASE_DSN='postgres://gophkeeper:gophkeeper@localhost:5432/gophkeeper?sslmode=disable' \
 GOPHKEEPER_ACCESS_TOKEN_SECRET='local-dev-secret-change-me' \
+GOPHKEEPER_LOG_MODE='dev' \
 go run ./cmd/gophkeeper-server
 ```
 
@@ -299,10 +306,11 @@ go run ./cmd/gophkeeper-server
 GOPHKEEPER_GRPC_ADDRESS=':9091' \
 GOPHKEEPER_DATABASE_DSN='postgres://gophkeeper:gophkeeper@localhost:5432/gophkeeper?sslmode=disable' \
 GOPHKEEPER_ACCESS_TOKEN_SECRET='local-dev-secret-change-me' \
+GOPHKEEPER_LOG_MODE='dev' \
 go run ./cmd/gophkeeper-server
 ```
 
-Ожидаемый результат при старте - JSON-лог от `zap` с полями `service`, `address` и `tls_enabled`.
+Ожидаемый результат при старте в `dev` режиме - цветной console log от `zap` с полями `service`, `address` и `tls_enabled`.
 
 Остановить сервер можно через `Ctrl+C`.
 
