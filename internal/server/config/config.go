@@ -21,6 +21,7 @@ type Config struct {
 	MigrationsEnabled bool          `env:"GOPHKEEPER_MIGRATIONS_ENABLED" env-default:"true"`
 	MigrationsDir     string        `env:"GOPHKEEPER_MIGRATIONS_DIR" env-default:"migrations"`
 	DatabasePingTTL   time.Duration `env:"GOPHKEEPER_DATABASE_PING_TTL" env-default:"5s"`
+	LogMode           string        `env:"GOPHKEEPER_LOG_MODE" env-default:"dev"`
 }
 
 // Load загружает конфигурацию серверного приложения из переменных окружения
@@ -64,6 +65,12 @@ func (c *Config) Validate() error {
 
 	if c.MigrationsEnabled && strings.TrimSpace(c.MigrationsDir) == "" {
 		return fmt.Errorf("migrations dir is required when migrations are enabled")
+	}
+
+	switch c.LogMode {
+	case "dev", "prod":
+	default:
+		return fmt.Errorf("log mode must be dev or prod")
 	}
 
 	return nil

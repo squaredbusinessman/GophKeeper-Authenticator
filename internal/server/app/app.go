@@ -19,19 +19,27 @@ import (
 
 // Run запускает серверное приложение
 func Run(parent context.Context) error {
-	log, err := logger.New()
+	log, err := logger.New("dev")
 	if err != nil {
 		return fmt.Errorf("create logger: %w", err)
 	}
-	defer func() {
-		_ = log.Sync()
-	}()
 
 	cfg, err := config.Load()
 	if err != nil {
 		log.Error("failed to load server config", zap.Error(err))
+		_ = log.Sync()
 		return fmt.Errorf("load server config: %w", err)
 	}
+
+	_ = log.Sync()
+
+	log, err = logger.New(cfg.LogMode)
+	if err != nil {
+		return fmt.Errorf("create configured logger: %w", err)
+	}
+	defer func() {
+		_ = log.Sync()
+	}()
 
 	db, err := database.Open(parent, cfg)
 	if err != nil {
