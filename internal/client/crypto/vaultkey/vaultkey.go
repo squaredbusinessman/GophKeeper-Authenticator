@@ -10,28 +10,44 @@ import (
 )
 
 const (
-	VaultKeyLength = 32
+	// KeyLength задает длину vault key в байтах
+	KeyLength = 32
 
-	KDFAlgorithm        = "argon2id"
+	// KDFAlgorithm содержит название KDF для получения key-encryption key из мастер-пароля
+	KDFAlgorithm = "argon2id"
+	// EncryptionAlgorithm содержит название алгоритма шифрования vault key
 	EncryptionAlgorithm = "xchacha20poly1305"
 )
 
+// KDFParams описывает параметры получения key-encryption key из мастер-пароля
 type KDFParams struct {
-	Algorithm   string
-	Salt        []byte
-	TimeCost    uint32
-	MemoryKiB   uint32
+	// Algorithm содержит название KDF
+	Algorithm string
+	// Salt содержит случайную соль KDF
+	Salt []byte
+	// TimeCost задает количество проходов Argon2id
+	TimeCost uint32
+	// MemoryKiB задает объем памяти Argon2id в KiB
+	MemoryKiB uint32
+	// Parallelism задает уровень параллелизма Argon2id
 	Parallelism uint8
-	KeyLength   uint32
+	// KeyLength задает длину key-encryption key в байтах
+	KeyLength uint32
 }
 
+// Envelope содержит зашифрованный vault key и параметры для его расшифровки на клиенте
 type Envelope struct {
+	// EncryptedVaultKey содержит vault key, зашифрованный через key-encryption key
 	EncryptedVaultKey []byte
-	Nonce             []byte
-	EncryptionAlg     string
-	KDFParams         KDFParams
+	// Nonce содержит одноразовое значение для AEAD-расшифровки vault key
+	Nonce []byte
+	// EncryptionAlg содержит название алгоритма шифрования vault key
+	EncryptionAlg string
+	// KDFParams содержит параметры получения key-encryption key из мастер-пароля
+	KDFParams KDFParams
 }
 
+// DefaultKDFParams содержит параметры Argon2id для шифрования vault key по умолчанию
 var DefaultKDFParams = KDFParams{
 	Algorithm:   KDFAlgorithm,
 	TimeCost:    3,
@@ -40,13 +56,10 @@ var DefaultKDFParams = KDFParams{
 	KeyLength:   chacha20poly1305.KeySize,
 }
 
-func (p *KDFParams) Validate() error {
+// ValidateConfig проверяет KDF-параметры до генерации соли при шифровании
+func (p *KDFParams) ValidateConfig() error {
 	if p.Algorithm != "" && p.Algorithm != KDFAlgorithm {
 		return fmt.Errorf("unsupported kdf algorithm: %s", p.Algorithm)
-	}
-
-	if len(p.Salt) == 0 {
-		return fmt.Errorf("kdf salt is required")
 	}
 
 	if p.TimeCost == 0 {
@@ -68,6 +81,20 @@ func (p *KDFParams) Validate() error {
 	return nil
 }
 
+// Validate проверяет полные KDF-параметры с обязательной солью
+func (p *KDFParams) Validate() error {
+	if err := p.ValidateConfig(); err != nil {
+		return err
+	}
+
+	if len(p.Salt) == 0 {
+		return fmt.Errorf("kdf salt is required")
+	}
+
+	return nil
+}
+
+// Validate проверяет полноту envelope перед расшифровкой vault key
 func (e *Envelope) Validate() error {
 	if len(e.EncryptedVaultKey) == 0 {
 		return fmt.Errorf("encrypted vault key is required")
@@ -88,8 +115,9 @@ func (e *Envelope) Validate() error {
 	return nil
 }
 
+// Generate создает новый криптостойкий vault key
 func Generate() ([]byte, error) {
-	key := make([]byte, VaultKeyLength)
+	key := make([]byte, KeyLength)
 	if _, err := rand.Read(key); err != nil {
 		return nil, fmt.Errorf("unable to generate vault key: %w", err)
 	}
@@ -97,33 +125,35 @@ func Generate() ([]byte, error) {
 	return key, nil
 }
 
+// Encrypt шифрует vault key мастер-паролем с параметрами KDF по умолчанию
 func Encrypt(masterPass string, vaultKey []byte) (Envelope, error) {
 	return EncryptWithParams(masterPass, vaultKey, DefaultKDFParams)
 }
 
-func EncryptWithParams(masterPass string, vaultKey []byte, KDFParams KDFParams) (Envelope, error) {
+// EncryptWithParams шифрует vault key мастер-паролем с переданными параметрами KDF
+func EncryptWithParams(masterPass string, vaultKey []byte, params KDFParams) (Envelope, error) {
 	if masterPass == "" {
 		return Envelope{}, fmt.Errorf("master pass cannot be empty")
 	}
 
-	if len(vaultKey) != VaultKeyLength {
-		return Envelope{}, fmt.Errorf("vault key length must be %d bytes", VaultKeyLength)
+	if len(vaultKey) != KeyLength {
+		return Envelope{}, fmt.Errorf("vault key length must be %d bytes", KeyLength)
 	}
 
-	if err := KDFParams.Validate(); err != nil {
+	if err := params.ValidateConfig(); err != nil {
 		return Envelope{}, fmt.Errorf("invalid KDF params: %w", err)
 	}
 
-	KDFParams.Algorithm = KDFAlgorithm
+	params.Algorithm = KDFAlgorithm
 
 	salt := make([]byte, 16)
 	if _, err := rand.Read(salt); err != nil {
 		return Envelope{}, fmt.Errorf("unable to generate salt: %w", err)
 	}
 
-	KDFParams.Salt = salt
+	params.Salt = salt
 
-	keyEncryptionKey := deriveKey(masterPass, KDFParams)
+	keyEncryptionKey := deriveKey(masterPass, params)
 
 	aead, err := chacha20poly1305.NewX(keyEncryptionKey)
 	if err != nil {
@@ -141,10 +171,11 @@ func EncryptWithParams(masterPass string, vaultKey []byte, KDFParams KDFParams) 
 		EncryptedVaultKey: encryptedVaultKey,
 		Nonce:             nonce,
 		EncryptionAlg:     EncryptionAlgorithm,
-		KDFParams:         KDFParams,
+		KDFParams:         params,
 	}, nil
 }
 
+// Decrypt расшифровывает vault key мастер-паролем и данными из envelope
 func Decrypt(masterPass string, envelope Envelope) ([]byte, error) {
 	if masterPass == "" {
 		return nil, fmt.Errorf("master pass cannot be empty")
@@ -166,20 +197,20 @@ func Decrypt(masterPass string, envelope Envelope) ([]byte, error) {
 		return nil, fmt.Errorf("unable to decrypt vault key: %w", err)
 	}
 
-	if len(vaultKey) != VaultKeyLength {
-		return nil, fmt.Errorf("decrypted vault key length must be %d bytes", VaultKeyLength)
+	if len(vaultKey) != KeyLength {
+		return nil, fmt.Errorf("decrypted vault key length must be %d bytes", KeyLength)
 	}
 
 	return vaultKey, nil
 }
 
-func deriveKey(masterPass string, KDFParams KDFParams) []byte {
+func deriveKey(masterPass string, params KDFParams) []byte {
 	return argon2.IDKey(
 		[]byte(masterPass),
-		KDFParams.Salt,
-		KDFParams.TimeCost,
-		KDFParams.MemoryKiB,
-		KDFParams.Parallelism,
-		KDFParams.KeyLength,
+		params.Salt,
+		params.TimeCost,
+		params.MemoryKiB,
+		params.Parallelism,
+		params.KeyLength,
 	)
 }
