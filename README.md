@@ -2,95 +2,94 @@
 
 GophKeeper - клиент-серверный менеджер секретов для безопасного хранения приватных данных пользователя.
 
-Проект разрабатывается как выпускной проект и фокусируется на:
+Проект разрабатывается как выпускной проект. Основная цель - реализовать надежное ядро менеджера секретов с gRPC API, PostgreSQL, CLI-клиентом, клиентским шифрованием и синхронизацией данных между несколькими устройствами одного пользователя.
 
-- безопасном хранении пользовательских секретов;
-- клиентском шифровании;
-- синхронизации данных между несколькими клиентами одного пользователя;
-- простом локальном запуске для проверки;
-- CLI-клиенте под macOS, Linux и Windows.
-
-## Статус
+## Статус проекта
 
 Проект находится в активной разработке.
 
-Этот README подготовлен заранее и будет обновляться вместе с реализацией. Разделы с планируемыми командами описывают целевой сценарий локальной проверки.
+На текущем этапе уже подготовлены:
 
-## Что хранит GophKeeper
+- базовая структура Go-проекта;
+- команда версии CLI;
+- загрузка конфигурации сервера и клиента из переменных окружения;
+- начальные gRPC proto-контракты;
+- генерация Go-кода из proto через EasyP;
+- bootstrap gRPC-сервера;
+- graceful shutdown серверного приложения;
+- структурный logging через `go.uber.org/zap`;
+- локальный PostgreSQL в Docker Compose.
+
+Часть команд ниже описывает уже рабочий сценарий, часть команд помечена как планируемая и будет уточняться по мере реализации бизнес-логики.
+
+## Что должен уметь GophKeeper
 
 GophKeeper должен поддерживать хранение:
 
-- пар логин/пароль;
+- пар логин и пароль;
 - произвольных текстовых секретов;
 - произвольных бинарных данных;
 - данных банковских карт;
-- метаинформации для любого сохраненного элемента.
+- произвольной текстовой метаинформации для любого элемента.
 
-Опциональные функции, которые могут быть добавлены после надежного ядра:
-
-- OTP/TOTP;
-- TUI;
-- gRPC streaming для больших бинарных файлов;
-- MinIO/S3-совместимое blob-хранилище;
-- Swagger/OpenAPI через gRPC-Gateway.
-
-CLI является обязательным интерфейсом. OTP полезен как encrypted payload type, но не обязателен для MVP. TUI может быть добавлен только после надежного ядра и должен использовать тот же client core, что и CLI.
-
-Для MVP поддержка бинарных данных ограничивается небольшими encrypted payload, которые могут храниться inline в PostgreSQL. Полноценное файловое хранилище с MinIO, chunking и gRPC streaming рассматривается как расширение после надежного вертикального MVP.
-
-## Обязательное ядро MVP
-
-Финальный MVP-scope проекта:
+Обязательное ядро MVP:
 
 - gRPC API;
 - PostgreSQL;
-- Docker Compose;
-- register/login;
+- Docker Compose для локального запуска;
+- регистрация и вход пользователя;
 - auth middleware;
 - client-side encryption;
 - CRUD секретов;
 - version-based sync;
 - CLI;
-- tests >= 70%;
-- README;
-- version/build date в CLI.
+- unit-тесты с покрытием не менее 70%;
+- README с инструкциями запуска и проверки;
+- отображение версии и даты сборки CLI.
 
-Post-MVP расширения:
+Расширения после надежного MVP:
 
 - refresh token flow;
-- OTP;
+- OTP/TOTP;
 - TUI;
-- MinIO;
-- BlobService streaming;
-- Swagger/gRPC-Gateway;
-- offline/cache через SQLite;
-- Wails GUI.
+- MinIO или S3-compatible blob storage;
+- gRPC streaming для больших бинарных файлов;
+- Swagger/OpenAPI через gRPC-Gateway;
+- offline/cache режим через SQLite;
+- GUI через Wails.
 
 ## Архитектура
 
-GophKeeper состоит из:
+Проект состоит из следующих частей:
 
-- CLI-клиента;
-- gRPC-сервера;
-- PostgreSQL для серверного хранения данных;
-- опционального MinIO/S3-совместимого хранилища для больших зашифрованных бинарных объектов.
+- `cmd/gophkeeper-cli` - CLI-клиент;
+- `cmd/gophkeeper-server` - серверное приложение;
+- `api/proto` - gRPC proto-контракты;
+- `internal/gen/proto` - сгенерированный Go-код protobuf и gRPC;
+- `internal/client` - будущая клиентская бизнес-логика;
+- `internal/server` - серверная логика и инфраструктура;
+- `internal/shared` - общие пакеты;
+- `deploy` - локальная инфраструктура для разработки и проверки;
+- `migrations` - будущие SQL-миграции.
 
-PostgreSQL используется как серверная БД. SQLite не используется на сервере и может появиться только как клиентское локальное хранилище для будущего offline/cache-режима.
+Основной протокол взаимодействия клиента и сервера - gRPC.
 
-Основной протокол взаимодействия клиента и сервера: **gRPC**.
+Для MVP `.proto` файлы являются главным описанием API. Swagger/OpenAPI через gRPC-Gateway можно добавить позже, если основной сценарий будет реализован надежно.
 
-Для MVP основным описанием API являются `.proto`-контракты. Swagger/OpenAPI через gRPC-Gateway рассматривается как расширение после надежного вертикального MVP.
+Серверная база данных - PostgreSQL. SQLite не используется на сервере. SQLite может появиться только на стороне клиента для будущего offline/cache режима.
 
-Клиентская часть проектируется так, чтобы client core был отделен от пользовательских интерфейсов:
+## Client core и интерфейсы
+
+Клиентская часть должна быть разделена на business core и presentation layers.
 
 ```text
 client core
-- authentication use cases
+- auth use cases
 - vault use cases
-- synchronization logic
-- client-side cryptography
+- sync logic
+- client-side crypto
 - token storage
-- gRPC client
+- grpc client
 
 presentation layers
 - CLI
@@ -98,48 +97,38 @@ presentation layers
 - потенциальный GUI через Wails
 ```
 
-Такой подход должен позволить CLI, TUI и возможному будущему GUI использовать одну и ту же клиентскую бизнес-логику.
+CLI, TUI и будущий GUI не должны содержать бизнес-логику, напрямую шифровать данные, напрямую работать с token storage или ходить в gRPC API в обход client core.
 
-CLI, TUI и будущий GUI не должны содержать бизнес-логику, выполнять шифрование, обращаться к gRPC server напрямую или работать с token storage напрямую. Эти задачи должны оставаться внутри общего client core.
+Такой подход нужен, чтобы позже добавить TUI или GUI без переписывания клиентской бизнес-логики.
 
 ## Модель безопасности
 
-GophKeeper использует zero-knowledge/client-side encryption модель.
+GophKeeper проектируется как zero-knowledge/client-side encryption система.
 
-Сервер хранит зашифрованные данные и технические метаданные. Сервер не должен иметь доступа к пользовательским секретам в открытом виде.
+Сервер хранит encrypted payload и технические метаданные. Сервер не должен иметь доступа к пользовательским секретам в открытом виде.
 
 ### Пароль входа и мастер-пароль
 
-В GophKeeper используются два разных пароля:
+В системе используются два разных пароля:
 
-1. **Пароль входа**.
-2. **Мастер-пароль**.
+1. Пароль входа.
+2. Мастер-пароль.
 
-Пароль входа используется для аутентификации пользователя на сервере.
-
-Пароль входа не используется как ключ шифрования пользовательских секретов.
+Пароль входа используется только для аутентификации на сервере.
 
 Мастер-пароль используется локально на клиенте для открытия зашифрованного хранилища.
 
-Мастер-пароль:
-
-- должен отличаться от пароля входа;
-- не отправляется на сервер;
-- не хранится на сервере;
-- не хранится на клиенте в открытом виде;
-- нужен на каждом устройстве, где пользователь хочет расшифровать свои секреты.
-
 Важно:
 
-```text
-Мастер-пароль защищает ваше зашифрованное хранилище.
-Он должен отличаться от пароля входа.
-Если вы потеряете мастер-пароль, восстановить сохраненные секреты будет невозможно.
-```
+- пароль входа и мастер-пароль должны отличаться;
+- мастер-пароль не отправляется на сервер;
+- мастер-пароль не хранится на сервере;
+- мастер-пароль не должен храниться на клиенте в открытом виде;
+- если мастер-пароль потерян, восстановить сохраненные секреты невозможно.
 
-### Multi-device encryption
+### Vault key
 
-Чтобы пользователь мог расшифровывать свои данные на разных устройствах, используется модель с vault key:
+Для поддержки нескольких устройств используется схема с `vault key`.
 
 ```text
 master password
@@ -151,57 +140,353 @@ vault key
 user secrets
 ```
 
-`vault key` генерируется один раз на клиенте при создании пользовательского хранилища.
+`vault key` генерируется криптостойко один раз на клиенте. На сервере он хранится только в зашифрованном виде. Клиент расшифровывает `vault key` через ключ, полученный из мастер-пароля.
 
-Сервер хранит только зашифрованный `vault key` и KDF-метаданные. Сервер не знает:
+Сервер не знает:
 
 - мастер-пароль;
 - key-encryption key;
 - vault key;
 - пользовательские секреты в открытом виде.
 
-### Токены доступа
+### Восстановление доступа
 
-Для MVP планируется использовать access token с ограниченным TTL.
+Если пользователь потерял мастер-пароль, восстановить секреты невозможно.
 
-Access token передается в защищенные gRPC методы через metadata. Refresh token flow и server-side logout рассматриваются как расширение после надежного вертикального MVP.
+Это ожидаемое ограничение zero-knowledge модели. Сервер не может помочь восстановить доступ, потому что не имеет ключей для расшифрования пользовательских данных.
 
-### Бинарные данные
+### TLS
 
-В MVP бинарные данные рассматриваются как небольшие encrypted payload.
+Для локальной проверки допускается dev-режим без TLS.
 
-Планируемые ограничения MVP:
+Dev-режим без TLS предназначен только для запуска на локальной машине. Его нельзя использовать для сетевого или production-like развертывания.
 
-- хранение inline в PostgreSQL;
-- явный лимит размера;
-- file metadata хранится в зашифрованном виде;
-- слишком большие файлы отклоняются понятной ошибкой;
-- MinIO, chunking и BlobService streaming остаются расширениями.
+Для production-like режима нужен TLS, потому что пароль входа, access token и gRPC metadata не должны передаваться по незащищенному каналу.
 
-Поиск по пользовательским file metadata в MVP выполняется на клиенте после расшифрования metadata. Сервер не должен видеть пользовательские имена файлов в открытом виде.
+## Синхронизация
 
-### Синхронизация
-
-Для MVP используется online-first синхронизация.
+Для MVP используется online-first подход.
 
 Основные правила:
 
 - сервер является источником истины;
 - каждый элемент хранилища имеет `version`;
-- обновление и удаление требуют `expected_version`;
-- при несовпадении версии сервер возвращает conflict;
+- update и delete требуют `expected_version`;
+- если версия не совпала, сервер должен вернуть conflict;
 - удаление выполняется как soft delete через `deleted_at`;
-- tombstones участвуют в синхронизации между клиентами.
+- tombstones должны участвовать в синхронизации между клиентами.
 
-Offline/cache режим остается расширением после MVP.
+Полноценный offline-режим в MVP не входит. Локальное шифрованное хранилище, очередь изменений, retry и replay изменений можно добавить позже.
 
-В первой версии при недоступности сервера клиент должен возвращать понятную ошибку. Локальное шифрованное хранилище, очередь изменений и retry/replay после восстановления соединения не входят в MVP.
+## Бинарные данные
 
-### Восстановление доступа
+Для MVP небольшие бинарные данные могут храниться inline в PostgreSQL как encrypted payload.
 
-Если мастер-пароль потерян, восстановить сохраненные секреты невозможно.
+Планируемые ограничения MVP:
 
-Это осознанное ограничение zero-knowledge/client-side encryption модели. Так как сервер не может расшифровать пользовательские данные, он также не может восстановить доступ к зашифрованным секретам без мастер-пароля.
+- явный лимит размера payload;
+- file metadata хранится в зашифрованном виде;
+- слишком большие файлы отклоняются понятной ошибкой;
+- поиск по пользовательским file metadata выполняется на клиенте после расшифрования.
+
+MinIO, chunking, checksums и gRPC streaming остаются расширениями после MVP.
+
+## Требования для локального запуска
+
+Для разработки и проверки нужны:
+
+- Go toolchain версии, указанной в `go.mod`;
+- Docker;
+- Docker Compose;
+- терминал на macOS, Linux или Windows.
+
+Проверяющий не должен вручную устанавливать PostgreSQL или подключать внешние managed-сервисы.
+
+## Переменные окружения
+
+Пример локальных переменных для Docker лежит в:
+
+```text
+deploy/.env.example
+```
+
+Создать локальный `.env` для Docker можно так:
+
+```bash
+cp deploy/.env.example deploy/.env
+```
+
+Текущие значения для PostgreSQL:
+
+```env
+POSTGRES_DB=gophkeeper
+POSTGRES_USER=gophkeeper
+POSTGRES_PASSWORD=gophkeeper
+POSTGRES_PORT=5432
+
+GOPHKEEPER_DATABASE_DSN=postgres://gophkeeper:gophkeeper@localhost:5432/gophkeeper?sslmode=disable
+```
+
+Файл `deploy/.env` предназначен для локальной машины и не должен содержать production secrets.
+
+## Локальный PostgreSQL через Docker Compose
+
+Запуск PostgreSQL:
+
+```bash
+docker compose -f deploy/docker-compose.yml up -d
+```
+
+Проверка контейнера:
+
+```bash
+docker compose -f deploy/docker-compose.yml ps
+```
+
+Проверка готовности PostgreSQL:
+
+```bash
+docker compose -f deploy/docker-compose.yml exec postgres pg_isready -U gophkeeper -d gophkeeper
+```
+
+Просмотр логов PostgreSQL:
+
+```bash
+docker compose -f deploy/docker-compose.yml logs -f postgres
+```
+
+Остановка контейнера без удаления данных:
+
+```bash
+docker compose -f deploy/docker-compose.yml stop
+```
+
+Остановка и удаление контейнера:
+
+```bash
+docker compose -f deploy/docker-compose.yml down
+```
+
+Полная очистка локальных данных PostgreSQL:
+
+```bash
+docker compose -f deploy/docker-compose.yml down -v
+```
+
+## Запуск gRPC-сервера
+
+Сейчас сервер умеет стартовать, регистрировать gRPC-сервисы и корректно завершаться по `SIGINT` или `SIGTERM`.
+
+Серверные handlers пока являются заглушками через `Unimplemented...Server`. Это нормально для bootstrap-этапа: транспортный слой уже поднимается, а бизнес-логика будет добавляться следующими шагами.
+
+Перед запуском сервера нужно передать обязательные переменные окружения:
+
+```bash
+GOPHKEEPER_DATABASE_DSN='postgres://gophkeeper:gophkeeper@localhost:5432/gophkeeper?sslmode=disable' \
+GOPHKEEPER_ACCESS_TOKEN_SECRET='local-dev-secret-change-me' \
+go run ./cmd/gophkeeper-server
+```
+
+По умолчанию сервер слушает:
+
+```text
+:9090
+```
+
+Переопределить адрес можно так:
+
+```bash
+GOPHKEEPER_GRPC_ADDRESS=':9091' \
+GOPHKEEPER_DATABASE_DSN='postgres://gophkeeper:gophkeeper@localhost:5432/gophkeeper?sslmode=disable' \
+GOPHKEEPER_ACCESS_TOKEN_SECRET='local-dev-secret-change-me' \
+go run ./cmd/gophkeeper-server
+```
+
+Ожидаемый результат при старте - JSON-лог от `zap` с полями `service`, `address` и `tls_enabled`.
+
+Остановить сервер можно через `Ctrl+C`.
+
+## CLI
+
+Сейчас реализована команда версии.
+
+Запуск через Go:
+
+```bash
+go run ./cmd/gophkeeper-cli version
+```
+
+Сборка CLI:
+
+```bash
+go build -o ./bin/gophkeeper ./cmd/gophkeeper-cli
+```
+
+Проверка версии собранного бинарного файла:
+
+```bash
+./bin/gophkeeper version
+```
+
+Планируемые команды CLI:
+
+```text
+gophkeeper version
+gophkeeper register
+gophkeeper login
+gophkeeper logout
+gophkeeper list
+gophkeeper get
+gophkeeper create
+gophkeeper update
+gophkeeper delete
+gophkeeper sync
+```
+
+Секретные значения не должны передаваться через CLI flags, потому что они могут попасть в shell history. Для чувствительных данных нужно использовать скрытый prompt или безопасный ввод через файл.
+
+## Сборка версии CLI
+
+CLI должен показывать:
+
+- версию;
+- дату сборки;
+- commit hash, если он передан при сборке.
+
+Текущая dev-команда:
+
+```bash
+go run ./cmd/gophkeeper-cli version
+```
+
+Планируемая сборка с `ldflags`:
+
+```bash
+go build \
+  -ldflags "-X github.com/squaredbusinessman/gophkeeper-authenticator/internal/shared/version.Version=dev -X github.com/squaredbusinessman/gophkeeper-authenticator/internal/shared/version.BuildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ) -X github.com/squaredbusinessman/gophkeeper-authenticator/internal/shared/version.Commit=$(git rev-parse --short HEAD)" \
+  -o ./bin/gophkeeper \
+  ./cmd/gophkeeper-cli
+```
+
+## Proto и gRPC code generation
+
+Proto-контракты находятся в:
+
+```text
+api/proto/gophkeeper/v1/gophkeeper.proto
+```
+
+Сгенерированный Go-код находится в:
+
+```text
+internal/gen/proto/gophkeeper/v1
+```
+
+Проверка EasyP-конфига:
+
+```bash
+easyp validate-config
+```
+
+Lint proto-контрактов:
+
+```bash
+easyp lint --root api/proto --path .
+```
+
+Генерация Go-кода:
+
+```bash
+easyp generate
+```
+
+Сгенерированный код коммитится в репозиторий, чтобы проверяющему не нужно было обязательно устанавливать EasyP для обычной сборки проекта.
+
+## Тестирование
+
+Запуск всех тестов:
+
+```bash
+go test ./...
+```
+
+Планируемая проверка покрытия:
+
+```bash
+go test ./... -coverprofile=coverage.out
+go tool cover -func=coverage.out
+```
+
+Целевое покрытие проекта unit-тестами - не менее 70%.
+
+Наиболее важные зоны тестирования:
+
+- password hashing;
+- password verification;
+- key derivation;
+- шифрование и расшифрование vault key;
+- шифрование и расшифрование секретов;
+- auth use cases;
+- vault use cases;
+- обработка version conflicts;
+- преобразование доменных ошибок в gRPC status codes;
+- поведение CLI-команд через fake client core.
+
+Generated protobuf code напрямую тестировать не планируется.
+
+## Локальный smoke-сценарий на текущем этапе
+
+Пока бизнес-логика регистрации и хранилища не реализована, минимальная проверка выглядит так:
+
+```bash
+docker compose -f deploy/docker-compose.yml up -d
+docker compose -f deploy/docker-compose.yml ps
+go test ./...
+go run ./cmd/gophkeeper-cli version
+GOPHKEEPER_DATABASE_DSN='postgres://gophkeeper:gophkeeper@localhost:5432/gophkeeper?sslmode=disable' GOPHKEEPER_ACCESS_TOKEN_SECRET='local-dev-secret-change-me' go run ./cmd/gophkeeper-server
+```
+
+После запуска сервера нажать `Ctrl+C` и убедиться, что приложение завершилось без panic.
+
+## Будущий приемочный сценарий
+
+Когда бизнес-логика будет реализована, проверяющий должен иметь возможность выполнить один локальный сценарий:
+
+```bash
+docker compose -f deploy/docker-compose.yml up -d
+go test ./...
+go build -o ./bin/gophkeeper ./cmd/gophkeeper-cli
+./bin/gophkeeper version
+./bin/gophkeeper register
+./bin/gophkeeper login
+./bin/gophkeeper create
+./bin/gophkeeper list
+./bin/gophkeeper get
+./bin/gophkeeper update
+./bin/gophkeeper delete
+./bin/gophkeeper sync
+docker compose -f deploy/docker-compose.yml down
+```
+
+Команды `register`, `login`, `create`, `list`, `get`, `update`, `delete` и `sync` пока являются целевым интерфейсом и будут уточняться при реализации CLI.
+
+## Разработка
+
+Проект реализуется через короткие задачи и небольшие коммиты.
+
+Рекомендуемый порядок MVP:
+
+1. Локальная инфраструктура и bootstrap сервера.
+2. Схема БД и миграции.
+3. Регистрация и вход.
+4. Auth middleware.
+5. Client-side crypto.
+6. CRUD секретов.
+7. Version-based sync.
+8. CLI поверх client core.
+9. Тесты, документация и финальная приемочная проверка.
+
+Опциональные функции не должны блокировать надежный основной сценарий.
 
 ## Модель угроз
 
@@ -220,168 +505,6 @@ GophKeeper не защищает от:
 - слабого мастер-пароля;
 - потери мастер-пароля;
 - чтения данных, уже расшифрованных в памяти процесса;
-- утечки секретов через shell history, если пользователь передает секреты аргументами командной строки.
+- утечки секретов через shell history.
 
-Практическое следствие: секретные значения должны вводиться через скрытый prompt или передаваться через файлы, а не через CLI flags, которые могут сохраниться в shell history.
-
-## TLS и режимы запуска
-
-Для локальной проверки допускается dev-режим без TLS.
-
-Этот режим предназначен только для запуска на локальной машине через Docker Compose. Его нельзя использовать как production-like режим или для сетевого развертывания.
-
-Для production-like запуска требуется TLS, потому что пароль входа, access token и gRPC metadata не должны передаваться по незащищенному каналу.
-
-Планируемая dev-конфигурация:
-
-```text
-GOPHKEEPER_GRPC_TLS_ENABLED=false
-```
-
-## Локальная проверка проекта
-
-Проект должен быть удобен для локального запуска проверяющим.
-
-Целевой сценарий локальной проверки требует:
-
-- Docker;
-- Docker Compose;
-- Go toolchain;
-- терминал на macOS, Linux или Windows.
-
-Облачный деплой для проверки проекта не требуется.
-
-Проверяющий должен иметь возможность запустить на одной машине:
-
-- GophKeeper server;
-- PostgreSQL;
-- опционально MinIO, если будет реализовано blob-хранилище;
-- GophKeeper CLI client.
-
-К финальной версии README должен содержать точные команды для:
-
-- запуска Docker Compose;
-- применения миграций;
-- настройки через `.env.example`;
-- сборки CLI;
-- проверки версии CLI;
-- регистрации и входа;
-- создания, чтения, обновления и удаления секрета;
-- запуска синхронизации;
-- просмотра логов сервера;
-- остановки окружения;
-- очистки локальных данных;
-- запуска тестов.
-
-Проверяющий не должен вручную устанавливать PostgreSQL или подключать внешние managed-сервисы.
-
-## Планируемый локальный запуск
-
-Точные команды будут обновляться по мере добавления реализации.
-
-Целевой сценарий запуска серверной части:
-
-```bash
-docker compose -f deploy/docker-compose.yml up -d
-```
-
-Сборка CLI:
-
-```bash
-go build -o ./bin/gophkeeper ./cmd/gophkeeper-cli
-```
-
-Проверка версии клиента:
-
-```bash
-./bin/gophkeeper version
-```
-
-Регистрация пользователя:
-
-```bash
-./bin/gophkeeper register
-```
-
-Вход:
-
-```bash
-./bin/gophkeeper login
-```
-
-Создание, просмотр списка и чтение секретов:
-
-```bash
-./bin/gophkeeper create
-./bin/gophkeeper list
-./bin/gophkeeper get
-```
-
-Эти команды описывают планируемый smoke-сценарий и могут быть уточнены при реализации CLI.
-
-## Планируемые CLI-команды
-
-CLI должен предоставить команды:
-
-```text
-gophkeeper version
-gophkeeper register
-gophkeeper login
-gophkeeper logout
-gophkeeper list
-gophkeeper get
-gophkeeper create
-gophkeeper update
-gophkeeper delete
-gophkeeper sync
-```
-
-## Сборка клиента
-
-Клиент должен собираться под:
-
-- macOS;
-- Linux;
-- Windows.
-
-Бинарный файл клиента должен уметь показывать:
-
-- версию;
-- дату сборки;
-- при возможности commit hash.
-
-Эти значения планируется передавать при сборке через Go linker flags.
-
-## Тестирование
-
-Целевое покрытие проекта unit-тестами: не менее 70%.
-
-Наиболее важные зоны тестирования:
-
-- password hashing;
-- password verification;
-- key derivation;
-- шифрование и расшифрование vault key;
-- шифрование и расшифрование секретов;
-- auth use cases;
-- vault use cases;
-- обнаружение конфликтов синхронизации;
-- преобразование ошибок в gRPC status codes;
-- поведение CLI-команд через fake client core.
-
-Generated protobuf code напрямую тестировать не планируется.
-
-## Подход к разработке
-
-Проект реализуется через вертикальный MVP:
-
-1. Локальный запуск сервера.
-2. Регистрация и вход.
-3. Открытие vault на клиенте.
-4. Создание зашифрованного секрета.
-5. Список, чтение, обновление и удаление секретов.
-6. Базовая синхронизация.
-7. Тесты и документация.
-8. Опциональные расширения.
-
-Опциональные функции не должны блокировать надежный основной сценарий.
+Практическое следствие: пользовательские секреты не нужно передавать как аргументы командной строки.
