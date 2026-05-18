@@ -2,8 +2,10 @@
 package grpcserver
 
 import (
+	"database/sql"
 	"net"
 
+	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/server/auth/register"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 
@@ -22,7 +24,7 @@ type Server struct {
 }
 
 // New создает и настраивает gRPC-сервер
-func New(cfg *config.Config, logger *zap.Logger) (*Server, error) {
+func New(cfg *config.Config, logger *zap.Logger, db *sql.DB) (*Server, error) {
 	listener, err := net.Listen("tcp", cfg.GRPCAddress)
 	if err != nil {
 		return nil, err
@@ -30,7 +32,10 @@ func New(cfg *config.Config, logger *zap.Logger) (*Server, error) {
 
 	grpcServer := grpc.NewServer()
 
-	gophkeeperv1.RegisterAuthServiceServer(grpcServer, handler.NewAuthHandler())
+	registerRepository := register.NewPostgresRepository(db)
+	registerUseCase := register.NewService(registerRepository, nil, nil)
+
+	gophkeeperv1.RegisterAuthServiceServer(grpcServer, handler.NewAuthHandler(registerUseCase))
 	gophkeeperv1.RegisterVaultServiceServer(grpcServer, handler.NewVaultHandler())
 
 	return &Server{

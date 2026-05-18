@@ -65,7 +65,7 @@ func Run(parent context.Context) error {
 		log.Info("database migrations applied", zap.String("dir", cfg.MigrationsDir))
 	}
 
-	server, err := grpcserver.New(cfg, log)
+	server, err := grpcserver.New(cfg, log, db)
 	if err != nil {
 		log.Error("failed to create grpc server", zap.Error(err))
 		return fmt.Errorf("create grpc server: %w", err)
