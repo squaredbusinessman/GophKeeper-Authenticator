@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  test:
+  go:
     runs-on: ubuntu-latest
 
     steps:
@@ -16,7 +16,78 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.26'
+          go-version-file: go.mod
+
+      - name: Download modules
+        run: go mod download
+
+      - name: Check formatting
+        run: |
+          files="$(gofmt -l .)"
+          if [ -n "$files" ]; then
+            echo "$files"
+            exit 1
+          fi
+
+      - name: Vet
+        run: go vet ./...
 
       - name: Test
+        run: go test ./... -coverprofile=coverage.out
+
+      - name: Coverage summary
+        run: go tool cover -func=coverage.out
+
+      - name: Build CLI
+        run: go build -o /tmp/gophkeeper-cli ./cmd/gophkeeper-cli
+
+      - name: Build server
+        run: go build -o /tmp/gophkeeper-server ./cmd/gophkeeper-server
+
+  postgres-smoke:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: gophkeeper
+          POSTGRES_USER: gophkeeper
+          POSTGRES_PASSWORD: gophkeeper
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gophkeeper -d gophkeeper"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Download modules
+        run: go mod download
+
+      - name: Build server
+        run: go build -o /tmp/gophkeeper-server ./cmd/gophkeeper-server
+
+      - name: Start server with migrations
+        env:
+          GOPHKEEPER_DATABASE_DSN: postgres://gophkeeper:gophkeeper@localhost:5432/gophkeeper?sslmode=disable
+          GOPHKEEPER_ACCESS_TOKEN_SECRET: ci-local-secret
+          GOPHKEEPER_LOG_MODE: prod
+        run: |
+          timeout 10s /tmp/gophkeeper-server || test $? -eq 124
+
+      - name: Test with PostgreSQL available
+        env:
+          GOPHKEEPER_DATABASE_DSN: postgres://gophkeeper:gophkeeper@localhost:5432/gophkeeper?sslmode=disable
+          GOPHKEEPER_ACCESS_TOKEN_SECRET: ci-local-secret
+          GOPHKEEPER_LOG_MODE: prod
         run: go test ./...
