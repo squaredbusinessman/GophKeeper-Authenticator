@@ -14,7 +14,9 @@ type PostgresRepository struct {
 
 // NewPostgresRepository создает PostgreSQL repository для login
 func NewPostgresRepository(db *sql.DB) *PostgresRepository {
-	return &PostgresRepository{}
+	return &PostgresRepository{
+		db: db,
+	}
 }
 
 // FindUserByLogin возвращает пользователя, password hash и encrypted vault metadata
