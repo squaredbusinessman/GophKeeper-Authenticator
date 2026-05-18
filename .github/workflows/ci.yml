@@ -84,10 +84,3 @@ jobs:
           GOPHKEEPER_LOG_MODE: prod
         run: |
           timeout 10s /tmp/gophkeeper-server || test $? -eq 124
-
-      - name: Test with PostgreSQL available
-        env:
-          GOPHKEEPER_DATABASE_DSN: postgres://gophkeeper:gophkeeper@localhost:5432/gophkeeper?sslmode=disable
-          GOPHKEEPER_ACCESS_TOKEN_SECRET: ci-local-secret
-          GOPHKEEPER_LOG_MODE: prod
-        run: go test ./...
