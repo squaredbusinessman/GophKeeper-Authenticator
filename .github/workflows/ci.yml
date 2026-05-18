@@ -84,3 +84,8 @@ jobs:
           GOPHKEEPER_LOG_MODE: prod
         run: |
           timeout 10s /tmp/gophkeeper-server || test $? -eq 124
+
+      - name: Test auth repositories with PostgreSQL
+        env:
+          GOPHKEEPER_TEST_DATABASE_DSN: postgres://gophkeeper:gophkeeper@localhost:5432/gophkeeper?sslmode=disable
+        run: go test ./internal/server/auth/register ./internal/server/auth/login
