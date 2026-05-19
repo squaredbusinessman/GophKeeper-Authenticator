@@ -32,13 +32,16 @@ func New(cfg *config.Config, logger *zap.Logger, db *sql.DB) (*Server, error) {
 		return nil, err
 	}
 
-	grpcServer := grpc.NewServer()
+	tokenIssuer := token.NewIssuer(cfg.AccessTokenSecret, cfg.AccessTokenTTL)
+
+	grpcServer := grpc.NewServer(
+		grpc.UnaryInterceptor(AuthUnaryInterceptor(tokenIssuer)),
+	)
 
 	registerRepository := register.NewPostgresRepository(db)
 	registerUseCase := register.NewService(registerRepository, nil, nil)
 
 	loginRepository := login.NewPostgresRepository(db)
-	tokenIssuer := token.NewIssuer(cfg.AccessTokenSecret, cfg.AccessTokenTTL)
 	loginUseCase := login.NewService(loginRepository, nil, tokenIssuer)
 
 	gophkeeperv1.RegisterAuthServiceServer(grpcServer, handler.NewAuthHandler(registerUseCase, loginUseCase))
