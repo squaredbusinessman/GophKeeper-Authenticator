@@ -1,38 +1,73 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"io"
 	"os"
 
+	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/client/config"
+	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/client/core"
+	gophkeeperv1 "github.com/squaredbusinessman/gophkeeper-authenticator/internal/gen/proto/gophkeeper/v1"
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/shared/version"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
-	if len(os.Args) < 2 {
-		printUsage()
-		return
-	}
-
-	switch os.Args[1] {
-	case "version":
-		printVersion()
-	default:
-		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", os.Args[1])
-		printUsage()
+	if err := run(context.Background(), os.Args[1:], os.Stdout, os.Stderr); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 }
 
 func printVersion() {
+	printVersionTo(os.Stdout)
+}
+
+func printVersionTo(stdout io.Writer) {
 	info := version.Get()
 
-	fmt.Printf("GophKeeper CLI\n")
-	fmt.Printf("Version: %s\n", info.Version)
-	fmt.Printf("Build date: %s\n", info.BuildDate)
-	fmt.Printf("Commit: %s\n", info.Commit)
+	fmt.Fprintln(stdout, "GophKeeper CLI")
+	fmt.Fprintf(stdout, "Version: %s\n", info.Version)
+	fmt.Fprintf(stdout, "Build date: %s\n", info.BuildDate)
+	fmt.Fprintf(stdout, "Commit: %s\n", info.Commit)
 }
 
 func printUsage() {
-	fmt.Println("Usage:")
-	fmt.Println("  gophkeeper version")
+	printUsageTo(os.Stdout)
+}
+
+func printUsageTo(stdout io.Writer) {
+	fmt.Fprintln(stdout, "Usage:")
+	fmt.Fprintln(stdout, "  gophkeeper version")
+	fmt.Fprintln(stdout, "  gophkeeper register")
+	fmt.Fprintln(stdout, "  gophkeeper login")
+}
+
+func run(ctx context.Context, args []string, stdout io.Writer, stderr io.Writer) error {
+	if len(args) > 0 && args[0] == "version" {
+		return runCLI(ctx, args, nil, nil, stdout, stderr)
+	}
+
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("error loading config: %w", err)
+	}
+
+	conn, err := grpc.NewClient(
+		cfg.ServerAddress,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		return fmt.Errorf("error creating grpc client: %w", err)
+	}
+	defer conn.Close()
+
+	authClient := gophkeeperv1.NewAuthServiceClient(conn)
+	tokenStore := core.NewFileTokenStore(cfg.TokenFile)
+	authService := core.NewAuthService(authClient, tokenStore)
+	prompter := newTerminalPrompter(os.Stdin, stdout, int(os.Stdin.Fd()))
+
+	return runCLI(ctx, args, authService, prompter, stdout, stderr)
 }
