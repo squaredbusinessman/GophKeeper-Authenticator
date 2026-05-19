@@ -70,6 +70,14 @@ func validLoginRequest() *gophkeeperv1.LoginRequest {
 	}
 }
 
+func validRegisterResult() register.Result {
+	return register.Result{
+		UserID:               "user-id-1",
+		AccessToken:          "access-token",
+		AccessTokenExpiresAt: time.Date(2026, 5, 18, 12, 5, 0, 0, time.UTC),
+	}
+}
+
 func validLoginResult() login.Result {
 	return login.Result{
 		UserID:               "user-id-1",
@@ -91,9 +99,9 @@ func validLoginResult() login.Result {
 	}
 }
 
-func TestAuthHandlerRegisterCallsUseCaseAndReturnsVaultKey(t *testing.T) {
+func TestAuthHandlerRegisterCallsUseCaseAndReturnsTokenWithVaultKey(t *testing.T) {
 	useCase := &fakeRegisterUseCase{
-		result: register.Result{UserID: "user-id-1"},
+		result: validRegisterResult(),
 	}
 	handler := NewAuthHandler(useCase, nil)
 
@@ -104,6 +112,18 @@ func TestAuthHandlerRegisterCallsUseCaseAndReturnsVaultKey(t *testing.T) {
 
 	if response == nil {
 		t.Fatalf("Register() response = nil")
+	}
+
+	if response.AccessToken != "access-token" {
+		t.Fatalf("AccessToken = %q, want %q", response.AccessToken, "access-token")
+	}
+
+	if response.AccessTokenExpiresAt == nil {
+		t.Fatalf("AccessTokenExpiresAt = nil")
+	}
+
+	if !response.AccessTokenExpiresAt.AsTime().Equal(validRegisterResult().AccessTokenExpiresAt) {
+		t.Fatalf("AccessTokenExpiresAt = %s, want %s", response.AccessTokenExpiresAt.AsTime(), validRegisterResult().AccessTokenExpiresAt)
 	}
 
 	if response.VaultKey == nil {

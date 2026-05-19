@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
+
+	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/server/auth/token"
 )
 
 type fakeRepository struct {
@@ -45,6 +48,21 @@ func (g fakeIDGenerator) NewID() (string, error) {
 	return g.id, nil
 }
 
+type fakeTokenIssuer struct {
+	token token.AccessToken
+	err   error
+	calls []string
+}
+
+func (i *fakeTokenIssuer) Issue(userID string) (token.AccessToken, error) {
+	i.calls = append(i.calls, userID)
+	if i.err != nil {
+		return token.AccessToken{}, i.err
+	}
+
+	return i.token, nil
+}
+
 func validInput() Input {
 	return Input{
 		Login:         "user@example.com",
@@ -70,12 +88,29 @@ func newTestService(repository Repository) *Service {
 		repository,
 		fakePasswordHasher{},
 		fakeIDGenerator{id: "user-id-1"},
+		&fakeTokenIssuer{
+			token: token.AccessToken{
+				Value:     "access-token",
+				ExpiresAt: time.Date(2026, 5, 19, 12, 30, 0, 0, time.UTC),
+			},
+		},
 	)
 }
 
-func TestServiceRegisterCreatesUserWithPasswordHashAndVaultMetadata(t *testing.T) {
+func TestServiceRegisterCreatesUserWithPasswordHashVaultMetadataAndAccessToken(t *testing.T) {
 	repository := &fakeRepository{}
-	service := newTestService(repository)
+	tokenIssuer := &fakeTokenIssuer{
+		token: token.AccessToken{
+			Value:     "access-token",
+			ExpiresAt: time.Date(2026, 5, 19, 12, 30, 0, 0, time.UTC),
+		},
+	}
+	service := NewService(
+		repository,
+		fakePasswordHasher{},
+		fakeIDGenerator{id: "user-id-1"},
+		tokenIssuer,
+	)
 
 	result, err := service.Register(context.Background(), Input{
 		Login:         "  user@example.com  ",
@@ -88,6 +123,18 @@ func TestServiceRegisterCreatesUserWithPasswordHashAndVaultMetadata(t *testing.T
 
 	if result.UserID != "user-id-1" {
 		t.Fatalf("UserID = %q, want %q", result.UserID, "user-id-1")
+	}
+
+	if result.AccessToken != "access-token" {
+		t.Fatalf("AccessToken = %q, want access-token", result.AccessToken)
+	}
+
+	if !result.AccessTokenExpiresAt.Equal(time.Date(2026, 5, 19, 12, 30, 0, 0, time.UTC)) {
+		t.Fatalf("AccessTokenExpiresAt = %s, want fixed expires at", result.AccessTokenExpiresAt)
+	}
+
+	if len(tokenIssuer.calls) != 1 || tokenIssuer.calls[0] != "user-id-1" {
+		t.Fatalf("token issuer calls = %v, want user-id-1", tokenIssuer.calls)
 	}
 
 	if len(repository.calls) != 1 {
@@ -144,6 +191,7 @@ func TestServiceRegisterDoesNotCallRepositoryWhenPasswordHashFails(t *testing.T)
 			return "", hashErr
 		}},
 		fakeIDGenerator{id: "user-id-1"},
+		&fakeTokenIssuer{},
 	)
 
 	_, err := service.Register(context.Background(), validInput())
@@ -163,6 +211,7 @@ func TestServiceRegisterDoesNotCallRepositoryWhenIDGenerationFails(t *testing.T)
 		repository,
 		fakePasswordHasher{},
 		fakeIDGenerator{err: idErr},
+		&fakeTokenIssuer{},
 	)
 
 	_, err := service.Register(context.Background(), validInput())
@@ -172,6 +221,45 @@ func TestServiceRegisterDoesNotCallRepositoryWhenIDGenerationFails(t *testing.T)
 
 	if len(repository.calls) != 0 {
 		t.Fatalf("repository calls = %d, want 0", len(repository.calls))
+	}
+}
+
+func TestServiceRegisterReturnsErrorWhenTokenIssuerIsMissing(t *testing.T) {
+	repository := &fakeRepository{}
+	service := NewService(
+		repository,
+		fakePasswordHasher{},
+		fakeIDGenerator{id: "user-id-1"},
+		nil,
+	)
+
+	_, err := service.Register(context.Background(), validInput())
+	if err == nil {
+		t.Fatalf("Register() error = nil, want error")
+	}
+
+	if len(repository.calls) != 0 {
+		t.Fatalf("repository calls = %d, want 0", len(repository.calls))
+	}
+}
+
+func TestServiceRegisterReturnsErrorWhenTokenIssueFails(t *testing.T) {
+	issueErr := errors.New("issue failed")
+	repository := &fakeRepository{}
+	service := NewService(
+		repository,
+		fakePasswordHasher{},
+		fakeIDGenerator{id: "user-id-1"},
+		&fakeTokenIssuer{err: issueErr},
+	)
+
+	_, err := service.Register(context.Background(), validInput())
+	if !errors.Is(err, issueErr) {
+		t.Fatalf("Register() error = %v, want issue error", err)
+	}
+
+	if len(repository.calls) != 1 {
+		t.Fatalf("repository calls = %d, want 1", len(repository.calls))
 	}
 }
 
