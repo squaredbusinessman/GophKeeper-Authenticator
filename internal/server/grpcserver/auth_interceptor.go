@@ -6,6 +6,7 @@ import (
 
 	gophkeeperv1 "github.com/squaredbusinessman/gophkeeper-authenticator/internal/gen/proto/gophkeeper/v1"
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/server/auth/token"
+	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/server/grpcserver/authcontext"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -16,10 +17,6 @@ import (
 type TokenValidator interface {
 	Validate(rawToken string) (token.Claims, error)
 }
-
-type authContextKey struct{}
-
-var userIDContextKey authContextKey
 
 // AuthUnaryInterceptor закрывает приватные unary методы gRPC проверкой access token
 func AuthUnaryInterceptor(validator TokenValidator) grpc.UnaryServerInterceptor {
@@ -52,22 +49,13 @@ func AuthUnaryInterceptor(validator TokenValidator) grpc.UnaryServerInterceptor 
 			return nil, status.Error(codes.Unauthenticated, "invalid access token")
 		}
 
-		return handler(contextWithUserID(ctx, userID), req)
+		return handler(authcontext.ContextWithUserID(ctx, userID), req)
 	}
 }
 
 // UserIDFromContext достает user id, который middleware положил в context
 func UserIDFromContext(ctx context.Context) (string, bool) {
-	userID, ok := ctx.Value(userIDContextKey).(string)
-	if !ok || strings.TrimSpace(userID) == "" {
-		return "", false
-	}
-
-	return userID, true
-}
-
-func contextWithUserID(ctx context.Context, userID string) context.Context {
-	return context.WithValue(ctx, userIDContextKey, userID)
+	return authcontext.UserIDFromContext(ctx)
 }
 
 func isPublicMethod(method string) bool {
