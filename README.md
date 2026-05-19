@@ -497,13 +497,62 @@ go run ./cmd/gophkeeper-server
 
 ## CLI
 
-Сейчас реализована команда версии.
+Сейчас CLI умеет показывать версию, регистрировать пользователя и выполнять вход.
 
 Запуск через Go:
 
 ```bash
 go run ./cmd/gophkeeper-cli version
 ```
+
+Регистрация:
+
+```bash
+go run ./cmd/gophkeeper-cli register
+```
+
+Вход:
+
+```bash
+go run ./cmd/gophkeeper-cli login
+```
+
+Команды `register` и `login` используют интерактивный ввод:
+
+- login вводится обычным prompt;
+- пароль входа вводится скрытым prompt;
+- мастер-пароль вводится скрытым prompt;
+- при регистрации мастер-пароль нужно повторить;
+- пароль входа и мастер-пароль не должны совпадать;
+- при регистрации CLI предупреждает, что мастер-пароль невозможно восстановить.
+
+Перед запуском `register` и `login` должен быть запущен gRPC-сервер. По умолчанию клиент подключается к:
+
+```text
+localhost:9090
+```
+
+Переопределить адрес сервера можно так:
+
+```bash
+GOPHKEEPER_SERVER_ADDRESS='localhost:9091' \
+go run ./cmd/gophkeeper-cli login
+```
+
+Access token сохраняется в локальный JSON-файл. По умолчанию используется:
+
+```text
+$HOME/.gophkeeper/token.json
+```
+
+Переопределить путь можно так:
+
+```bash
+GOPHKEEPER_TOKEN_FILE='/tmp/gophkeeper-token.json' \
+go run ./cmd/gophkeeper-cli login
+```
+
+Файл token state создается с правами `0600`. В нем хранится access token и срок его действия. Мастер-пароль и открытый vault key туда не записываются.
 
 Сборка CLI:
 
@@ -517,12 +566,17 @@ go build -o ./bin/gophkeeper ./cmd/gophkeeper-cli
 ./bin/gophkeeper version
 ```
 
-Планируемые команды CLI:
+Команды CLI:
 
 ```text
 gophkeeper version
 gophkeeper register
 gophkeeper login
+```
+
+Планируемые команды CLI:
+
+```text
 gophkeeper logout
 gophkeeper list
 gophkeeper get
