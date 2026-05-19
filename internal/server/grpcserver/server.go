@@ -8,6 +8,7 @@ import (
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/server/auth/login"
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/server/auth/register"
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/server/auth/token"
+	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/server/vault"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 
@@ -44,8 +45,11 @@ func New(cfg *config.Config, logger *zap.Logger, db *sql.DB) (*Server, error) {
 	loginRepository := login.NewPostgresRepository(db)
 	loginUseCase := login.NewService(loginRepository, nil, tokenIssuer)
 
+	vaultRepository := vault.NewPostgresRepository(db)
+	vaultUseCase := vault.NewService(vaultRepository, nil)
+
 	gophkeeperv1.RegisterAuthServiceServer(grpcServer, handler.NewAuthHandler(registerUseCase, loginUseCase))
-	gophkeeperv1.RegisterVaultServiceServer(grpcServer, handler.NewVaultHandler())
+	gophkeeperv1.RegisterVaultServiceServer(grpcServer, handler.NewVaultHandler(vaultUseCase))
 
 	return &Server{
 		grpcServer: grpcServer,
