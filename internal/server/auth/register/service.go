@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/server/auth/password"
+	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/server/auth/token"
 )
 
 // Repository сохраняет пользователя и зашифрованный vault key
@@ -47,15 +48,21 @@ func (f IDGeneratorFunc) NewID() (string, error) {
 	return f()
 }
 
+// TokenIssuer выпускает access token для нового пользователя
+type TokenIssuer interface {
+	Issue(userID string) (token.AccessToken, error)
+}
+
 // Service выполняет use case регистрации пользователя
 type Service struct {
 	repository     Repository
 	passwordHasher PasswordHasher
 	idGenerator    IDGenerator
+	tokenIssuer    TokenIssuer
 }
 
 // NewService создает use case регистрации пользователя
-func NewService(repository Repository, passwordHasher PasswordHasher, idGenerator IDGenerator) *Service {
+func NewService(repository Repository, passwordHasher PasswordHasher, idGenerator IDGenerator, tokenIssuer TokenIssuer) *Service {
 	if passwordHasher == nil {
 		passwordHasher = PasswordHasherFunc(password.Hash)
 	}
@@ -68,6 +75,7 @@ func NewService(repository Repository, passwordHasher PasswordHasher, idGenerato
 		repository:     repository,
 		passwordHasher: passwordHasher,
 		idGenerator:    idGenerator,
+		tokenIssuer:    tokenIssuer,
 	}
 }
 
@@ -102,9 +110,22 @@ func (s *Service) Register(ctx context.Context, input Input) (Result, error) {
 		VaultKey:     input.VaultKey,
 	}
 
+	if s.tokenIssuer == nil {
+		return Result{}, fmt.Errorf("token issuer is required")
+	}
+
 	if err = s.repository.CreateUserWithVault(ctx, params); err != nil {
 		return Result{}, fmt.Errorf("create user with vault: %w", err)
 	}
 
-	return Result{UserID: userID}, nil
+	accessToken, err := s.tokenIssuer.Issue(userID)
+	if err != nil {
+		return Result{}, fmt.Errorf("issue access token: %w", err)
+	}
+
+	return Result{
+		UserID:               userID,
+		AccessToken:          accessToken.Value,
+		AccessTokenExpiresAt: accessToken.ExpiresAt,
+	}, nil
 }

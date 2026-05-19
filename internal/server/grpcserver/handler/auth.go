@@ -52,12 +52,15 @@ func (h *AuthHandler) Register(ctx context.Context, req *gophkeeperv1.RegisterRe
 		return nil, status.Error(codes.InvalidArgument, "register use case is not configured")
 	}
 
-	if _, err = h.registerUseCase.Register(ctx, input); err != nil {
+	result, err := h.registerUseCase.Register(ctx, input)
+	if err != nil {
 		return nil, registerStatusError(err)
 	}
 
 	return &gophkeeperv1.RegisterResponse{
-		VaultKey: req.GetVaultKey(),
+		AccessToken:          result.AccessToken,
+		AccessTokenExpiresAt: timestamppb.New(result.AccessTokenExpiresAt),
+		VaultKey:             req.GetVaultKey(),
 	}, nil
 }
 

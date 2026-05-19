@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 )
 
 var (
@@ -24,7 +25,9 @@ type Input struct {
 
 // Result содержит id пользователя после регистрации
 type Result struct {
-	UserID string
+	UserID               string
+	AccessToken          string
+	AccessTokenExpiresAt time.Time
 }
 
 // KDFParams описывает параметры получения encryption key из мастер-пароля

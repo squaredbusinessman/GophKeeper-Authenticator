@@ -39,7 +39,7 @@ func New(cfg *config.Config, logger *zap.Logger, db *sql.DB) (*Server, error) {
 	)
 
 	registerRepository := register.NewPostgresRepository(db)
-	registerUseCase := register.NewService(registerRepository, nil, nil)
+	registerUseCase := register.NewService(registerRepository, nil, nil, tokenIssuer)
 
 	loginRepository := login.NewPostgresRepository(db)
 	loginUseCase := login.NewService(loginRepository, nil, tokenIssuer)
