@@ -66,11 +66,18 @@ func runCreateTextSecret(
 		return fmt.Errorf("encode text secret metadata: %w", err)
 	}
 
+	textPayload, schemaVersion, err := core.EncodeTextPayload(core.TextPayload{
+		Text: secretText,
+	})
+	if err != nil {
+		return fmt.Errorf("encode text payload: %w", err)
+	}
+
 	secret, err := vaultService.CreateSecret(ctx, session, core.CreateSecretInput{
 		Type:                 core.SecretTypeText,
 		Metadata:             metadata,
-		Payload:              []byte(secretText),
-		PayloadSchemaVersion: 1,
+		Payload:              textPayload,
+		PayloadSchemaVersion: schemaVersion,
 	})
 	if err != nil {
 		return fmt.Errorf("create text secret: %w", err)
@@ -121,7 +128,12 @@ func runGetTextSecret(
 		fmt.Fprintf(stdout, "Title: %s\n", title)
 	}
 
-	fmt.Fprintf(stdout, "Secret text: %s\n", string(secret.Payload))
+	textPayload, err := core.DecodeTextPayload(secret.Payload, secret.PayloadSchemaVersion)
+	if err != nil {
+		return fmt.Errorf("decode text payload: %w", err)
+	}
+
+	fmt.Fprintf(stdout, "Secret text: %s\n", textPayload.Text)
 	return nil
 }
 
@@ -238,13 +250,20 @@ func runUpdateTextSecret(ctx context.Context, authService CLIAuthService, vaultS
 		return fmt.Errorf("encode text secret metadata: %w", err)
 	}
 
+	textPayload, schemaVersion, err := core.EncodeTextPayload(core.TextPayload{
+		Text: secretText,
+	})
+	if err != nil {
+		return fmt.Errorf("encode text payload: %w", err)
+	}
+
 	secret, err := vaultService.UpdateSecret(ctx, session, core.UpdateSecretInput{
 		ID:                   id,
 		ExpectedVersion:      expectedVersion,
 		Type:                 core.SecretTypeText,
 		Metadata:             metadata,
-		Payload:              []byte(secretText),
-		PayloadSchemaVersion: 1,
+		Payload:              textPayload,
+		PayloadSchemaVersion: schemaVersion,
 	})
 	if err != nil {
 		return fmt.Errorf("version conflict: update text secret: %w", err)

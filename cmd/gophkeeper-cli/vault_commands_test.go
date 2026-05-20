@@ -91,8 +91,8 @@ func (s *fakeCLIVaultService) GetSecret(ctx context.Context, session core.Sessio
 		ID:                   input.ID,
 		Type:                 core.SecretTypeText,
 		Metadata:             []byte(`{"title":"work note"}`),
-		Payload:              []byte("secret text"),
-		PayloadSchemaVersion: 1,
+		Payload:              mustEncodeTextPayload("secret text"),
+		PayloadSchemaVersion: core.TextPayloadSchemaVersion,
 		Version:              2,
 	}, nil
 }
@@ -113,16 +113,16 @@ func (s *fakeCLIVaultService) ListSecrets(ctx context.Context, session core.Sess
 			ID:                   "active-secret-id",
 			Type:                 core.SecretTypeText,
 			Metadata:             []byte(`{"title":"active note"}`),
-			Payload:              []byte("active secret"),
-			PayloadSchemaVersion: 1,
+			Payload:              mustEncodeTextPayload("active secret"),
+			PayloadSchemaVersion: core.TextPayloadSchemaVersion,
 			Version:              2,
 		},
 		{
 			ID:                   "deleted-secret-id",
 			Type:                 core.SecretTypeText,
 			Metadata:             []byte(`{"title":"deleted note"}`),
-			Payload:              []byte("deleted secret"),
-			PayloadSchemaVersion: 1,
+			Payload:              mustEncodeTextPayload("deleted secret"),
+			PayloadSchemaVersion: core.TextPayloadSchemaVersion,
 			Version:              3,
 			DeletedAt:            &deletedAt,
 		},
@@ -182,16 +182,16 @@ func (s *fakeCLIVaultService) SyncSecrets(ctx context.Context, session core.Sess
 				ID:                   "active-secret-id",
 				Type:                 core.SecretTypeText,
 				Metadata:             []byte(`{"title":"active note"}`),
-				Payload:              []byte("active secret"),
-				PayloadSchemaVersion: 1,
+				Payload:              mustEncodeTextPayload("active secret"),
+				PayloadSchemaVersion: core.TextPayloadSchemaVersion,
 				Version:              2,
 			},
 			{
 				ID:                   "deleted-secret-id",
 				Type:                 core.SecretTypeText,
 				Metadata:             []byte(`{"title":"deleted note"}`),
-				Payload:              []byte("deleted secret"),
-				PayloadSchemaVersion: 1,
+				Payload:              mustEncodeTextPayload("deleted secret"),
+				PayloadSchemaVersion: core.TextPayloadSchemaVersion,
 				Version:              3,
 				DeletedAt:            &deletedAt,
 			},
@@ -240,12 +240,17 @@ func TestCreateTextSecretCommandLogsInPromptsSecretHiddenAndCallsVaultService(t 
 		t.Fatalf("metadata = %q, want title", call.input.Metadata)
 	}
 
-	if string(call.input.Payload) != "secret text" {
-		t.Fatalf("payload = %q, want secret text", call.input.Payload)
+	textPayload, err := core.DecodeTextPayload(call.input.Payload, call.input.PayloadSchemaVersion)
+	if err != nil {
+		t.Fatalf("DecodeTextPayload() error = %v", err)
 	}
 
-	if call.input.PayloadSchemaVersion != 1 {
-		t.Fatalf("payload schema version = %d, want 1", call.input.PayloadSchemaVersion)
+	if textPayload.Text != "secret text" {
+		t.Fatalf("payload text = %q, want secret text", textPayload.Text)
+	}
+
+	if call.input.PayloadSchemaVersion != core.TextPayloadSchemaVersion {
+		t.Fatalf("payload schema version = %d, want %d", call.input.PayloadSchemaVersion, core.TextPayloadSchemaVersion)
 	}
 
 	wantHidden := []bool{false, true, true, false, true}
@@ -308,6 +313,10 @@ func TestGetTextSecretCommandLogsInPromptsIDAndPrintsSecret(t *testing.T) {
 
 	if !strings.Contains(stdout.String(), "secret text") {
 		t.Fatalf("stdout = %q, want secret payload", stdout.String())
+	}
+
+	if strings.Contains(stdout.String(), "{\"text\"") {
+		t.Fatalf("stdout = %q, want decoded text payload instead of raw json", stdout.String())
 	}
 }
 
@@ -391,8 +400,13 @@ func TestUpdateTextSecretCommandPromptsVersionAndSecretHidden(t *testing.T) {
 		t.Fatalf("metadata = %q, want updated title", call.input.Metadata)
 	}
 
-	if string(call.input.Payload) != "updated secret text" {
-		t.Fatalf("payload = %q, want updated secret text", call.input.Payload)
+	textPayload, err := core.DecodeTextPayload(call.input.Payload, call.input.PayloadSchemaVersion)
+	if err != nil {
+		t.Fatalf("DecodeTextPayload() error = %v", err)
+	}
+
+	if textPayload.Text != "updated secret text" {
+		t.Fatalf("payload text = %q, want updated secret text", textPayload.Text)
 	}
 
 	wantHidden := []bool{false, true, true, false, false, false, true}
@@ -615,4 +629,13 @@ func TestVaultCommandsRequireDependencies(t *testing.T) {
 	if err == nil {
 		t.Fatalf("runCLI(sync) error = nil, want error")
 	}
+}
+
+func mustEncodeTextPayload(text string) []byte {
+	payload, _, err := core.EncodeTextPayload(core.TextPayload{Text: text})
+	if err != nil {
+		panic(err)
+	}
+
+	return payload
 }
