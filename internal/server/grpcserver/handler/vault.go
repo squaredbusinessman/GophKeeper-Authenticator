@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	gophkeeperv1 "github.com/squaredbusinessman/gophkeeper-authenticator/internal/gen/proto/gophkeeper/v1"
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/server/grpcserver/authcontext"
@@ -21,6 +22,7 @@ type VaultUseCase interface {
 	ListItems(context.Context, vault.ListItemsInput) ([]vault.Item, error)
 	UpdateItem(context.Context, vault.UpdateItemInput) (vault.Item, error)
 	DeleteItem(context.Context, vault.DeleteItemInput) (vault.DeleteItemResult, error)
+	SyncItems(context.Context, vault.SyncItemsInput) (vault.SyncItemsResult, error)
 }
 
 // VaultHandler обрабатывает запросы сервиса хранилища
@@ -173,6 +175,34 @@ func (h *VaultHandler) DeleteItem(ctx context.Context, req *gophkeeperv1.DeleteI
 	}, nil
 }
 
+// Sync возвращает изменения vault items через gRPC API
+func (h *VaultHandler) Sync(ctx context.Context, req *gophkeeperv1.SyncRequest) (*gophkeeperv1.SyncResponse, error) {
+	userID, ok := authcontext.UserIDFromContext(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "user id is required")
+	}
+
+	if h.vaultUseCase == nil {
+		return nil, status.Error(codes.Internal, "vault use case is not configured")
+	}
+
+	result, err := h.vaultUseCase.SyncItems(ctx, syncItemsInputFromProto(userID, req))
+	if err != nil {
+		return nil, vaultStatusError(err)
+	}
+
+	response := &gophkeeperv1.SyncResponse{
+		Items:            make([]*gophkeeperv1.VaultItem, 0, len(result.Items)),
+		NextChangedAfter: timestamppb.New(result.NextChangedAfter),
+	}
+
+	for _, item := range result.Items {
+		response.Items = append(response.Items, vaultItemToProto(item))
+	}
+
+	return response, nil
+}
+
 func createItemInputFromProto(userID string, req *gophkeeperv1.CreateItemRequest) (vault.CreateItemInput, error) {
 	if req == nil {
 		return vault.CreateItemInput{}, fmt.Errorf("create item request is required")
@@ -290,6 +320,18 @@ func deleteItemInputFromProto(userID string, req *gophkeeperv1.DeleteItemRequest
 		ItemID:          req.GetId(),
 		ExpectedVersion: req.GetExpectedVersion(),
 	}, nil
+}
+
+func syncItemsInputFromProto(userID string, req *gophkeeperv1.SyncRequest) vault.SyncItemsInput {
+	changedAfter := time.Time{}
+	if req != nil && req.GetChangedAfter() != nil {
+		changedAfter = req.GetChangedAfter().AsTime()
+	}
+
+	return vault.SyncItemsInput{
+		UserID:       userID,
+		ChangedAfter: changedAfter,
+	}
 }
 
 func encryptedDataFromProto(data *gophkeeperv1.EncryptedData, fieldName string) (vault.EncryptedData, error) {

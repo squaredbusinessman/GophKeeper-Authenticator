@@ -14,12 +14,14 @@ type fakeRepository struct {
 	listFunc   func(context.Context, ListItemsParams) ([]Item, error)
 	updateFunc func(context.Context, UpdateItemParams) (Item, error)
 	deleteFunc func(context.Context, DeleteItemParams) (DeleteItemResult, error)
+	syncFunc   func(context.Context, SyncItemsParams) (SyncItemsResult, error)
 
 	createCalls []CreateItemParams
 	findCalls   []string
 	listCalls   []ListItemsParams
 	updateCalls []UpdateItemParams
 	deleteCalls []DeleteItemParams
+	syncCalls   []SyncItemsParams
 }
 
 func (r *fakeRepository) CreateItem(ctx context.Context, params CreateItemParams) (Item, error) {
@@ -87,6 +89,18 @@ func (r *fakeRepository) DeleteItem(ctx context.Context, params DeleteItemParams
 		ItemID:    params.ItemID,
 		Version:   params.ExpectedVersion + 1,
 		DeletedAt: time.Date(2026, 5, 20, 13, 0, 0, 0, time.UTC),
+	}, nil
+}
+
+func (r *fakeRepository) SyncItems(ctx context.Context, params SyncItemsParams) (SyncItemsResult, error) {
+	r.syncCalls = append(r.syncCalls, params)
+	if r.syncFunc != nil {
+		return r.syncFunc(ctx, params)
+	}
+
+	return SyncItemsResult{
+		Items:            []Item{validItem()},
+		NextChangedAfter: time.Date(2026, 5, 20, 14, 0, 0, 0, time.UTC),
 	}, nil
 }
 
@@ -736,6 +750,71 @@ func TestServiceDeleteItemReturnsErrorForInvalidInput(t *testing.T) {
 				t.Fatalf("repository find calls = %d, want 0", len(repository.findCalls))
 			}
 		})
+	}
+}
+
+func TestServiceSyncItemsReturnsChangedItemsIncludingDeleted(t *testing.T) {
+	changedAfter := time.Date(2026, 5, 20, 10, 0, 0, 0, time.UTC)
+	deletedAt := time.Date(2026, 5, 20, 11, 0, 0, 0, time.UTC)
+	deletedItem := validItem()
+	deletedItem.ID = "deleted-item-id"
+	deletedItem.DeletedAt = &deletedAt
+	deletedItem.UpdatedAt = deletedAt
+
+	repository := &fakeRepository{
+		syncFunc: func(_ context.Context, params SyncItemsParams) (SyncItemsResult, error) {
+			if params.UserID != "user-id-1" {
+				t.Fatalf("UserID = %q, want user-id-1", params.UserID)
+			}
+
+			if !params.ChangedAfter.Equal(changedAfter) {
+				t.Fatalf("ChangedAfter = %s, want %s", params.ChangedAfter, changedAfter)
+			}
+
+			return SyncItemsResult{
+				Items:            []Item{deletedItem},
+				NextChangedAfter: deletedAt,
+			}, nil
+		},
+	}
+	service := newTestService(repository)
+
+	result, err := service.SyncItems(context.Background(), SyncItemsInput{
+		UserID:       " user-id-1 ",
+		ChangedAfter: changedAfter,
+	})
+	if err != nil {
+		t.Fatalf("SyncItems() error = %v", err)
+	}
+
+	if len(result.Items) != 1 {
+		t.Fatalf("items length = %d, want 1", len(result.Items))
+	}
+
+	if result.Items[0].DeletedAt == nil {
+		t.Fatalf("DeletedAt = nil, want tombstone")
+	}
+
+	if !result.NextChangedAfter.Equal(deletedAt) {
+		t.Fatalf("NextChangedAfter = %s, want %s", result.NextChangedAfter, deletedAt)
+	}
+
+	if len(repository.syncCalls) != 1 {
+		t.Fatalf("sync calls = %d, want 1", len(repository.syncCalls))
+	}
+}
+
+func TestServiceSyncItemsReturnsErrorForInvalidInput(t *testing.T) {
+	repository := &fakeRepository{}
+	service := newTestService(repository)
+
+	_, err := service.SyncItems(context.Background(), SyncItemsInput{})
+	if !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("SyncItems() error = %v, want ErrInvalidInput", err)
+	}
+
+	if len(repository.syncCalls) != 0 {
+		t.Fatalf("sync calls = %d, want 0", len(repository.syncCalls))
 	}
 }
 

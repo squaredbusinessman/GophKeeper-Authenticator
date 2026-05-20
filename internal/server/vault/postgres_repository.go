@@ -300,3 +300,70 @@ func (r *PostgresRepository) DeleteItem(ctx context.Context, params DeleteItemPa
 
 	return result, nil
 }
+
+// SyncItems возвращает changed items пользователя, включая tombstones
+func (r *PostgresRepository) SyncItems(ctx context.Context, params SyncItemsParams) (SyncItemsResult, error) {
+	rows, err := r.db.QueryContext(
+		ctx,
+		`SELECT
+			id,
+			user_id,
+			type,
+			encrypted_metadata,
+			metadata_nonce,
+			encrypted_payload,
+			payload_nonce,
+			encryption_alg,
+			payload_schema_version,
+			version,
+			created_at,
+			updated_at,
+			deleted_at
+		FROM vault_items
+		WHERE user_id = $1
+			AND updated_at > $2
+		ORDER BY updated_at ASC, id ASC`,
+		params.UserID,
+		params.ChangedAfter,
+	)
+	if err != nil {
+		return SyncItemsResult{}, fmt.Errorf("sync vault items: %w", err)
+	}
+	defer rows.Close()
+
+	result := SyncItemsResult{
+		NextChangedAfter: params.ChangedAfter,
+	}
+
+	for rows.Next() {
+		var item Item
+		if err = rows.Scan(
+			&item.ID,
+			&item.UserID,
+			&item.Type,
+			&item.Metadata.Ciphertext,
+			&item.Metadata.Nonce,
+			&item.Payload.Ciphertext,
+			&item.Payload.Nonce,
+			&item.EncryptionAlg,
+			&item.PayloadSchemaVersion,
+			&item.Version,
+			&item.CreatedAt,
+			&item.UpdatedAt,
+			&item.DeletedAt,
+		); err != nil {
+			return SyncItemsResult{}, fmt.Errorf("scan synced vault item: %w", err)
+		}
+
+		result.Items = append(result.Items, item)
+		if item.UpdatedAt.After(result.NextChangedAfter) {
+			result.NextChangedAfter = item.UpdatedAt
+		}
+	}
+
+	if err = rows.Err(); err != nil {
+		return SyncItemsResult{}, fmt.Errorf("iterate synced vault items: %w", err)
+	}
+
+	return result, nil
+}

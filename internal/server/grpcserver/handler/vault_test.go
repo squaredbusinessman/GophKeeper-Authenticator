@@ -11,6 +11,7 @@ import (
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/server/vault"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type fakeVaultUseCase struct {
@@ -19,12 +20,14 @@ type fakeVaultUseCase struct {
 	listFunc   func(context.Context, vault.ListItemsInput) ([]vault.Item, error)
 	updateFunc func(context.Context, vault.UpdateItemInput) (vault.Item, error)
 	deleteFunc func(context.Context, vault.DeleteItemInput) (vault.DeleteItemResult, error)
+	syncFunc   func(context.Context, vault.SyncItemsInput) (vault.SyncItemsResult, error)
 
 	createCalls []vault.CreateItemInput
 	getCalls    []vault.GetItemInput
 	listCalls   []vault.ListItemsInput
 	updateCalls []vault.UpdateItemInput
 	deleteCalls []vault.DeleteItemInput
+	syncCalls   []vault.SyncItemsInput
 }
 
 func (u *fakeVaultUseCase) CreateItem(ctx context.Context, input vault.CreateItemInput) (vault.Item, error) {
@@ -81,6 +84,19 @@ func (u *fakeVaultUseCase) DeleteItem(ctx context.Context, input vault.DeleteIte
 		ItemID:    input.ItemID,
 		Version:   input.ExpectedVersion + 1,
 		DeletedAt: time.Date(2026, 5, 20, 12, 0, 0, 0, time.UTC),
+	}, nil
+}
+
+func (u *fakeVaultUseCase) SyncItems(ctx context.Context, input vault.SyncItemsInput) (vault.SyncItemsResult, error) {
+	u.syncCalls = append(u.syncCalls, input)
+	if u.syncFunc != nil {
+		return u.syncFunc(ctx, input)
+	}
+
+	nextChangedAfter := time.Date(2026, 5, 20, 14, 0, 0, 0, time.UTC)
+	return vault.SyncItemsResult{
+		Items:            []vault.Item{validVaultItem()},
+		NextChangedAfter: nextChangedAfter,
 	}, nil
 }
 
@@ -331,6 +347,73 @@ func TestVaultHandlerDeleteItemCallsUseCaseAndReturnsResult(t *testing.T) {
 	}
 }
 
+func TestVaultHandlerSyncCallsUseCaseAndReturnsChangedItems(t *testing.T) {
+	changedAfter := time.Date(2026, 5, 20, 10, 0, 0, 0, time.UTC)
+	deletedAt := time.Date(2026, 5, 20, 14, 30, 0, 0, time.UTC)
+	deletedItem := validVaultItem()
+	deletedItem.ID = "deleted-item-id"
+	deletedItem.UpdatedAt = deletedAt
+	deletedItem.DeletedAt = &deletedAt
+
+	useCase := &fakeVaultUseCase{
+		syncFunc: func(ctx context.Context, input vault.SyncItemsInput) (vault.SyncItemsResult, error) {
+			if input.UserID != "user-id-1" {
+				t.Fatalf("input UserID = %q, want user-id-1", input.UserID)
+			}
+
+			if !input.ChangedAfter.Equal(changedAfter) {
+				t.Fatalf("input ChangedAfter = %s, want %s", input.ChangedAfter, changedAfter)
+			}
+
+			return vault.SyncItemsResult{
+				Items:            []vault.Item{deletedItem},
+				NextChangedAfter: deletedAt,
+			}, nil
+		},
+	}
+	handler := NewVaultHandler(useCase)
+
+	response, err := handler.Sync(vaultContext(), &gophkeeperv1.SyncRequest{
+		ChangedAfter: timestamppb.New(changedAfter),
+	})
+	if err != nil {
+		t.Fatalf("Sync() error = %v", err)
+	}
+
+	if response == nil {
+		t.Fatalf("Sync() response = nil")
+	}
+
+	if len(response.GetItems()) != 1 {
+		t.Fatalf("items length = %d, want 1", len(response.GetItems()))
+	}
+
+	item := response.GetItems()[0]
+	if item.GetId() != "deleted-item-id" {
+		t.Fatalf("item id = %q, want deleted-item-id", item.GetId())
+	}
+
+	if item.GetDeletedAt() == nil {
+		t.Fatalf("item deleted_at = nil")
+	}
+
+	if !item.GetDeletedAt().AsTime().Equal(deletedAt) {
+		t.Fatalf("item deleted_at = %s, want %s", item.GetDeletedAt().AsTime(), deletedAt)
+	}
+
+	if response.GetNextChangedAfter() == nil {
+		t.Fatalf("next_changed_after = nil")
+	}
+
+	if !response.GetNextChangedAfter().AsTime().Equal(deletedAt) {
+		t.Fatalf("next_changed_after = %s, want %s", response.GetNextChangedAfter().AsTime(), deletedAt)
+	}
+
+	if len(useCase.syncCalls) != 1 {
+		t.Fatalf("sync calls = %d, want 1", len(useCase.syncCalls))
+	}
+}
+
 func TestVaultHandlerReturnsUnauthenticatedWhenUserIDMissing(t *testing.T) {
 	useCase := &fakeVaultUseCase{}
 	handler := NewVaultHandler(useCase)
@@ -360,6 +443,11 @@ func TestVaultHandlerReturnsUnauthenticatedWhenUserIDMissing(t *testing.T) {
 		t.Fatalf("DeleteItem() code = %s, want %s", status.Code(err), codes.Unauthenticated)
 	}
 
+	_, err = handler.Sync(context.Background(), &gophkeeperv1.SyncRequest{})
+	if status.Code(err) != codes.Unauthenticated {
+		t.Fatalf("Sync() code = %s, want %s", status.Code(err), codes.Unauthenticated)
+	}
+
 	if len(useCase.createCalls) != 0 {
 		t.Fatalf("create calls = %d, want 0", len(useCase.createCalls))
 	}
@@ -378,6 +466,10 @@ func TestVaultHandlerReturnsUnauthenticatedWhenUserIDMissing(t *testing.T) {
 
 	if len(useCase.deleteCalls) != 0 {
 		t.Fatalf("delete calls = %d, want 0", len(useCase.deleteCalls))
+	}
+
+	if len(useCase.syncCalls) != 0 {
+		t.Fatalf("sync calls = %d, want 0", len(useCase.syncCalls))
 	}
 }
 
@@ -723,6 +815,20 @@ func TestVaultHandlerMapsUseCaseErrors(t *testing.T) {
 			_, err := handler.DeleteItem(vaultContext(), &gophkeeperv1.DeleteItemRequest{Id: "item-id-1", ExpectedVersion: 7})
 			if status.Code(err) != tt.code {
 				t.Fatalf("DeleteItem() code = %s, want %s, err = %v", status.Code(err), tt.code, err)
+			}
+		})
+
+		t.Run("sync "+tt.name, func(t *testing.T) {
+			useCase := &fakeVaultUseCase{
+				syncFunc: func(context.Context, vault.SyncItemsInput) (vault.SyncItemsResult, error) {
+					return vault.SyncItemsResult{}, tt.err
+				},
+			}
+			handler := NewVaultHandler(useCase)
+
+			_, err := handler.Sync(vaultContext(), &gophkeeperv1.SyncRequest{})
+			if status.Code(err) != tt.code {
+				t.Fatalf("Sync() code = %s, want %s, err = %v", status.Code(err), tt.code, err)
 			}
 		})
 	}
