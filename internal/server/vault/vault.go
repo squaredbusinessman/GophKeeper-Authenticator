@@ -124,6 +124,21 @@ type DeleteItemResult struct {
 	DeletedAt time.Time
 }
 
+type SyncItemsInput struct {
+	UserID       string
+	ChangedAfter time.Time
+}
+
+type SyncItemsParams struct {
+	UserID       string
+	ChangedAfter time.Time
+}
+
+type SyncItemsResult struct {
+	Items            []Item
+	NextChangedAfter time.Time
+}
+
 func (d *EncryptedData) Validate() error {
 	if len(d.Ciphertext) == 0 {
 		return fmt.Errorf("%w: ciphertext is required", ErrInvalidInput)
@@ -231,6 +246,14 @@ func (i *DeleteItemInput) Validate() error {
 
 	if i.ExpectedVersion <= 0 {
 		return fmt.Errorf("%w: expected version is required", ErrInvalidInput)
+	}
+
+	return nil
+}
+
+func (i *SyncItemsInput) Validate() error {
+	if strings.TrimSpace(i.UserID) == "" {
+		return fmt.Errorf("%w: user id is required", ErrInvalidInput)
 	}
 
 	return nil

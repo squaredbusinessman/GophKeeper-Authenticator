@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"testing"
+	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
@@ -453,6 +454,101 @@ func TestPostgresRepositoryDeleteItemReturnsVersionConflict(t *testing.T) {
 	}
 }
 
+func TestPostgresRepositorySyncItemsReturnsChangedItemsIncludingDeletedForUserOnly(t *testing.T) {
+	db := openTestDB(t)
+	ctx := context.Background()
+	userID := createTestUser(t, ctx, db)
+	anotherUserID := createTestUser(t, ctx, db)
+	oldItemID := newTestUUID(t)
+	activeItemID := newTestUUID(t)
+	deletedItemID := newTestUUID(t)
+	anotherUserItemID := newTestUUID(t)
+
+	defer func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id = $1`, userID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id = $1`, anotherUserID)
+	}()
+
+	changedAfter := time.Date(2026, 5, 20, 10, 0, 0, 0, time.UTC)
+	oldUpdatedAt := time.Date(2026, 5, 20, 9, 59, 0, 0, time.UTC)
+	activeUpdatedAt := time.Date(2026, 5, 20, 10, 1, 0, 0, time.UTC)
+	deletedUpdatedAt := time.Date(2026, 5, 20, 10, 2, 0, 0, time.UTC)
+	anotherUserUpdatedAt := time.Date(2026, 5, 20, 10, 3, 0, 0, time.UTC)
+
+	insertTestVaultItemWithUpdatedAt(t, ctx, db, userID, oldItemID, 1, oldUpdatedAt, nil)
+	insertTestVaultItemWithUpdatedAt(t, ctx, db, userID, activeItemID, 2, activeUpdatedAt, nil)
+	insertTestVaultItemWithUpdatedAt(t, ctx, db, userID, deletedItemID, 3, deletedUpdatedAt, &deletedUpdatedAt)
+	insertTestVaultItemWithUpdatedAt(t, ctx, db, anotherUserID, anotherUserItemID, 4, anotherUserUpdatedAt, nil)
+
+	repository := NewPostgresRepository(db)
+
+	result, err := repository.SyncItems(ctx, SyncItemsParams{
+		UserID:       userID,
+		ChangedAfter: changedAfter,
+	})
+	if err != nil {
+		t.Fatalf("SyncItems() error = %v", err)
+	}
+
+	if len(result.Items) != 2 {
+		t.Fatalf("items length = %d, want 2", len(result.Items))
+	}
+
+	if !containsItemID(result.Items, activeItemID) {
+		t.Fatalf("items do not contain active changed item")
+	}
+
+	if !containsItemID(result.Items, deletedItemID) {
+		t.Fatalf("items do not contain deleted changed item")
+	}
+
+	if containsItemID(result.Items, oldItemID) {
+		t.Fatalf("items contain item older than changed_after")
+	}
+
+	if containsItemID(result.Items, anotherUserItemID) {
+		t.Fatalf("items contain another user's item")
+	}
+
+	deletedItem := findItemByID(t, result.Items, deletedItemID)
+	if deletedItem.DeletedAt == nil {
+		t.Fatalf("DeletedAt = nil, want tombstone")
+	}
+
+	if !result.NextChangedAfter.Equal(deletedUpdatedAt) {
+		t.Fatalf("NextChangedAfter = %s, want %s", result.NextChangedAfter, deletedUpdatedAt)
+	}
+}
+
+func TestPostgresRepositorySyncItemsReturnsChangedAfterWhenNoChanges(t *testing.T) {
+	db := openTestDB(t)
+	ctx := context.Background()
+	userID := createTestUser(t, ctx, db)
+
+	defer func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id = $1`, userID)
+	}()
+
+	changedAfter := time.Date(2026, 5, 20, 10, 0, 0, 0, time.UTC)
+	repository := NewPostgresRepository(db)
+
+	result, err := repository.SyncItems(ctx, SyncItemsParams{
+		UserID:       userID,
+		ChangedAfter: changedAfter,
+	})
+	if err != nil {
+		t.Fatalf("SyncItems() error = %v", err)
+	}
+
+	if len(result.Items) != 0 {
+		t.Fatalf("items length = %d, want 0", len(result.Items))
+	}
+
+	if !result.NextChangedAfter.Equal(changedAfter) {
+		t.Fatalf("NextChangedAfter = %s, want changed_after %s", result.NextChangedAfter, changedAfter)
+	}
+}
+
 func openTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 
@@ -557,6 +653,47 @@ func insertTestVaultItem(t *testing.T, ctx context.Context, db *sql.DB, userID s
 	}
 }
 
+func insertTestVaultItemWithUpdatedAt(t *testing.T, ctx context.Context, db *sql.DB, userID string, itemID string, version int64, updatedAt time.Time, deletedAt *time.Time) {
+	t.Helper()
+
+	_, err := db.ExecContext(
+		ctx,
+		`INSERT INTO vault_items (
+			id,
+			user_id,
+			type,
+			encrypted_metadata,
+			metadata_nonce,
+			encrypted_payload,
+			payload_nonce,
+			encryption_alg,
+			payload_schema_version,
+			version,
+			created_at,
+			updated_at,
+			deleted_at
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
+		)`,
+		itemID,
+		userID,
+		string(ItemTypeLoginPassword),
+		[]byte("encrypted-metadata-"+itemID),
+		[]byte("metadata-nonce"),
+		[]byte("encrypted-payload-"+itemID),
+		[]byte("payload-nonce"),
+		"aes-256-gcm",
+		1,
+		version,
+		updatedAt,
+		updatedAt,
+		deletedAt,
+	)
+	if err != nil {
+		t.Fatalf("insert vault item error = %v", err)
+	}
+}
+
 func containsItemID(items []Item, itemID string) bool {
 	for _, item := range items {
 		if item.ID == itemID {
@@ -565,4 +702,17 @@ func containsItemID(items []Item, itemID string) bool {
 	}
 
 	return false
+}
+
+func findItemByID(t *testing.T, items []Item, itemID string) Item {
+	t.Helper()
+
+	for _, item := range items {
+		if item.ID == itemID {
+			return item
+		}
+	}
+
+	t.Fatalf("item %q not found", itemID)
+	return Item{}
 }

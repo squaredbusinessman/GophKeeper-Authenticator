@@ -13,6 +13,7 @@ type Repository interface {
 	ListItems(context.Context, ListItemsParams) ([]Item, error)
 	UpdateItem(context.Context, UpdateItemParams) (Item, error)
 	DeleteItem(context.Context, DeleteItemParams) (DeleteItemResult, error)
+	SyncItems(context.Context, SyncItemsParams) (SyncItemsResult, error)
 }
 
 // IDGenerator генерирует ID vault item
@@ -176,6 +177,23 @@ func (s *Service) DeleteItem(ctx context.Context, input DeleteItemInput) (Delete
 	})
 	if err != nil {
 		return DeleteItemResult{}, fmt.Errorf("delete vault item: %w", err)
+	}
+
+	return result, nil
+}
+
+// SyncItems возвращает измененные vault items пользователя, включая tombstones
+func (s *Service) SyncItems(ctx context.Context, input SyncItemsInput) (SyncItemsResult, error) {
+	if err := input.Validate(); err != nil {
+		return SyncItemsResult{}, err
+	}
+
+	result, err := s.repository.SyncItems(ctx, SyncItemsParams{
+		UserID:       strings.TrimSpace(input.UserID),
+		ChangedAfter: input.ChangedAfter,
+	})
+	if err != nil {
+		return SyncItemsResult{}, fmt.Errorf("sync vault items: %w", err)
 	}
 
 	return result, nil
