@@ -26,9 +26,18 @@ GophKeeper - клиент-серверный менеджер секретов �
 - gRPC `Register`;
 - серверный use case входа;
 - JWT access token с TTL;
-- gRPC `Login` с возвратом access token и encrypted vault key metadata.
+- gRPC `Login` с возвратом access token и encrypted vault key metadata;
+- auth middleware для protected gRPC-методов;
+- серверные use cases для create, get, list, update, delete и sync vault items;
+- gRPC Vault API для create, get, list, update, delete и sync;
+- client core для auth flow, vault flow и sync flow;
+- CLI-команды `register`, `login`, `create`, `get`, `list`, `update`, `delete`, `sync`;
+- typed client payload schemas для `login_password`, `text`, `bank_card` и `binary`;
+- inline binary metadata, checksum и size limit;
+- coverage gate в CI с порогом не ниже 70%;
+- кроссплатформенная сборка CLI под Linux, macOS и Windows.
 
-Часть команд ниже описывает уже рабочий сценарий, часть команд помечена как планируемая и будет уточняться по мере реализации бизнес-логики.
+Команды ниже описывают рабочий сценарий текущего состояния проекта.
 
 ## Что должен уметь GophKeeper
 
@@ -78,7 +87,7 @@ GophKeeper должен поддерживать хранение:
 - `internal/server` - серверная логика и инфраструктура;
 - `internal/shared` - общие пакеты;
 - `deploy` - локальная инфраструктура для разработки и проверки;
-- `migrations` - будущие SQL-миграции.
+- `migrations` - SQL-миграции базы данных.
 
 Основной протокол взаимодействия клиента и сервера - gRPC.
 
@@ -363,14 +372,15 @@ Dev-режим без TLS предназначен только для запу�
 
 Для MVP небольшие бинарные данные могут храниться inline в PostgreSQL как encrypted payload.
 
-Планируемые ограничения MVP:
+Текущие ограничения MVP:
 
 - явный лимит размера payload;
 - file metadata хранится в зашифрованном виде;
+- checksum хранится в зашифрованном payload и проверяется на клиенте;
 - слишком большие файлы отклоняются понятной ошибкой;
 - поиск по пользовательским file metadata выполняется на клиенте после расшифрования.
 
-MinIO, chunking, checksums и gRPC streaming остаются расширениями после MVP.
+MinIO, chunking и gRPC streaming остаются расширениями после MVP.
 
 ## Требования для локального запуска
 
@@ -497,7 +507,7 @@ go run ./cmd/gophkeeper-server
 
 ## CLI
 
-Сейчас CLI умеет показывать версию, регистрировать пользователя, выполнять вход, создавать текстовый секрет и получать текстовый секрет по ID.
+Сейчас CLI умеет показывать версию, регистрировать пользователя, выполнять вход, создавать текстовый секрет, получать секрет по ID, выводить список активных секретов, обновлять секрет, мягко удалять секрет и запускать server-side sync.
 
 Запуск через Go:
 
@@ -529,7 +539,31 @@ go run ./cmd/gophkeeper-cli create
 go run ./cmd/gophkeeper-cli get
 ```
 
-Команды `register`, `login`, `create` и `get` используют интерактивный ввод:
+Список активных текстовых секретов:
+
+```bash
+go run ./cmd/gophkeeper-cli list
+```
+
+Обновление текстового секрета:
+
+```bash
+go run ./cmd/gophkeeper-cli update
+```
+
+Мягкое удаление текстового секрета:
+
+```bash
+go run ./cmd/gophkeeper-cli delete
+```
+
+Синхронизация изменений:
+
+```bash
+go run ./cmd/gophkeeper-cli sync
+```
+
+Команды `register`, `login`, `create`, `get`, `list`, `update`, `delete` и `sync` используют интерактивный ввод:
 
 - login вводится обычным prompt;
 - пароль входа вводится скрытым prompt;
@@ -538,11 +572,15 @@ go run ./cmd/gophkeeper-cli get
 - пароль входа и мастер-пароль не должны совпадать;
 - при регистрации CLI предупреждает, что мастер-пароль невозможно восстановить.
 
-Команда `create` сейчас создает секрет первого поддержанного типа: текстовый секрет. CLI запрашивает title обычным prompt, а само секретное значение скрытым prompt. Title сохраняется как metadata, секретный текст сохраняется как payload. Перед отправкой на сервер client core шифрует и metadata, и payload через vault key.
+Команда `create` сейчас создает текстовый секрет. CLI запрашивает title обычным prompt, а само секретное значение скрытым prompt. Title сохраняется как encrypted metadata, секретный текст кодируется в client payload schema `TextPayload`, а затем шифруется на клиенте через vault key.
 
-Команда `get` запрашивает ID секрета, получает encrypted item с сервера и расшифровывает metadata и payload на клиенте. Для открытия vault команды `create` и `get` заново запрашивают login, пароль входа и мастер-пароль. Это нужно потому, что текущий CLI сохраняет только access token, но не хранит открытый vault key между запусками.
+Команда `get` запрашивает ID секрета, получает encrypted item с сервера и расшифровывает metadata и payload на клиенте. Для открытия vault команды заново запрашивают login, пароль входа и мастер-пароль. Это нужно потому, что текущий CLI сохраняет только access token, но не хранит открытый vault key между запусками.
 
-Перед запуском `register`, `login`, `create` и `get` должен быть запущен gRPC-сервер. По умолчанию клиент подключается к:
+Команды `update` и `delete` требуют `Expected version`. Версию нужно брать из `list`, `get` или результата предыдущей команды. Если версия устарела, сервер возвращает version conflict.
+
+Команда `sync` получает изменения с сервера, включая tombstones для удаленных записей. На текущем этапе offline cache еще нет, поэтому CLI не сохраняет sync cursor локально и отправляет пустой `changed_after`.
+
+Перед запуском `register`, `login`, `create`, `get`, `list`, `update`, `delete` и `sync` должен быть запущен gRPC-сервер. По умолчанию клиент подключается к:
 
 ```text
 localhost:9090
@@ -573,13 +611,13 @@ go run ./cmd/gophkeeper-cli login
 Сборка CLI:
 
 ```bash
-go build -o ./bin/gophkeeper ./cmd/gophkeeper-cli
+make build-cli
 ```
 
 Проверка версии собранного бинарного файла:
 
 ```bash
-./bin/gophkeeper version
+./bin/gophkeeper-cli version
 ```
 
 Команды CLI:
@@ -590,12 +628,6 @@ gophkeeper register
 gophkeeper login
 gophkeeper create
 gophkeeper get
-```
-
-Планируемые команды CLI:
-
-```text
-gophkeeper logout
 gophkeeper list
 gophkeeper update
 gophkeeper delete
@@ -688,11 +720,10 @@ easyp generate
 go test ./...
 ```
 
-Планируемая проверка покрытия:
+Проверка покрытия с исключением generated protobuf code:
 
 ```bash
-go test ./... -coverprofile=coverage.out
-go tool cover -func=coverage.out
+./scripts/check_coverage.sh
 ```
 
 Целевое покрытие проекта unit-тестами - не менее 70%.
@@ -712,75 +743,374 @@ go tool cover -func=coverage.out
 
 Generated protobuf code напрямую тестировать не планируется.
 
-## Локальный smoke-сценарий на текущем этапе
+## Пошаговая приемочная проверка
 
-Минимальная проверка текущего состояния выглядит так:
+Этот сценарий нужен, чтобы любой проверяющий мог локально пройти основные возможности проекта из ТЗ. Все команды выполняются из корня репозитория.
+
+### 1. Проверить toolchain
+
+Нужны:
+
+- Go версии из `go.mod`;
+- Docker;
+- Docker Compose;
+- `make`;
+- свободный порт `5432` для PostgreSQL;
+- свободный порт `9090` для gRPC-сервера.
+
+Проверка:
+
+```bash
+go version
+docker version
+docker compose version
+make --version
+```
+
+### 2. Запустить PostgreSQL
 
 ```bash
 docker compose -f deploy/docker-compose.yml up -d
 docker compose -f deploy/docker-compose.yml ps
-go test ./...
-go run ./cmd/gophkeeper-cli version
-GOPHKEEPER_DATABASE_DSN='postgres://gophkeeper:gophkeeper@localhost:5432/gophkeeper?sslmode=disable' GOPHKEEPER_ACCESS_TOKEN_SECRET='local-dev-secret-change-me' go run ./cmd/gophkeeper-server
+docker compose -f deploy/docker-compose.yml exec postgres pg_isready -U gophkeeper -d gophkeeper
 ```
 
-После запуска сервера нажать `Ctrl+C` и убедиться, что приложение завершилось без panic.
+Ожидаемый результат: `pg_isready` возвращает `accepting connections`.
 
-На текущем этапе автоматизированно проверяются:
-
-- password hash и verify;
-- шифрование vault key;
-- шифрование payload;
-- register use case;
-- login use case;
-- vault create/get use cases;
-- client core create/get secret flow;
-- CLI register/login/create/get flow;
-- JWT issue и validate;
-- mapping ошибок auth use cases в gRPC status codes;
-- сборка server и CLI в CI.
-
-Ручной сценарий через CLI на текущем этапе уже покрывает регистрацию, вход, создание текстового секрета и получение текстового секрета по ID.
-
-## Будущий приемочный сценарий
-
-Когда бизнес-логика будет реализована, проверяющий должен иметь возможность выполнить один локальный сценарий:
+### 3. Проверить тесты, vet и coverage
 
 ```bash
-docker compose -f deploy/docker-compose.yml up -d
 go test ./...
-go build -o ./bin/gophkeeper ./cmd/gophkeeper-cli
-./bin/gophkeeper version
-./bin/gophkeeper register
-./bin/gophkeeper login
-./bin/gophkeeper create
-./bin/gophkeeper list
-./bin/gophkeeper get
-./bin/gophkeeper update
-./bin/gophkeeper delete
-./bin/gophkeeper sync
+go vet ./...
+./scripts/check_coverage.sh
+```
+
+Ожидаемый результат:
+
+- все тесты проходят;
+- `go vet` завершается без ошибок;
+- coverage не ниже 70%;
+- generated protobuf code не учитывается в coverage threshold.
+
+### 4. Собрать CLI
+
+Сборка для текущей платформы:
+
+```bash
+make build-cli
+./bin/gophkeeper-cli version
+```
+
+Ожидаемый результат: CLI печатает `Version`, `Build date` и `Commit`.
+
+Кроссплатформенная сборка:
+
+```bash
+make build-cli-all
+ls -1 bin
+```
+
+Ожидаемый результат: в `bin` появляются файлы:
+
+```text
+gophkeeper-cli
+gophkeeper-cli_linux_amd64
+gophkeeper-cli_linux_arm64
+gophkeeper-cli_darwin_amd64
+gophkeeper-cli_darwin_arm64
+gophkeeper-cli_windows_amd64.exe
+```
+
+### 5. Запустить сервер
+
+В отдельном терминале:
+
+```bash
+GOPHKEEPER_DATABASE_DSN='postgres://gophkeeper:gophkeeper@localhost:5432/gophkeeper?sslmode=disable' \
+GOPHKEEPER_ACCESS_TOKEN_SECRET='local-dev-secret-change-me' \
+GOPHKEEPER_LOG_MODE='dev' \
+go run ./cmd/gophkeeper-server
+```
+
+Ожидаемый результат: сервер применяет миграции и слушает `:9090`.
+
+Альтернативный запуск через dev-скрипт:
+
+```bash
+./scripts/dev.sh server
+```
+
+### 6. Проверить CLI version
+
+В другом терминале:
+
+```bash
+./bin/gophkeeper-cli version
+```
+
+Ожидаемый результат: команда завершается сразу и печатает версию. Это нормальное поведение CLI: процесс выполняет одну команду и завершается.
+
+### 7. Зарегистрировать пользователя
+
+```bash
+./bin/gophkeeper-cli register
+```
+
+Пример вводимых данных:
+
+```text
+Login: user@example.com
+Login password: login-password-123
+Master password: master-password-123
+Repeat master password: master-password-123
+```
+
+Ожидаемый результат:
+
+```text
+Регистрация выполнена
+```
+
+Проверяется:
+
+- создание пользователя;
+- hash пароля входа на сервере;
+- генерация vault key на клиенте;
+- шифрование vault key мастер-паролем;
+- сохранение encrypted vault key metadata;
+- запрет совпадения пароля входа и мастер-пароля.
+
+### 8. Проверить вход
+
+```bash
+./bin/gophkeeper-cli login
+```
+
+Использовать те же login, пароль входа и мастер-пароль.
+
+Ожидаемый результат:
+
+```text
+Вход выполнен
+```
+
+Проверяется:
+
+- проверка password hash;
+- выпуск JWT access token;
+- сохранение token state в `$HOME/.gophkeeper/token.json`;
+- расшифровка vault key на клиенте.
+
+### 9. Создать текстовый секрет
+
+```bash
+./bin/gophkeeper-cli create
+```
+
+Пример вводимых данных:
+
+```text
+Login: user@example.com
+Login password: login-password-123
+Master password: master-password-123
+Title: first note
+Secret text: very secret text
+```
+
+Ожидаемый результат:
+
+```text
+Секрет создан: <secret-id>
+```
+
+Сохранить `<secret-id>` для следующих шагов.
+
+Проверяется:
+
+- protected gRPC method;
+- client-side encryption metadata и payload;
+- `TextPayload` schema;
+- сохранение encrypted item на сервере.
+
+### 10. Получить секрет по ID
+
+```bash
+./bin/gophkeeper-cli get
+```
+
+Ввести `<secret-id>` из предыдущего шага.
+
+Ожидаемый результат:
+
+```text
+Title: first note
+Secret text: very secret text
+```
+
+Проверяется:
+
+- проверка owner на сервере;
+- получение encrypted item;
+- расшифровка metadata и payload на клиенте.
+
+### 11. Проверить список активных секретов
+
+```bash
+./bin/gophkeeper-cli list
+```
+
+Ожидаемый результат:
+
+```text
+<secret-id> | version 1 | first note
+```
+
+Сохранить актуальную `version`. Она нужна для optimistic locking.
+
+Проверяется:
+
+- list protected method;
+- фильтрация deleted items;
+- отображение ID, версии и title.
+
+### 12. Обновить секрет
+
+```bash
+./bin/gophkeeper-cli update
+```
+
+Пример вводимых данных:
+
+```text
+Secret ID: <secret-id>
+Expected version: 1
+Title: updated note
+Secret text: updated secret text
+```
+
+Ожидаемый результат:
+
+```text
+Секрет обновлен: <secret-id>, version: 2
+```
+
+Проверяется:
+
+- update protected method;
+- expected version;
+- version increment;
+- повторное шифрование metadata и payload;
+- понятная ошибка при version conflict.
+
+### 13. Проверить обновленное значение
+
+```bash
+./bin/gophkeeper-cli get
+```
+
+Ввести `<secret-id>`.
+
+Ожидаемый результат:
+
+```text
+Title: updated note
+Secret text: updated secret text
+```
+
+### 14. Удалить секрет
+
+```bash
+./bin/gophkeeper-cli delete
+```
+
+Пример вводимых данных:
+
+```text
+Secret ID: <secret-id>
+Expected version: 2
+```
+
+Ожидаемый результат:
+
+```text
+Секрет удален: <secret-id>, version: 3
+```
+
+Проверяется:
+
+- soft delete;
+- expected version;
+- deleted_at на сервере;
+- deleted item не показывается как активный.
+
+### 15. Проверить, что удаленный секрет не виден в active list
+
+```bash
+./bin/gophkeeper-cli list
+```
+
+Ожидаемый результат: удаленный `<secret-id>` отсутствует в списке.
+
+### 16. Проверить sync и tombstones
+
+```bash
+./bin/gophkeeper-cli sync
+```
+
+Ожидаемый результат: в выводе есть изменения пользователя, включая удаленный item со статусом `удален`.
+
+Проверяется:
+
+- server-side sync;
+- changed items;
+- tombstones;
+- фильтрация по текущему пользователю;
+- расшифровка synced payload на клиенте.
+
+### 17. Проверить ошибку version conflict
+
+Создать новый секрет:
+
+```bash
+./bin/gophkeeper-cli create
+./bin/gophkeeper-cli list
+```
+
+Обновить его с актуальной версией, например `1`, затем повторить update с той же старой версией `1`.
+
+Ожидаемый результат второго update: CLI возвращает ошибку с контекстом `version conflict`.
+
+### 18. Проверить ошибку неверного мастер-пароля
+
+```bash
+./bin/gophkeeper-cli get
+```
+
+Ввести правильные login и пароль входа, но неверный мастер-пароль.
+
+Ожидаемый результат: команда завершается ошибкой расшифровки vault key. Это корректно: мастер-пароль не хранится и не восстанавливается.
+
+### 19. Остановить локальную инфраструктуру
+
+Остановить сервер через `Ctrl+C`.
+
+Остановить PostgreSQL без удаления данных:
+
+```bash
+docker compose -f deploy/docker-compose.yml stop
+```
+
+Удалить контейнеры:
+
+```bash
 docker compose -f deploy/docker-compose.yml down
 ```
 
-Команды `register`, `login`, `create`, `list`, `get`, `update`, `delete` и `sync` пока являются целевым интерфейсом и будут уточняться при реализации CLI.
+Полностью очистить локальные данные PostgreSQL:
 
-## Разработка
-
-Проект реализуется через короткие задачи и небольшие коммиты.
-
-Рекомендуемый порядок MVP:
-
-1. Локальная инфраструктура и bootstrap сервера.
-2. Схема БД и миграции.
-3. Регистрация и вход.
-4. Auth middleware.
-5. Client-side crypto.
-6. CRUD секретов.
-7. Version-based sync.
-8. CLI поверх client core.
-9. Тесты, документация и финальная приемочная проверка.
-
-Опциональные функции не должны блокировать надежный основной сценарий.
+```bash
+docker compose -f deploy/docker-compose.yml down -v
+```
 
 ## Модель угроз
 
