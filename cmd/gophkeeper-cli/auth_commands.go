@@ -122,7 +122,15 @@ func runLogin(ctx context.Context, authService CLIAuthService, prompter Prompter
 	return nil
 }
 
-func runCLI(ctx context.Context, args []string, authService CLIAuthService, prompter Prompter, stdout io.Writer, stderr io.Writer) error {
+func runCLI(
+	ctx context.Context,
+	args []string,
+	authService CLIAuthService,
+	vaultService CLIVaultService,
+	prompter Prompter,
+	stdout io.Writer,
+	stderr io.Writer,
+) error {
 	if len(args) == 0 {
 		printUsageTo(stdout)
 		return nil
@@ -133,6 +141,10 @@ func runCLI(ctx context.Context, args []string, authService CLIAuthService, prom
 		return runRegister(ctx, authService, prompter, stdout, stderr)
 	case "login":
 		return runLogin(ctx, authService, prompter, stdout)
+	case "create":
+		return runCreateTextSecret(ctx, authService, vaultService, prompter, stdout)
+	case "get":
+		return runGetTextSecret(ctx, authService, vaultService, prompter, stdout)
 	case "version":
 		printVersionTo(stdout)
 		return nil
