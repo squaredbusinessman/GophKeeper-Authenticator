@@ -2,10 +2,11 @@ VERSION ?= dev
 BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 OUTPUT_DIR ?= bin
+SMOKE_DATABASE_DSN ?= postgres://gophkeeper:gophkeeper@localhost:5432/gophkeeper?sslmode=disable
 VERSION_PACKAGE := github.com/squaredbusinessman/gophkeeper-authenticator/internal/shared/version
 LDFLAGS := -s -w -X $(VERSION_PACKAGE).Version=$(VERSION) -X $(VERSION_PACKAGE).BuildDate=$(BUILD_DATE) -X $(VERSION_PACKAGE).Commit=$(COMMIT)
 
-.PHONY: build-cli build-cli-all test vet coverage
+.PHONY: build-cli build-cli-all test vet coverage smoke
 
 build-cli:
 	@mkdir -p $(OUTPUT_DIR)
@@ -22,3 +23,6 @@ vet:
 
 coverage:
 	./scripts/check_coverage.sh
+
+smoke:
+	GOPHKEEPER_TEST_DATABASE_DSN="$(SMOKE_DATABASE_DSN)" go test -tags=smoke ./internal/smoke

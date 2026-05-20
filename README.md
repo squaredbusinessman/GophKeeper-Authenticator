@@ -726,6 +726,15 @@ go test ./...
 ./scripts/check_coverage.sh
 ```
 
+Интеграционный smoke-сценарий с живым PostgreSQL и gRPC-сервером:
+
+```bash
+docker compose -f deploy/docker-compose.yml up -d
+make smoke
+```
+
+`make smoke` запускает тесты с build tag `smoke`. Обычный `go test ./...` эти тесты не запускает, чтобы локальная быстрая проверка не требовала PostgreSQL.
+
 Целевое покрытие проекта unit-тестами - не менее 70%.
 
 Наиболее важные зоны тестирования:
@@ -783,6 +792,7 @@ docker compose -f deploy/docker-compose.yml exec postgres pg_isready -U gophkeep
 go test ./...
 go vet ./...
 ./scripts/check_coverage.sh
+make smoke
 ```
 
 Ожидаемый результат:
@@ -791,6 +801,7 @@ go vet ./...
 - `go vet` завершается без ошибок;
 - coverage не ниже 70%;
 - generated protobuf code не учитывается в coverage threshold.
+- smoke-сценарий проходит register, login, create, list, get, update, delete и sync через реальный gRPC-сервер и PostgreSQL.
 
 ### 4. Собрать CLI
 
