@@ -129,3 +129,174 @@ func (r *PostgresRepository) FindItemByID(ctx context.Context, itemID string) (I
 
 	return item, nil
 }
+
+// ListItems возвращает encrypted vault items пользователя
+func (r *PostgresRepository) ListItems(ctx context.Context, params ListItemsParams) ([]Item, error) {
+	query := `SELECT
+			id,
+			user_id,
+			type,
+			encrypted_metadata,
+			metadata_nonce,
+			encrypted_payload,
+			payload_nonce,
+			encryption_alg,
+			payload_schema_version,
+			version,
+			created_at,
+			updated_at,
+			deleted_at
+		FROM vault_items
+		WHERE user_id = $1`
+
+	if !params.IncludeDeleted {
+		query += ` AND deleted_at IS NULL`
+	}
+
+	query += ` ORDER BY updated_at DESC, id DESC`
+
+	rows, err := r.db.QueryContext(ctx, query, params.UserID)
+	if err != nil {
+		return nil, fmt.Errorf("list vault items: %w", err)
+	}
+	defer rows.Close()
+
+	var items []Item
+	for rows.Next() {
+		var item Item
+		if err = rows.Scan(
+			&item.ID,
+			&item.UserID,
+			&item.Type,
+			&item.Metadata.Ciphertext,
+			&item.Metadata.Nonce,
+			&item.Payload.Ciphertext,
+			&item.Payload.Nonce,
+			&item.EncryptionAlg,
+			&item.PayloadSchemaVersion,
+			&item.Version,
+			&item.CreatedAt,
+			&item.UpdatedAt,
+			&item.DeletedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan vault item: %w", err)
+		}
+
+		items = append(items, item)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate vault items: %w", err)
+	}
+
+	return items, nil
+}
+
+// UpdateItem обновляет encrypted vault item при совпадении owner и expected version
+func (r *PostgresRepository) UpdateItem(ctx context.Context, params UpdateItemParams) (Item, error) {
+	var item Item
+
+	err := r.db.QueryRowContext(
+		ctx,
+		`UPDATE vault_items
+		SET
+			type = $4,
+			encrypted_metadata = $5,
+			metadata_nonce = $6,
+			encrypted_payload = $7,
+			payload_nonce = $8,
+			encryption_alg = $9,
+			payload_schema_version = $10,
+			version = version + 1,
+			updated_at = NOW()
+		WHERE id = $1
+			AND user_id = $2
+			AND version = $3
+			AND deleted_at IS NULL
+		RETURNING
+			id,
+			user_id,
+			type,
+			encrypted_metadata,
+			metadata_nonce,
+			encrypted_payload,
+			payload_nonce,
+			encryption_alg,
+			payload_schema_version,
+			version,
+			created_at,
+			updated_at,
+			deleted_at`,
+		params.ItemID,
+		params.UserID,
+		params.ExpectedVersion,
+		string(params.Type),
+		params.Metadata.Ciphertext,
+		params.Metadata.Nonce,
+		params.Payload.Ciphertext,
+		params.Payload.Nonce,
+		params.EncryptionAlg,
+		params.PayloadSchemaVersion,
+	).Scan(
+		&item.ID,
+		&item.UserID,
+		&item.Type,
+		&item.Metadata.Ciphertext,
+		&item.Metadata.Nonce,
+		&item.Payload.Ciphertext,
+		&item.Payload.Nonce,
+		&item.EncryptionAlg,
+		&item.PayloadSchemaVersion,
+		&item.Version,
+		&item.CreatedAt,
+		&item.UpdatedAt,
+		&item.DeletedAt,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return Item{}, ErrVersionConflict
+		}
+
+		return Item{}, fmt.Errorf("update vault item: %w", err)
+	}
+
+	return item, nil
+}
+
+// DeleteItem мягко удаляет vault item при совпадении owner и expected version
+func (r *PostgresRepository) DeleteItem(ctx context.Context, params DeleteItemParams) (DeleteItemResult, error) {
+	var result DeleteItemResult
+
+	err := r.db.QueryRowContext(
+		ctx,
+		`UPDATE vault_items
+		SET
+			version = version + 1,
+			updated_at = NOW(),
+			deleted_at = NOW()
+		WHERE id = $1
+			AND user_id = $2
+			AND version = $3
+			AND deleted_at IS NULL
+		RETURNING
+			id,
+			version,
+			deleted_at`,
+		params.ItemID,
+		params.UserID,
+		params.ExpectedVersion,
+	).Scan(
+		&result.ItemID,
+		&result.Version,
+		&result.DeletedAt,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return DeleteItemResult{}, ErrVersionConflict
+		}
+
+		return DeleteItemResult{}, fmt.Errorf("delete vault item: %w", err)
+	}
+
+	return result, nil
+}

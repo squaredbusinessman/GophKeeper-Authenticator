@@ -17,6 +17,9 @@ var (
 
 	// ErrAccessDenied означает попытку доступа к item другого пользователя
 	ErrAccessDenied = errors.New("vault item access denied")
+
+	// ErrVersionConflict означает, что item изменился после версии, известной клиенту
+	ErrVersionConflict = errors.New("vault item version conflict")
 )
 
 type ItemType string
@@ -71,6 +74,56 @@ type CreateItemParams struct {
 	PayloadSchemaVersion uint32
 }
 
+type ListItemsInput struct {
+	UserID         string
+	IncludeDeleted bool
+}
+
+type UpdateItemInput struct {
+	UserID               string
+	ItemID               string
+	ExpectedVersion      int64
+	Type                 ItemType
+	Metadata             EncryptedData
+	Payload              EncryptedData
+	EncryptionAlg        string
+	PayloadSchemaVersion uint32
+}
+
+type DeleteItemInput struct {
+	UserID          string
+	ItemID          string
+	ExpectedVersion int64
+}
+
+type ListItemsParams struct {
+	UserID         string
+	IncludeDeleted bool
+}
+
+type UpdateItemParams struct {
+	ItemID               string
+	UserID               string
+	ExpectedVersion      int64
+	Type                 ItemType
+	Metadata             EncryptedData
+	Payload              EncryptedData
+	EncryptionAlg        string
+	PayloadSchemaVersion uint32
+}
+
+type DeleteItemParams struct {
+	ItemID          string
+	UserID          string
+	ExpectedVersion int64
+}
+
+type DeleteItemResult struct {
+	ItemID    string
+	Version   int64
+	DeletedAt time.Time
+}
+
 func (d *EncryptedData) Validate() error {
 	if len(d.Ciphertext) == 0 {
 		return fmt.Errorf("%w: ciphertext is required", ErrInvalidInput)
@@ -118,6 +171,66 @@ func (i *GetItemInput) Validate() error {
 
 	if strings.TrimSpace(i.ItemID) == "" {
 		return fmt.Errorf("%w: item id is required", ErrInvalidInput)
+	}
+
+	return nil
+}
+
+func (i *ListItemsInput) Validate() error {
+	if strings.TrimSpace(i.UserID) == "" {
+		return fmt.Errorf("%w: user id is required", ErrInvalidInput)
+	}
+
+	return nil
+}
+
+func (i *UpdateItemInput) Validate() error {
+	if strings.TrimSpace(i.UserID) == "" {
+		return fmt.Errorf("%w: user id is required", ErrInvalidInput)
+	}
+
+	if strings.TrimSpace(i.ItemID) == "" {
+		return fmt.Errorf("%w: item id is required", ErrInvalidInput)
+	}
+
+	if i.ExpectedVersion <= 0 {
+		return fmt.Errorf("%w: expected version is required", ErrInvalidInput)
+	}
+
+	if i.Type == "" {
+		return fmt.Errorf("%w: item type is required", ErrInvalidInput)
+	}
+
+	if err := i.Metadata.Validate(); err != nil {
+		return err
+	}
+
+	if err := i.Payload.Validate(); err != nil {
+		return err
+	}
+
+	if strings.TrimSpace(i.EncryptionAlg) == "" {
+		return fmt.Errorf("%w: encryption algorithm is required", ErrInvalidInput)
+	}
+
+	if i.PayloadSchemaVersion == 0 {
+		return fmt.Errorf("%w: payload schema version is required", ErrInvalidInput)
+	}
+
+	return nil
+}
+
+func (i *DeleteItemInput) Validate() error {
+	if strings.TrimSpace(i.UserID) == "" {
+		return fmt.Errorf("%w: user id is required", ErrInvalidInput)
+	}
+
+	if strings.TrimSpace(i.ItemID) == "" {
+		return fmt.Errorf("%w: item id is required", ErrInvalidInput)
+	}
+
+	if i.ExpectedVersion <= 0 {
+		return fmt.Errorf("%w: expected version is required", ErrInvalidInput)
 	}
 
 	return nil

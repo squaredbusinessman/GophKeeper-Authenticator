@@ -10,6 +10,9 @@ import (
 type Repository interface {
 	CreateItem(context.Context, CreateItemParams) (Item, error)
 	FindItemByID(context.Context, string) (Item, error)
+	ListItems(context.Context, ListItemsParams) ([]Item, error)
+	UpdateItem(context.Context, UpdateItemParams) (Item, error)
+	DeleteItem(context.Context, DeleteItemParams) (DeleteItemResult, error)
 }
 
 // IDGenerator генерирует ID vault item
@@ -25,7 +28,7 @@ func (f IDGeneratorFunc) NewID() (string, error) {
 	return f()
 }
 
-// Service выполняет use case создания и получения vault items
+// Service выполняет use case работы с vault items
 type Service struct {
 	repository  Repository
 	idGenerator IDGenerator
@@ -86,4 +89,94 @@ func (s *Service) GetItem(ctx context.Context, input GetItemInput) (Item, error)
 	}
 
 	return item, nil
+}
+
+// ListItems возвращает encrypted vault items пользователя
+func (s *Service) ListItems(ctx context.Context, input ListItemsInput) ([]Item, error) {
+	if err := input.Validate(); err != nil {
+		return nil, err
+	}
+
+	items, err := s.repository.ListItems(ctx, ListItemsParams{
+		UserID:         strings.TrimSpace(input.UserID),
+		IncludeDeleted: input.IncludeDeleted,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list vault items: %w", err)
+	}
+
+	return items, nil
+}
+
+// UpdateItem обновляет encrypted vault item с проверкой владельца и expected version
+func (s *Service) UpdateItem(ctx context.Context, input UpdateItemInput) (Item, error) {
+	if err := input.Validate(); err != nil {
+		return Item{}, err
+	}
+
+	userID := strings.TrimSpace(input.UserID)
+	itemID := strings.TrimSpace(input.ItemID)
+
+	item, err := s.repository.FindItemByID(ctx, itemID)
+	if err != nil {
+		return Item{}, fmt.Errorf("find vault item by id: %w", err)
+	}
+
+	if item.UserID != userID {
+		return Item{}, ErrAccessDenied
+	}
+
+	if item.Version != input.ExpectedVersion {
+		return Item{}, ErrVersionConflict
+	}
+
+	updatedItem, err := s.repository.UpdateItem(ctx, UpdateItemParams{
+		ItemID:               itemID,
+		UserID:               userID,
+		ExpectedVersion:      input.ExpectedVersion,
+		Type:                 input.Type,
+		Metadata:             input.Metadata,
+		Payload:              input.Payload,
+		EncryptionAlg:        strings.TrimSpace(input.EncryptionAlg),
+		PayloadSchemaVersion: input.PayloadSchemaVersion,
+	})
+	if err != nil {
+		return Item{}, fmt.Errorf("update vault item: %w", err)
+	}
+
+	return updatedItem, nil
+}
+
+// DeleteItem мягко удаляет vault item с проверкой владельца и expected version
+func (s *Service) DeleteItem(ctx context.Context, input DeleteItemInput) (DeleteItemResult, error) {
+	if err := input.Validate(); err != nil {
+		return DeleteItemResult{}, err
+	}
+
+	userID := strings.TrimSpace(input.UserID)
+	itemID := strings.TrimSpace(input.ItemID)
+
+	item, err := s.repository.FindItemByID(ctx, itemID)
+	if err != nil {
+		return DeleteItemResult{}, fmt.Errorf("find vault item by id: %w", err)
+	}
+
+	if item.UserID != userID {
+		return DeleteItemResult{}, ErrAccessDenied
+	}
+
+	if item.Version != input.ExpectedVersion {
+		return DeleteItemResult{}, ErrVersionConflict
+	}
+
+	result, err := s.repository.DeleteItem(ctx, DeleteItemParams{
+		ItemID:          itemID,
+		UserID:          userID,
+		ExpectedVersion: input.ExpectedVersion,
+	})
+	if err != nil {
+		return DeleteItemResult{}, fmt.Errorf("delete vault item: %w", err)
+	}
+
+	return result, nil
 }

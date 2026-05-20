@@ -11,9 +11,15 @@ import (
 type fakeRepository struct {
 	createFunc func(context.Context, CreateItemParams) (Item, error)
 	findFunc   func(context.Context, string) (Item, error)
+	listFunc   func(context.Context, ListItemsParams) ([]Item, error)
+	updateFunc func(context.Context, UpdateItemParams) (Item, error)
+	deleteFunc func(context.Context, DeleteItemParams) (DeleteItemResult, error)
 
 	createCalls []CreateItemParams
 	findCalls   []string
+	listCalls   []ListItemsParams
+	updateCalls []UpdateItemParams
+	deleteCalls []DeleteItemParams
 }
 
 func (r *fakeRepository) CreateItem(ctx context.Context, params CreateItemParams) (Item, error) {
@@ -43,6 +49,45 @@ func (r *fakeRepository) FindItemByID(ctx context.Context, itemID string) (Item,
 	}
 
 	return validItem(), nil
+}
+
+func (r *fakeRepository) ListItems(ctx context.Context, params ListItemsParams) ([]Item, error) {
+	r.listCalls = append(r.listCalls, params)
+	if r.listFunc != nil {
+		return r.listFunc(ctx, params)
+	}
+
+	return []Item{validItem()}, nil
+}
+
+func (r *fakeRepository) UpdateItem(ctx context.Context, params UpdateItemParams) (Item, error) {
+	r.updateCalls = append(r.updateCalls, params)
+	if r.updateFunc != nil {
+		return r.updateFunc(ctx, params)
+	}
+
+	item := validItem()
+	item.Type = params.Type
+	item.Metadata = params.Metadata
+	item.Payload = params.Payload
+	item.EncryptionAlg = params.EncryptionAlg
+	item.PayloadSchemaVersion = params.PayloadSchemaVersion
+	item.Version = params.ExpectedVersion + 1
+	item.UpdatedAt = time.Date(2026, 5, 20, 12, 30, 0, 0, time.UTC)
+	return item, nil
+}
+
+func (r *fakeRepository) DeleteItem(ctx context.Context, params DeleteItemParams) (DeleteItemResult, error) {
+	r.deleteCalls = append(r.deleteCalls, params)
+	if r.deleteFunc != nil {
+		return r.deleteFunc(ctx, params)
+	}
+
+	return DeleteItemResult{
+		ItemID:    params.ItemID,
+		Version:   params.ExpectedVersion + 1,
+		DeletedAt: time.Date(2026, 5, 20, 13, 0, 0, 0, time.UTC),
+	}, nil
 }
 
 type fakeIDGenerator struct {
@@ -371,5 +416,344 @@ func TestServiceGetItemReturnsErrorForInvalidInput(t *testing.T) {
 				t.Fatalf("repository find calls = %d, want 0", len(repository.findCalls))
 			}
 		})
+	}
+}
+
+func TestServiceListItemsReturnsOwnedItems(t *testing.T) {
+	repository := &fakeRepository{
+		listFunc: func(_ context.Context, params ListItemsParams) ([]Item, error) {
+			if params.UserID != "user-id-1" {
+				t.Fatalf("UserID = %q, want user-id-1", params.UserID)
+			}
+
+			if params.IncludeDeleted {
+				t.Fatalf("IncludeDeleted = true, want false")
+			}
+
+			return []Item{validItem()}, nil
+		},
+	}
+	service := newTestService(repository)
+
+	items, err := service.ListItems(context.Background(), ListItemsInput{
+		UserID: " user-id-1 ",
+	})
+	if err != nil {
+		t.Fatalf("ListItems() error = %v", err)
+	}
+
+	if len(items) != 1 {
+		t.Fatalf("items length = %d, want 1", len(items))
+	}
+
+	if len(repository.listCalls) != 1 {
+		t.Fatalf("repository list calls = %d, want 1", len(repository.listCalls))
+	}
+}
+
+func TestServiceListItemsReturnsErrorForInvalidInput(t *testing.T) {
+	repository := &fakeRepository{}
+	service := newTestService(repository)
+
+	_, err := service.ListItems(context.Background(), ListItemsInput{})
+	if !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("ListItems() error = %v, want ErrInvalidInput", err)
+	}
+
+	if len(repository.listCalls) != 0 {
+		t.Fatalf("repository list calls = %d, want 0", len(repository.listCalls))
+	}
+}
+
+func TestServiceUpdateItemUpdatesOwnedItemWithExpectedVersion(t *testing.T) {
+	repository := &fakeRepository{
+		findFunc: func(context.Context, string) (Item, error) {
+			item := validItem()
+			item.Version = 3
+			return item, nil
+		},
+	}
+	service := newTestService(repository)
+	input := validUpdateInput()
+
+	item, err := service.UpdateItem(context.Background(), input)
+	if err != nil {
+		t.Fatalf("UpdateItem() error = %v", err)
+	}
+
+	if item.Version != 4 {
+		t.Fatalf("Version = %d, want 4", item.Version)
+	}
+
+	if len(repository.findCalls) != 1 || repository.findCalls[0] != "item-id-1" {
+		t.Fatalf("repository find calls = %v, want item-id-1", repository.findCalls)
+	}
+
+	if len(repository.updateCalls) != 1 {
+		t.Fatalf("repository update calls = %d, want 1", len(repository.updateCalls))
+	}
+
+	params := repository.updateCalls[0]
+	if params.UserID != "user-id-1" {
+		t.Fatalf("UserID = %q, want user-id-1", params.UserID)
+	}
+
+	if params.ExpectedVersion != 3 {
+		t.Fatalf("ExpectedVersion = %d, want 3", params.ExpectedVersion)
+	}
+
+	if params.Type != ItemTypeText {
+		t.Fatalf("Type = %q, want %q", params.Type, ItemTypeText)
+	}
+}
+
+func TestServiceUpdateItemReturnsVersionConflict(t *testing.T) {
+	repository := &fakeRepository{
+		findFunc: func(context.Context, string) (Item, error) {
+			item := validItem()
+			item.Version = 4
+			return item, nil
+		},
+	}
+	service := newTestService(repository)
+	input := validUpdateInput()
+	input.ExpectedVersion = 3
+
+	_, err := service.UpdateItem(context.Background(), input)
+	if !errors.Is(err, ErrVersionConflict) {
+		t.Fatalf("UpdateItem() error = %v, want ErrVersionConflict", err)
+	}
+
+	if len(repository.updateCalls) != 0 {
+		t.Fatalf("repository update calls = %d, want 0", len(repository.updateCalls))
+	}
+}
+
+func TestServiceUpdateItemReturnsAccessDeniedForDifferentOwner(t *testing.T) {
+	repository := &fakeRepository{
+		findFunc: func(context.Context, string) (Item, error) {
+			item := validItem()
+			item.UserID = "another-user-id"
+			return item, nil
+		},
+	}
+	service := newTestService(repository)
+
+	_, err := service.UpdateItem(context.Background(), validUpdateInput())
+	if !errors.Is(err, ErrAccessDenied) {
+		t.Fatalf("UpdateItem() error = %v, want ErrAccessDenied", err)
+	}
+
+	if len(repository.updateCalls) != 0 {
+		t.Fatalf("repository update calls = %d, want 0", len(repository.updateCalls))
+	}
+}
+
+func TestServiceUpdateItemReturnsErrorForInvalidInput(t *testing.T) {
+	tests := []struct {
+		name  string
+		input UpdateItemInput
+	}{
+		{
+			name: "empty user id",
+			input: func() UpdateItemInput {
+				input := validUpdateInput()
+				input.UserID = " "
+				return input
+			}(),
+		},
+		{
+			name: "empty item id",
+			input: func() UpdateItemInput {
+				input := validUpdateInput()
+				input.ItemID = " "
+				return input
+			}(),
+		},
+		{
+			name: "zero expected version",
+			input: func() UpdateItemInput {
+				input := validUpdateInput()
+				input.ExpectedVersion = 0
+				return input
+			}(),
+		},
+		{
+			name: "empty payload ciphertext",
+			input: func() UpdateItemInput {
+				input := validUpdateInput()
+				input.Payload.Ciphertext = nil
+				return input
+			}(),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repository := &fakeRepository{}
+			service := newTestService(repository)
+
+			_, err := service.UpdateItem(context.Background(), tt.input)
+			if !errors.Is(err, ErrInvalidInput) {
+				t.Fatalf("UpdateItem() error = %v, want ErrInvalidInput", err)
+			}
+
+			if len(repository.findCalls) != 0 {
+				t.Fatalf("repository find calls = %d, want 0", len(repository.findCalls))
+			}
+		})
+	}
+}
+
+func TestServiceDeleteItemSoftDeletesOwnedItemWithExpectedVersion(t *testing.T) {
+	repository := &fakeRepository{
+		findFunc: func(context.Context, string) (Item, error) {
+			item := validItem()
+			item.Version = 5
+			return item, nil
+		},
+	}
+	service := newTestService(repository)
+
+	result, err := service.DeleteItem(context.Background(), DeleteItemInput{
+		UserID:          " user-id-1 ",
+		ItemID:          " item-id-1 ",
+		ExpectedVersion: 5,
+	})
+	if err != nil {
+		t.Fatalf("DeleteItem() error = %v", err)
+	}
+
+	if result.ItemID != "item-id-1" {
+		t.Fatalf("ItemID = %q, want item-id-1", result.ItemID)
+	}
+
+	if result.Version != 6 {
+		t.Fatalf("Version = %d, want 6", result.Version)
+	}
+
+	if result.DeletedAt.IsZero() {
+		t.Fatalf("DeletedAt is zero")
+	}
+
+	if len(repository.deleteCalls) != 1 {
+		t.Fatalf("repository delete calls = %d, want 1", len(repository.deleteCalls))
+	}
+
+	params := repository.deleteCalls[0]
+	if params.ExpectedVersion != 5 {
+		t.Fatalf("ExpectedVersion = %d, want 5", params.ExpectedVersion)
+	}
+}
+
+func TestServiceDeleteItemReturnsVersionConflict(t *testing.T) {
+	repository := &fakeRepository{
+		findFunc: func(context.Context, string) (Item, error) {
+			item := validItem()
+			item.Version = 6
+			return item, nil
+		},
+	}
+	service := newTestService(repository)
+
+	_, err := service.DeleteItem(context.Background(), DeleteItemInput{
+		UserID:          "user-id-1",
+		ItemID:          "item-id-1",
+		ExpectedVersion: 5,
+	})
+	if !errors.Is(err, ErrVersionConflict) {
+		t.Fatalf("DeleteItem() error = %v, want ErrVersionConflict", err)
+	}
+
+	if len(repository.deleteCalls) != 0 {
+		t.Fatalf("repository delete calls = %d, want 0", len(repository.deleteCalls))
+	}
+}
+
+func TestServiceDeleteItemReturnsAccessDeniedForDifferentOwner(t *testing.T) {
+	repository := &fakeRepository{
+		findFunc: func(context.Context, string) (Item, error) {
+			item := validItem()
+			item.UserID = "another-user-id"
+			return item, nil
+		},
+	}
+	service := newTestService(repository)
+
+	_, err := service.DeleteItem(context.Background(), DeleteItemInput{
+		UserID:          "user-id-1",
+		ItemID:          "item-id-1",
+		ExpectedVersion: 1,
+	})
+	if !errors.Is(err, ErrAccessDenied) {
+		t.Fatalf("DeleteItem() error = %v, want ErrAccessDenied", err)
+	}
+
+	if len(repository.deleteCalls) != 0 {
+		t.Fatalf("repository delete calls = %d, want 0", len(repository.deleteCalls))
+	}
+}
+
+func TestServiceDeleteItemReturnsErrorForInvalidInput(t *testing.T) {
+	tests := []struct {
+		name  string
+		input DeleteItemInput
+	}{
+		{
+			name: "empty user id",
+			input: DeleteItemInput{
+				ItemID:          "item-id-1",
+				ExpectedVersion: 1,
+			},
+		},
+		{
+			name: "empty item id",
+			input: DeleteItemInput{
+				UserID:          "user-id-1",
+				ExpectedVersion: 1,
+			},
+		},
+		{
+			name: "zero expected version",
+			input: DeleteItemInput{
+				UserID: "user-id-1",
+				ItemID: "item-id-1",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repository := &fakeRepository{}
+			service := newTestService(repository)
+
+			_, err := service.DeleteItem(context.Background(), tt.input)
+			if !errors.Is(err, ErrInvalidInput) {
+				t.Fatalf("DeleteItem() error = %v, want ErrInvalidInput", err)
+			}
+
+			if len(repository.findCalls) != 0 {
+				t.Fatalf("repository find calls = %d, want 0", len(repository.findCalls))
+			}
+		})
+	}
+}
+
+func validUpdateInput() UpdateItemInput {
+	return UpdateItemInput{
+		UserID:          "user-id-1",
+		ItemID:          "item-id-1",
+		ExpectedVersion: 3,
+		Type:            ItemTypeText,
+		Metadata: EncryptedData{
+			Ciphertext: []byte("updated-encrypted-metadata"),
+			Nonce:      []byte("updated-metadata-nonce"),
+		},
+		Payload: EncryptedData{
+			Ciphertext: []byte("updated-encrypted-payload"),
+			Nonce:      []byte("updated-payload-nonce"),
+		},
+		EncryptionAlg:        "aes-256-gcm",
+		PayloadSchemaVersion: 2,
 	}
 }
