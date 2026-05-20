@@ -506,7 +506,7 @@ func (s *VaultService) SyncSecrets(ctx context.Context, session Session, input S
 	}
 
 	return SyncSecretsResult{
-		Secrets: secrets,
+		Secrets:          secrets,
 		NextChangedAfter: timestampToTime(response.GetNextChangedAfter()),
 	}, nil
 }
