@@ -618,13 +618,32 @@ CLI должен показывать:
 go run ./cmd/gophkeeper-cli version
 ```
 
-Планируемая сборка с `ldflags`:
+Локальная сборка CLI для текущей платформы:
 
 ```bash
-go build \
-  -ldflags "-X github.com/squaredbusinessman/gophkeeper-authenticator/internal/shared/version.Version=dev -X github.com/squaredbusinessman/gophkeeper-authenticator/internal/shared/version.BuildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ) -X github.com/squaredbusinessman/gophkeeper-authenticator/internal/shared/version.Commit=$(git rev-parse --short HEAD)" \
-  -o ./bin/gophkeeper \
-  ./cmd/gophkeeper-cli
+make build-cli
+```
+
+Кроссплатформенная сборка CLI:
+
+```bash
+make build-cli-all
+```
+
+Она собирает бинарные файлы в `bin`:
+
+```text
+gophkeeper-cli_linux_amd64
+gophkeeper-cli_linux_arm64
+gophkeeper-cli_darwin_amd64
+gophkeeper-cli_darwin_arm64
+gophkeeper-cli_windows_amd64.exe
+```
+
+Версию, дату сборки и commit hash можно переопределить через переменные:
+
+```bash
+VERSION=0.1.0 make build-cli-all
 ```
 
 ## Proto и gRPC code generation
