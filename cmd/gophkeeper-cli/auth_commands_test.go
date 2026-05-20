@@ -86,7 +86,7 @@ func TestRegisterCommandPromptsPasswordsHiddenAndCallsAuthService(t *testing.T) 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	err := runCLI(context.Background(), []string{"register"}, authService, prompter, &stdout, &stderr)
+	err := runCLI(context.Background(), []string{"register"}, authService, nil, prompter, &stdout, &stderr)
 	if err != nil {
 		t.Fatalf("runCLI() error = %v", err)
 	}
@@ -139,7 +139,7 @@ func TestRegisterCommandRejectsDifferentMasterPasswordRepeat(t *testing.T) {
 		},
 	}
 
-	err := runCLI(context.Background(), []string{"register"}, authService, prompter, &bytes.Buffer{}, &bytes.Buffer{})
+	err := runCLI(context.Background(), []string{"register"}, authService, nil, prompter, &bytes.Buffer{}, &bytes.Buffer{})
 	if err == nil {
 		t.Fatalf("runCLI() error = nil, want error")
 	}
@@ -161,7 +161,7 @@ func TestRegisterCommandRejectsEqualLoginAndMasterPasswords(t *testing.T) {
 		},
 	}
 
-	err := runCLI(context.Background(), []string{"register"}, authService, prompter, &bytes.Buffer{}, &bytes.Buffer{})
+	err := runCLI(context.Background(), []string{"register"}, authService, nil, prompter, &bytes.Buffer{}, &bytes.Buffer{})
 	if err == nil {
 		t.Fatalf("runCLI() error = nil, want error")
 	}
@@ -186,7 +186,7 @@ func TestLoginCommandPromptsPasswordsHiddenAndCallsAuthService(t *testing.T) {
 	}
 	var stdout bytes.Buffer
 
-	err := runCLI(context.Background(), []string{"login"}, authService, prompter, &stdout, &bytes.Buffer{})
+	err := runCLI(context.Background(), []string{"login"}, authService, nil, prompter, &stdout, &bytes.Buffer{})
 	if err != nil {
 		t.Fatalf("runCLI() error = %v", err)
 	}
@@ -230,7 +230,7 @@ func TestLoginCommandRejectsEqualLoginAndMasterPasswords(t *testing.T) {
 		},
 	}
 
-	err := runCLI(context.Background(), []string{"login"}, authService, prompter, &bytes.Buffer{}, &bytes.Buffer{})
+	err := runCLI(context.Background(), []string{"login"}, authService, nil, prompter, &bytes.Buffer{}, &bytes.Buffer{})
 	if err == nil {
 		t.Fatalf("runCLI() error = nil, want error")
 	}

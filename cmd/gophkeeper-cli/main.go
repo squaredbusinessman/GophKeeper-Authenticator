@@ -43,11 +43,13 @@ func printUsageTo(stdout io.Writer) {
 	fmt.Fprintln(stdout, "  gophkeeper version")
 	fmt.Fprintln(stdout, "  gophkeeper register")
 	fmt.Fprintln(stdout, "  gophkeeper login")
+	fmt.Fprintln(stdout, "  gophkeeper create")
+	fmt.Fprintln(stdout, "  gophkeeper get")
 }
 
 func run(ctx context.Context, args []string, stdout io.Writer, stderr io.Writer) error {
 	if len(args) > 0 && args[0] == "version" {
-		return runCLI(ctx, args, nil, nil, stdout, stderr)
+		return runCLI(ctx, args, nil, nil, nil, stdout, stderr)
 	}
 
 	cfg, err := config.Load()
@@ -65,9 +67,11 @@ func run(ctx context.Context, args []string, stdout io.Writer, stderr io.Writer)
 	defer conn.Close()
 
 	authClient := gophkeeperv1.NewAuthServiceClient(conn)
+	vaultClient := gophkeeperv1.NewVaultServiceClient(conn)
 	tokenStore := core.NewFileTokenStore(cfg.TokenFile)
 	authService := core.NewAuthService(authClient, tokenStore)
+	vaultService := core.NewVaultService(vaultClient)
 	prompter := newTerminalPrompter(os.Stdin, stdout, int(os.Stdin.Fd()))
 
-	return runCLI(ctx, args, authService, prompter, stdout, stderr)
+	return runCLI(ctx, args, authService, vaultService, prompter, stdout, stderr)
 }

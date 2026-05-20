@@ -497,7 +497,7 @@ go run ./cmd/gophkeeper-server
 
 ## CLI
 
-Сейчас CLI умеет показывать версию, регистрировать пользователя и выполнять вход.
+Сейчас CLI умеет показывать версию, регистрировать пользователя, выполнять вход, создавать текстовый секрет и получать текстовый секрет по ID.
 
 Запуск через Go:
 
@@ -517,7 +517,19 @@ go run ./cmd/gophkeeper-cli register
 go run ./cmd/gophkeeper-cli login
 ```
 
-Команды `register` и `login` используют интерактивный ввод:
+Создание текстового секрета:
+
+```bash
+go run ./cmd/gophkeeper-cli create
+```
+
+Получение текстового секрета:
+
+```bash
+go run ./cmd/gophkeeper-cli get
+```
+
+Команды `register`, `login`, `create` и `get` используют интерактивный ввод:
 
 - login вводится обычным prompt;
 - пароль входа вводится скрытым prompt;
@@ -526,7 +538,11 @@ go run ./cmd/gophkeeper-cli login
 - пароль входа и мастер-пароль не должны совпадать;
 - при регистрации CLI предупреждает, что мастер-пароль невозможно восстановить.
 
-Перед запуском `register` и `login` должен быть запущен gRPC-сервер. По умолчанию клиент подключается к:
+Команда `create` сейчас создает секрет первого поддержанного типа: текстовый секрет. CLI запрашивает title обычным prompt, а само секретное значение скрытым prompt. Title сохраняется как metadata, секретный текст сохраняется как payload. Перед отправкой на сервер client core шифрует и metadata, и payload через vault key.
+
+Команда `get` запрашивает ID секрета, получает encrypted item с сервера и расшифровывает metadata и payload на клиенте. Для открытия vault команды `create` и `get` заново запрашивают login, пароль входа и мастер-пароль. Это нужно потому, что текущий CLI сохраняет только access token, но не хранит открытый vault key между запусками.
+
+Перед запуском `register`, `login`, `create` и `get` должен быть запущен gRPC-сервер. По умолчанию клиент подключается к:
 
 ```text
 localhost:9090
@@ -572,6 +588,8 @@ go build -o ./bin/gophkeeper ./cmd/gophkeeper-cli
 gophkeeper version
 gophkeeper register
 gophkeeper login
+gophkeeper create
+gophkeeper get
 ```
 
 Планируемые команды CLI:
@@ -579,8 +597,6 @@ gophkeeper login
 ```text
 gophkeeper logout
 gophkeeper list
-gophkeeper get
-gophkeeper create
 gophkeeper update
 gophkeeper delete
 gophkeeper sync
@@ -698,11 +714,14 @@ GOPHKEEPER_DATABASE_DSN='postgres://gophkeeper:gophkeeper@localhost:5432/gophkee
 - шифрование payload;
 - register use case;
 - login use case;
+- vault create/get use cases;
+- client core create/get secret flow;
+- CLI register/login/create/get flow;
 - JWT issue и validate;
 - mapping ошибок auth use cases в gRPC status codes;
 - сборка server и CLI в CI.
 
-Полный ручной сценарий через CLI появится после реализации client core и CLI-команд `register`/`login`.
+Ручной сценарий через CLI на текущем этапе уже покрывает регистрацию, вход, создание текстового секрета и получение текстового секрета по ID.
 
 ## Будущий приемочный сценарий
 
