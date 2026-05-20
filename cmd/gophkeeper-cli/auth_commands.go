@@ -145,6 +145,12 @@ func runCLI(
 		return runCreateTextSecret(ctx, authService, vaultService, prompter, stdout)
 	case "get":
 		return runGetTextSecret(ctx, authService, vaultService, prompter, stdout)
+	case "list":
+		return runListTextSecrets(ctx, authService, vaultService, prompter, stdout)
+	case "update":
+		return runUpdateTextSecret(ctx, authService, vaultService, prompter, stdout)
+	case "delete":
+		return runDeleteTextSecret(ctx, authService, vaultService, prompter, stdout)
 	case "version":
 		printVersionTo(stdout)
 		return nil

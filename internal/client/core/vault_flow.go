@@ -17,6 +17,9 @@ import (
 type VaultServiceClient interface {
 	CreateItem(context.Context, *gophkeeperv1.CreateItemRequest, ...grpc.CallOption) (*gophkeeperv1.CreateItemResponse, error)
 	GetItem(context.Context, *gophkeeperv1.GetItemRequest, ...grpc.CallOption) (*gophkeeperv1.GetItemResponse, error)
+	ListItems(context.Context, *gophkeeperv1.ListItemsRequest, ...grpc.CallOption) (*gophkeeperv1.ListItemsResponse, error)
+	UpdateItem(context.Context, *gophkeeperv1.UpdateItemRequest, ...grpc.CallOption) (*gophkeeperv1.UpdateItemResponse, error)
+	DeleteItem(context.Context, *gophkeeperv1.DeleteItemRequest, ...grpc.CallOption) (*gophkeeperv1.DeleteItemResponse, error)
 }
 
 // SecretType описывает тип секрета внутри client core без прямой зависимости UI от proto enum
@@ -63,6 +66,30 @@ type Secret struct {
 	CreatedAt            time.Time
 	UpdatedAt            time.Time
 	DeletedAt            *time.Time
+}
+
+type ListSecretsInput struct {
+	IncludeDeleted bool
+}
+
+type UpdateSecretInput struct {
+	ID                   string
+	ExpectedVersion      int64
+	Type                 SecretType
+	Metadata             []byte
+	Payload              []byte
+	PayloadSchemaVersion uint32
+}
+
+type DeleteSecretInput struct {
+	ID              string
+	ExpectedVersion int64
+}
+
+type DeleteSecretResult struct {
+	ID        string
+	Version   int64
+	DeletedAt time.Time
 }
 
 // VaultService выполняет client vault flow без UI-логики
@@ -280,4 +307,158 @@ func timestampToTimePtr(ts *timestamppb.Timestamp) *time.Time {
 
 	value := ts.AsTime()
 	return &value
+}
+
+// ListSecrets получает список секретов и расшифровывает active items на клиенте
+func (s *VaultService) ListSecrets(ctx context.Context, session Session, input ListSecretsInput) ([]Secret, error) {
+	if err := s.validateDependencies(); err != nil {
+		return nil, err
+	}
+
+	if err := validateSession(session); err != nil {
+		return nil, err
+	}
+
+	ctx = contextWithAccessToken(ctx, session.AccessToken)
+
+	response, err := s.vaultClient.ListItems(ctx, &gophkeeperv1.ListItemsRequest{
+		IncludeDeleted: input.IncludeDeleted,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list secrets: %w", err)
+	}
+
+	secrets := make([]Secret, 0, len(response.GetItems()))
+	for _, item := range response.GetItems() {
+		// это defensive boundary
+		if !input.IncludeDeleted && item.GetDeletedAt() != nil {
+			continue
+		}
+
+		secret, err := secretFromProto(session.VaultKey, item)
+		if err != nil {
+			return nil, fmt.Errorf("decode listed secret: %w", err)
+		}
+
+		secrets = append(secrets, secret)
+	}
+
+	return secrets, nil
+}
+
+// UpdateSecret шифрует новые plaintext-данные и обновляет секрет с expected version
+func (s *VaultService) UpdateSecret(ctx context.Context, session Session, input UpdateSecretInput) (Secret, error) {
+	if err := s.validateDependencies(); err != nil {
+		return Secret{}, err
+	}
+
+	if err := validateSession(session); err != nil {
+		return Secret{}, err
+	}
+
+	if err := input.validate(); err != nil {
+		return Secret{}, err
+	}
+
+	encryptedMetadata, err := payload.Encrypt(session.VaultKey, input.Metadata)
+	if err != nil {
+		return Secret{}, fmt.Errorf("encrypt metadata: %w", err)
+	}
+
+	encryptedPayload, err := payload.Encrypt(session.VaultKey, input.Payload)
+	if err != nil {
+		return Secret{}, fmt.Errorf("encrypt payload: %w", err)
+	}
+
+	ctx = contextWithAccessToken(ctx, session.AccessToken)
+
+	response, err := s.vaultClient.UpdateItem(ctx, &gophkeeperv1.UpdateItemRequest{
+		Id:                   strings.TrimSpace(input.ID),
+		ExpectedVersion:      input.ExpectedVersion,
+		Type:                 secretTypeToProto(input.Type),
+		Metadata:             encryptedDataToProto(encryptedMetadata),
+		Payload:              encryptedDataToProto(encryptedPayload),
+		EncryptionAlg:        payload.EncryptionAlgorithm,
+		PayloadSchemaVersion: input.PayloadSchemaVersion,
+	})
+	if err != nil {
+		return Secret{}, fmt.Errorf("update secret: %w", err)
+	}
+
+	return secretFromProto(session.VaultKey, response.GetItem())
+}
+
+// DeleteSecret мягко удаляет секрет с expected version
+func (s *VaultService) DeleteSecret(ctx context.Context, session Session, input DeleteSecretInput) (DeleteSecretResult, error) {
+	if err := s.validateDependencies(); err != nil {
+		return DeleteSecretResult{}, err
+	}
+
+	if err := validateSession(session); err != nil {
+		return DeleteSecretResult{}, err
+	}
+
+	if err := input.validate(); err != nil {
+		return DeleteSecretResult{}, err
+	}
+
+	ctx = contextWithAccessToken(ctx, session.AccessToken)
+
+	response, err := s.vaultClient.DeleteItem(ctx, &gophkeeperv1.DeleteItemRequest{
+		Id:              strings.TrimSpace(input.ID),
+		ExpectedVersion: input.ExpectedVersion,
+	})
+	if err != nil {
+		return DeleteSecretResult{}, fmt.Errorf("delete secret: %w", err)
+	}
+
+	if strings.TrimSpace(response.GetId()) == "" {
+		return DeleteSecretResult{}, fmt.Errorf("deleted secret id is required")
+	}
+
+	if response.GetVersion() <= 0 {
+		return DeleteSecretResult{}, fmt.Errorf("deleted secret version is required")
+	}
+
+	if response.GetDeletedAt() == nil {
+		return DeleteSecretResult{}, fmt.Errorf("deleted secret timestamp is required")
+	}
+
+	return DeleteSecretResult{
+		ID:        response.GetId(),
+		Version:   response.GetVersion(),
+		DeletedAt: response.GetDeletedAt().AsTime(),
+	}, nil
+}
+
+func (i *UpdateSecretInput) validate() error {
+	if strings.TrimSpace(i.ID) == "" {
+		return fmt.Errorf("secret id is required")
+	}
+
+	if i.ExpectedVersion <= 0 {
+		return fmt.Errorf("expected version is required")
+	}
+
+	if i.Type == SecretTypeUnspecified {
+		return fmt.Errorf("secret type is required")
+	}
+
+	if i.PayloadSchemaVersion == 0 {
+		return fmt.Errorf("payload schema version is required")
+	}
+
+	return nil
+}
+
+func (i *DeleteSecretInput) validate() error {
+	if strings.TrimSpace(i.ID) == "" {
+		return fmt.Errorf("secret id is required")
+	}
+
+	if i.ExpectedVersion <= 0 {
+		return fmt.Errorf("expected version is required")
+	}
+
+	return nil
 }

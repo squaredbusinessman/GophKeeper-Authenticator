@@ -45,6 +45,9 @@ func printUsageTo(stdout io.Writer) {
 	fmt.Fprintln(stdout, "  gophkeeper login")
 	fmt.Fprintln(stdout, "  gophkeeper create")
 	fmt.Fprintln(stdout, "  gophkeeper get")
+	fmt.Fprintln(stdout, "  gophkeeper list")
+	fmt.Fprintln(stdout, "  gophkeeper update")
+	fmt.Fprintln(stdout, "  gophkeeper delete")
 }
 
 func run(ctx context.Context, args []string, stdout io.Writer, stderr io.Writer) error {
