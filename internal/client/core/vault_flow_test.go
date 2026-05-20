@@ -21,12 +21,14 @@ type fakeVaultClient struct {
 	listItemsFunc  func(context.Context, *gophkeeperv1.ListItemsRequest, ...grpc.CallOption) (*gophkeeperv1.ListItemsResponse, error)
 	updateItemFunc func(context.Context, *gophkeeperv1.UpdateItemRequest, ...grpc.CallOption) (*gophkeeperv1.UpdateItemResponse, error)
 	deleteItemFunc func(context.Context, *gophkeeperv1.DeleteItemRequest, ...grpc.CallOption) (*gophkeeperv1.DeleteItemResponse, error)
+	syncFunc       func(context.Context, *gophkeeperv1.SyncRequest, ...grpc.CallOption) (*gophkeeperv1.SyncResponse, error)
 
 	createItemCalls []vaultClientCall[*gophkeeperv1.CreateItemRequest]
 	getItemCalls    []vaultClientCall[*gophkeeperv1.GetItemRequest]
 	listItemsCalls  []vaultClientCall[*gophkeeperv1.ListItemsRequest]
 	updateItemCalls []vaultClientCall[*gophkeeperv1.UpdateItemRequest]
 	deleteItemCalls []vaultClientCall[*gophkeeperv1.DeleteItemRequest]
+	syncCalls       []vaultClientCall[*gophkeeperv1.SyncRequest]
 }
 
 type vaultClientCall[T any] struct {
@@ -92,6 +94,18 @@ func (c *fakeVaultClient) DeleteItem(ctx context.Context, req *gophkeeperv1.Dele
 	}
 
 	return nil, errors.New("unexpected delete item call")
+}
+
+func (c *fakeVaultClient) Sync(ctx context.Context, req *gophkeeperv1.SyncRequest, opts ...grpc.CallOption) (*gophkeeperv1.SyncResponse, error) {
+	c.syncCalls = append(c.syncCalls, vaultClientCall[*gophkeeperv1.SyncRequest]{
+		ctx: ctx,
+		req: req,
+	})
+	if c.syncFunc != nil {
+		return c.syncFunc(ctx, req, opts...)
+	}
+
+	return nil, errors.New("unexpected sync call")
 }
 
 func TestVaultServiceCreateSecretEncryptsPayloadAndSendsAccessToken(t *testing.T) {
@@ -442,6 +456,77 @@ func TestVaultServiceDeleteSecretSendsExpectedVersion(t *testing.T) {
 	}
 }
 
+func TestVaultServiceSyncSecretsDecryptsChangedItemsAndSendsAccessToken(t *testing.T) {
+	session := testSession()
+	changedAfter := time.Date(2026, 5, 20, 10, 0, 0, 0, time.UTC)
+	nextChangedAfter := time.Date(2026, 5, 20, 12, 0, 0, 0, time.UTC)
+	deletedAt := time.Date(2026, 5, 20, 11, 0, 0, 0, time.UTC)
+
+	activeMetadata := []byte(`{"title":"active note"}`)
+	activePayload := []byte("active secret")
+	deletedMetadata := []byte(`{"title":"deleted note"}`)
+	deletedPayload := []byte("deleted secret")
+
+	activeItem := encryptedVaultItem(t, session.VaultKey, "active-id", gophkeeperv1.ItemType_ITEM_TYPE_TEXT, activeMetadata, activePayload)
+	deletedItem := encryptedVaultItem(t, session.VaultKey, "deleted-id", gophkeeperv1.ItemType_ITEM_TYPE_TEXT, deletedMetadata, deletedPayload)
+	deletedItem.DeletedAt = timestamppb.New(deletedAt)
+
+	vaultClient := &fakeVaultClient{
+		syncFunc: func(_ context.Context, req *gophkeeperv1.SyncRequest, _ ...grpc.CallOption) (*gophkeeperv1.SyncResponse, error) {
+			if req.GetChangedAfter() == nil {
+				t.Fatalf("ChangedAfter = nil, want timestamp")
+			}
+
+			if !req.GetChangedAfter().AsTime().Equal(changedAfter) {
+				t.Fatalf("ChangedAfter = %s, want %s", req.GetChangedAfter().AsTime(), changedAfter)
+			}
+
+			return &gophkeeperv1.SyncResponse{
+				Items:            []*gophkeeperv1.VaultItem{activeItem, deletedItem},
+				NextChangedAfter: timestamppb.New(nextChangedAfter),
+			}, nil
+		},
+	}
+	service := NewVaultService(vaultClient)
+
+	result, err := service.SyncSecrets(context.Background(), session, SyncSecretsInput{
+		ChangedAfter: changedAfter,
+	})
+	if err != nil {
+		t.Fatalf("SyncSecrets() error = %v", err)
+	}
+
+	if len(vaultClient.syncCalls) != 1 {
+		t.Fatalf("Sync() calls = %d, want 1", len(vaultClient.syncCalls))
+	}
+
+	assertOutgoingBearerToken(t, vaultClient.syncCalls[0].ctx, session.AccessToken)
+
+	if len(result.Secrets) != 2 {
+		t.Fatalf("secrets length = %d, want 2", len(result.Secrets))
+	}
+
+	if result.Secrets[0].ID != "active-id" {
+		t.Fatalf("active secret id = %q, want active-id", result.Secrets[0].ID)
+	}
+
+	if !bytes.Equal(result.Secrets[0].Payload, activePayload) {
+		t.Fatalf("active secret payload does not match plaintext")
+	}
+
+	if result.Secrets[1].DeletedAt == nil {
+		t.Fatalf("deleted secret DeletedAt = nil")
+	}
+
+	if !result.Secrets[1].DeletedAt.Equal(deletedAt) {
+		t.Fatalf("deleted secret DeletedAt = %s, want %s", *result.Secrets[1].DeletedAt, deletedAt)
+	}
+
+	if !result.NextChangedAfter.Equal(nextChangedAfter) {
+		t.Fatalf("NextChangedAfter = %s, want %s", result.NextChangedAfter, nextChangedAfter)
+	}
+}
+
 func TestVaultServiceGetSecretReturnsErrorWhenCiphertextIsDamaged(t *testing.T) {
 	session := testSession()
 	encryptedMetadata, err := payload.Encrypt(session.VaultKey, []byte(`{"title":"damaged"}`))
@@ -488,6 +573,7 @@ func TestVaultServiceReturnsErrorForInvalidInputAndDoesNotCallGRPC(t *testing.T)
 		list    ListSecretsInput
 		update  UpdateSecretInput
 		delete  DeleteSecretInput
+		sync    SyncSecretsInput
 		method  string
 	}{
 		{
@@ -580,6 +666,20 @@ func TestVaultServiceReturnsErrorForInvalidInputAndDoesNotCallGRPC(t *testing.T)
 			},
 			method: "delete",
 		},
+		{
+			name:    "sync without access token",
+			session: Session{VaultKey: validSession.VaultKey},
+			sync:    SyncSecretsInput{},
+			method:  "sync",
+		},
+		{
+			name: "sync without vault key",
+			session: Session{
+				AccessToken: "access-token",
+			},
+			sync:   SyncSecretsInput{},
+			method: "sync",
+		},
 	}
 
 	for _, tt := range tests {
@@ -599,6 +699,8 @@ func TestVaultServiceReturnsErrorForInvalidInputAndDoesNotCallGRPC(t *testing.T)
 				_, err = service.UpdateSecret(context.Background(), tt.session, tt.update)
 			case "delete":
 				_, err = service.DeleteSecret(context.Background(), tt.session, tt.delete)
+			case "sync":
+				_, err = service.SyncSecrets(context.Background(), tt.session, tt.sync)
 			default:
 				t.Fatalf("unknown method %q", tt.method)
 			}
@@ -624,6 +726,10 @@ func TestVaultServiceReturnsErrorForInvalidInputAndDoesNotCallGRPC(t *testing.T)
 
 			if len(vaultClient.deleteItemCalls) != 0 {
 				t.Fatalf("DeleteItem() calls = %d, want 0", len(vaultClient.deleteItemCalls))
+			}
+
+			if len(vaultClient.syncCalls) != 0 {
+				t.Fatalf("Sync() calls = %d, want 0", len(vaultClient.syncCalls))
 			}
 		})
 	}
@@ -671,6 +777,11 @@ func TestVaultServiceReturnsErrorForMissingClient(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatalf("DeleteSecret() error = nil, want error")
+	}
+
+	_, err = service.SyncSecrets(context.Background(), session, SyncSecretsInput{})
+	if err == nil {
+		t.Fatalf("SyncSecrets() error = nil, want error")
 	}
 }
 
