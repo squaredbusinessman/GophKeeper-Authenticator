@@ -1,6 +1,7 @@
 .idea
 *.iml
 out
+bin/
 /gen/
 *.exe
 *.exe~
