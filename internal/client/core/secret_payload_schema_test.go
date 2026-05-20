@@ -2,7 +2,10 @@ package core
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"testing"
 )
 
@@ -128,6 +131,108 @@ func TestSecretPayloadSchemasRoundTrip(t *testing.T) {
 	})
 }
 
+func TestBinaryPayloadSchemaAddsFileMetadataAndChecksum(t *testing.T) {
+	rawData := []byte("binary file content")
+	wantChecksum := sha256.Sum256(rawData)
+
+	payloadBytes, version, err := EncodeBinaryPayload(BinaryPayload{
+		FileName:    "document.pdf",
+		ContentType: "application/pdf",
+		Data:        rawData,
+	})
+	if err != nil {
+		t.Fatalf("EncodeBinaryPayload() error = %v", err)
+	}
+
+	if version != BinaryPayloadSchemaVersion {
+		t.Fatalf("schema version = %d, want %d", version, BinaryPayloadSchemaVersion)
+	}
+
+	decoded, err := DecodeBinaryPayload(payloadBytes, version)
+	if err != nil {
+		t.Fatalf("DecodeBinaryPayload() error = %v", err)
+	}
+
+	if decoded.FileName != "document.pdf" {
+		t.Fatalf("file name = %q, want document.pdf", decoded.FileName)
+	}
+
+	if decoded.ContentType != "application/pdf" {
+		t.Fatalf("content type = %q, want application/pdf", decoded.ContentType)
+	}
+
+	if decoded.SizeBytes != int64(len(rawData)) {
+		t.Fatalf("size bytes = %d, want %d", decoded.SizeBytes, len(rawData))
+	}
+
+	if decoded.ChecksumSHA256 != hex.EncodeToString(wantChecksum[:]) {
+		t.Fatalf("checksum = %q, want %q", decoded.ChecksumSHA256, hex.EncodeToString(wantChecksum[:]))
+	}
+}
+
+func TestBinaryPayloadSchemaRejectsTooLargeFile(t *testing.T) {
+	tooLargeData := bytes.Repeat([]byte{1}, MaxInlineBinaryPayloadSize+1)
+
+	_, _, err := EncodeBinaryPayload(BinaryPayload{
+		FileName: "large.bin",
+		Data:     tooLargeData,
+	})
+	if err == nil {
+		t.Fatalf("EncodeBinaryPayload() error = nil, want file too large error")
+	}
+
+	if !errors.Is(err, ErrBinaryFileTooLarge) {
+		t.Fatalf("EncodeBinaryPayload() error = %v, want ErrBinaryFileTooLarge", err)
+	}
+}
+
+func TestBinaryPayloadSchemaAllowsMaxInlineFileSize(t *testing.T) {
+	maxData := bytes.Repeat([]byte{1}, MaxInlineBinaryPayloadSize)
+
+	payloadBytes, version, err := EncodeBinaryPayload(BinaryPayload{
+		FileName: "max.bin",
+		Data:     maxData,
+	})
+	if err != nil {
+		t.Fatalf("EncodeBinaryPayload() error = %v", err)
+	}
+
+	decoded, err := DecodeBinaryPayload(payloadBytes, version)
+	if err != nil {
+		t.Fatalf("DecodeBinaryPayload() error = %v", err)
+	}
+
+	if decoded.SizeBytes != int64(MaxInlineBinaryPayloadSize) {
+		t.Fatalf("size bytes = %d, want %d", decoded.SizeBytes, MaxInlineBinaryPayloadSize)
+	}
+}
+
+func TestBinaryPayloadSchemaRejectsDamagedChecksum(t *testing.T) {
+	payloadBytes, version, err := EncodeBinaryPayload(BinaryPayload{
+		FileName: "document.pdf",
+		Data:     []byte("original file content"),
+	})
+	if err != nil {
+		t.Fatalf("EncodeBinaryPayload() error = %v", err)
+	}
+
+	var raw map[string]any
+	if err = json.Unmarshal(payloadBytes, &raw); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+
+	raw["checksum_sha256"] = "wrong-checksum"
+	damagedPayload, err := json.Marshal(raw)
+	if err != nil {
+		t.Fatalf("marshal damaged payload: %v", err)
+	}
+
+	_, err = DecodeBinaryPayload(damagedPayload, version)
+	if err == nil {
+		t.Fatalf("DecodeBinaryPayload() error = nil, want checksum error")
+	}
+}
+
 func TestSecretPayloadSchemasValidateRequiredFields(t *testing.T) {
 	tests := []struct {
 		name string
@@ -169,6 +274,13 @@ func TestSecretPayloadSchemasValidateRequiredFields(t *testing.T) {
 			name: "binary without data",
 			run: func() error {
 				_, _, err := EncodeBinaryPayload(BinaryPayload{FileName: "empty.bin"})
+				return err
+			},
+		},
+		{
+			name: "binary without file name",
+			run: func() error {
+				_, _, err := EncodeBinaryPayload(BinaryPayload{Data: []byte("content")})
 				return err
 			},
 		},
