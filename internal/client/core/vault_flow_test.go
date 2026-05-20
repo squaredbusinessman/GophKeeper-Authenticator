@@ -18,9 +18,15 @@ import (
 type fakeVaultClient struct {
 	createItemFunc func(context.Context, *gophkeeperv1.CreateItemRequest, ...grpc.CallOption) (*gophkeeperv1.CreateItemResponse, error)
 	getItemFunc    func(context.Context, *gophkeeperv1.GetItemRequest, ...grpc.CallOption) (*gophkeeperv1.GetItemResponse, error)
+	listItemsFunc  func(context.Context, *gophkeeperv1.ListItemsRequest, ...grpc.CallOption) (*gophkeeperv1.ListItemsResponse, error)
+	updateItemFunc func(context.Context, *gophkeeperv1.UpdateItemRequest, ...grpc.CallOption) (*gophkeeperv1.UpdateItemResponse, error)
+	deleteItemFunc func(context.Context, *gophkeeperv1.DeleteItemRequest, ...grpc.CallOption) (*gophkeeperv1.DeleteItemResponse, error)
 
 	createItemCalls []vaultClientCall[*gophkeeperv1.CreateItemRequest]
 	getItemCalls    []vaultClientCall[*gophkeeperv1.GetItemRequest]
+	listItemsCalls  []vaultClientCall[*gophkeeperv1.ListItemsRequest]
+	updateItemCalls []vaultClientCall[*gophkeeperv1.UpdateItemRequest]
+	deleteItemCalls []vaultClientCall[*gophkeeperv1.DeleteItemRequest]
 }
 
 type vaultClientCall[T any] struct {
@@ -50,6 +56,42 @@ func (c *fakeVaultClient) GetItem(ctx context.Context, req *gophkeeperv1.GetItem
 	}
 
 	return nil, errors.New("unexpected get item call")
+}
+
+func (c *fakeVaultClient) ListItems(ctx context.Context, req *gophkeeperv1.ListItemsRequest, opts ...grpc.CallOption) (*gophkeeperv1.ListItemsResponse, error) {
+	c.listItemsCalls = append(c.listItemsCalls, vaultClientCall[*gophkeeperv1.ListItemsRequest]{
+		ctx: ctx,
+		req: req,
+	})
+	if c.listItemsFunc != nil {
+		return c.listItemsFunc(ctx, req, opts...)
+	}
+
+	return nil, errors.New("unexpected list items call")
+}
+
+func (c *fakeVaultClient) UpdateItem(ctx context.Context, req *gophkeeperv1.UpdateItemRequest, opts ...grpc.CallOption) (*gophkeeperv1.UpdateItemResponse, error) {
+	c.updateItemCalls = append(c.updateItemCalls, vaultClientCall[*gophkeeperv1.UpdateItemRequest]{
+		ctx: ctx,
+		req: req,
+	})
+	if c.updateItemFunc != nil {
+		return c.updateItemFunc(ctx, req, opts...)
+	}
+
+	return nil, errors.New("unexpected update item call")
+}
+
+func (c *fakeVaultClient) DeleteItem(ctx context.Context, req *gophkeeperv1.DeleteItemRequest, opts ...grpc.CallOption) (*gophkeeperv1.DeleteItemResponse, error) {
+	c.deleteItemCalls = append(c.deleteItemCalls, vaultClientCall[*gophkeeperv1.DeleteItemRequest]{
+		ctx: ctx,
+		req: req,
+	})
+	if c.deleteItemFunc != nil {
+		return c.deleteItemFunc(ctx, req, opts...)
+	}
+
+	return nil, errors.New("unexpected delete item call")
 }
 
 func TestVaultServiceCreateSecretEncryptsPayloadAndSendsAccessToken(t *testing.T) {
@@ -204,6 +246,202 @@ func TestVaultServiceGetSecretDecryptsPayloadAndSendsAccessToken(t *testing.T) {
 	}
 }
 
+func TestVaultServiceListSecretsDecryptsActiveItemsAndSendsAccessToken(t *testing.T) {
+	session := testSession()
+	activeMetadata := []byte(`{"title":"active secret"}`)
+	activePayload := []byte("active payload")
+	deletedMetadata := []byte(`{"title":"deleted secret"}`)
+	deletedPayload := []byte("deleted payload")
+	deletedAt := time.Date(2026, 5, 20, 10, 0, 0, 0, time.UTC)
+
+	activeItem := encryptedVaultItem(t, session.VaultKey, "active-id", gophkeeperv1.ItemType_ITEM_TYPE_TEXT, activeMetadata, activePayload)
+	deletedItem := encryptedVaultItem(t, session.VaultKey, "deleted-id", gophkeeperv1.ItemType_ITEM_TYPE_TEXT, deletedMetadata, deletedPayload)
+	deletedItem.DeletedAt = timestamppb.New(deletedAt)
+
+	vaultClient := &fakeVaultClient{
+		listItemsFunc: func(_ context.Context, req *gophkeeperv1.ListItemsRequest, _ ...grpc.CallOption) (*gophkeeperv1.ListItemsResponse, error) {
+			if req.GetIncludeDeleted() {
+				t.Fatalf("IncludeDeleted = true, want false for active list")
+			}
+
+			return &gophkeeperv1.ListItemsResponse{
+				Items: []*gophkeeperv1.VaultItem{activeItem, deletedItem},
+			}, nil
+		},
+	}
+	service := NewVaultService(vaultClient)
+
+	secrets, err := service.ListSecrets(context.Background(), session, ListSecretsInput{})
+	if err != nil {
+		t.Fatalf("ListSecrets() error = %v", err)
+	}
+
+	if len(vaultClient.listItemsCalls) != 1 {
+		t.Fatalf("ListItems() calls = %d, want 1", len(vaultClient.listItemsCalls))
+	}
+
+	assertOutgoingBearerToken(t, vaultClient.listItemsCalls[0].ctx, session.AccessToken)
+
+	if len(secrets) != 1 {
+		t.Fatalf("secrets length = %d, want 1 active secret", len(secrets))
+	}
+
+	if secrets[0].ID != "active-id" {
+		t.Fatalf("secret id = %q, want active-id", secrets[0].ID)
+	}
+
+	if !bytes.Equal(secrets[0].Metadata, activeMetadata) {
+		t.Fatalf("secret metadata does not match active plaintext")
+	}
+
+	if !bytes.Equal(secrets[0].Payload, activePayload) {
+		t.Fatalf("secret payload does not match active plaintext")
+	}
+}
+
+func TestVaultServiceListSecretsCanIncludeDeletedItems(t *testing.T) {
+	session := testSession()
+	deletedAt := time.Date(2026, 5, 20, 10, 0, 0, 0, time.UTC)
+	deletedItem := encryptedVaultItem(t, session.VaultKey, "deleted-id", gophkeeperv1.ItemType_ITEM_TYPE_TEXT, []byte(`{"title":"deleted"}`), []byte("deleted payload"))
+	deletedItem.DeletedAt = timestamppb.New(deletedAt)
+
+	vaultClient := &fakeVaultClient{
+		listItemsFunc: func(_ context.Context, req *gophkeeperv1.ListItemsRequest, _ ...grpc.CallOption) (*gophkeeperv1.ListItemsResponse, error) {
+			if !req.GetIncludeDeleted() {
+				t.Fatalf("IncludeDeleted = false, want true")
+			}
+
+			return &gophkeeperv1.ListItemsResponse{
+				Items: []*gophkeeperv1.VaultItem{deletedItem},
+			}, nil
+		},
+	}
+	service := NewVaultService(vaultClient)
+
+	secrets, err := service.ListSecrets(context.Background(), session, ListSecretsInput{IncludeDeleted: true})
+	if err != nil {
+		t.Fatalf("ListSecrets() error = %v", err)
+	}
+
+	if len(secrets) != 1 {
+		t.Fatalf("secrets length = %d, want 1", len(secrets))
+	}
+
+	if secrets[0].DeletedAt == nil {
+		t.Fatalf("DeletedAt = nil, want deleted timestamp")
+	}
+}
+
+func TestVaultServiceUpdateSecretEncryptsPayloadAndSendsExpectedVersion(t *testing.T) {
+	session := testSession()
+	metadataPlaintext := []byte(`{"title":"updated secret"}`)
+	payloadPlaintext := []byte("updated payload")
+
+	vaultClient := &fakeVaultClient{
+		updateItemFunc: func(_ context.Context, req *gophkeeperv1.UpdateItemRequest, _ ...grpc.CallOption) (*gophkeeperv1.UpdateItemResponse, error) {
+			if req.GetId() != "item-id-1" {
+				t.Fatalf("request id = %q, want item-id-1", req.GetId())
+			}
+
+			if req.GetExpectedVersion() != 3 {
+				t.Fatalf("expected version = %d, want 3", req.GetExpectedVersion())
+			}
+
+			assertEncryptedDataDecrypts(t, session.VaultKey, req.GetMetadata(), metadataPlaintext)
+			assertEncryptedDataDecrypts(t, session.VaultKey, req.GetPayload(), payloadPlaintext)
+
+			return &gophkeeperv1.UpdateItemResponse{
+				Item: &gophkeeperv1.VaultItem{
+					Id:                   req.GetId(),
+					Type:                 req.GetType(),
+					Metadata:             req.GetMetadata(),
+					Payload:              req.GetPayload(),
+					EncryptionAlg:        req.GetEncryptionAlg(),
+					PayloadSchemaVersion: req.GetPayloadSchemaVersion(),
+					Version:              4,
+				},
+			}, nil
+		},
+	}
+	service := NewVaultService(vaultClient)
+
+	secret, err := service.UpdateSecret(context.Background(), session, UpdateSecretInput{
+		ID:                   " item-id-1 ",
+		ExpectedVersion:      3,
+		Type:                 SecretTypeText,
+		Metadata:             metadataPlaintext,
+		Payload:              payloadPlaintext,
+		PayloadSchemaVersion: 2,
+	})
+	if err != nil {
+		t.Fatalf("UpdateSecret() error = %v", err)
+	}
+
+	if len(vaultClient.updateItemCalls) != 1 {
+		t.Fatalf("UpdateItem() calls = %d, want 1", len(vaultClient.updateItemCalls))
+	}
+
+	assertOutgoingBearerToken(t, vaultClient.updateItemCalls[0].ctx, session.AccessToken)
+
+	if secret.Version != 4 {
+		t.Fatalf("secret version = %d, want 4", secret.Version)
+	}
+
+	if !bytes.Equal(secret.Payload, payloadPlaintext) {
+		t.Fatalf("secret payload does not match updated plaintext")
+	}
+}
+
+func TestVaultServiceDeleteSecretSendsExpectedVersion(t *testing.T) {
+	session := testSession()
+	deletedAt := time.Date(2026, 5, 20, 12, 0, 0, 0, time.UTC)
+
+	vaultClient := &fakeVaultClient{
+		deleteItemFunc: func(_ context.Context, req *gophkeeperv1.DeleteItemRequest, _ ...grpc.CallOption) (*gophkeeperv1.DeleteItemResponse, error) {
+			if req.GetId() != "item-id-1" {
+				t.Fatalf("request id = %q, want item-id-1", req.GetId())
+			}
+
+			if req.GetExpectedVersion() != 7 {
+				t.Fatalf("expected version = %d, want 7", req.GetExpectedVersion())
+			}
+
+			return &gophkeeperv1.DeleteItemResponse{
+				Id:        req.GetId(),
+				Version:   8,
+				DeletedAt: timestamppb.New(deletedAt),
+			}, nil
+		},
+	}
+	service := NewVaultService(vaultClient)
+
+	result, err := service.DeleteSecret(context.Background(), session, DeleteSecretInput{
+		ID:              " item-id-1 ",
+		ExpectedVersion: 7,
+	})
+	if err != nil {
+		t.Fatalf("DeleteSecret() error = %v", err)
+	}
+
+	if len(vaultClient.deleteItemCalls) != 1 {
+		t.Fatalf("DeleteItem() calls = %d, want 1", len(vaultClient.deleteItemCalls))
+	}
+
+	assertOutgoingBearerToken(t, vaultClient.deleteItemCalls[0].ctx, session.AccessToken)
+
+	if result.ID != "item-id-1" {
+		t.Fatalf("result id = %q, want item-id-1", result.ID)
+	}
+
+	if result.Version != 8 {
+		t.Fatalf("result version = %d, want 8", result.Version)
+	}
+
+	if !result.DeletedAt.Equal(deletedAt) {
+		t.Fatalf("deleted at = %s, want %s", result.DeletedAt, deletedAt)
+	}
+}
+
 func TestVaultServiceGetSecretReturnsErrorWhenCiphertextIsDamaged(t *testing.T) {
 	session := testSession()
 	encryptedMetadata, err := payload.Encrypt(session.VaultKey, []byte(`{"title":"damaged"}`))
@@ -247,6 +485,9 @@ func TestVaultServiceReturnsErrorForInvalidInputAndDoesNotCallGRPC(t *testing.T)
 		session Session
 		create  CreateSecretInput
 		get     GetSecretInput
+		list    ListSecretsInput
+		update  UpdateSecretInput
+		delete  DeleteSecretInput
 		method  string
 	}{
 		{
@@ -299,6 +540,46 @@ func TestVaultServiceReturnsErrorForInvalidInputAndDoesNotCallGRPC(t *testing.T)
 			get:     GetSecretInput{},
 			method:  "get",
 		},
+		{
+			name:    "update without id",
+			session: validSession,
+			update: UpdateSecretInput{
+				ExpectedVersion:      1,
+				Type:                 SecretTypeText,
+				Metadata:             []byte("{}"),
+				Payload:              []byte("secret"),
+				PayloadSchemaVersion: 1,
+			},
+			method: "update",
+		},
+		{
+			name:    "update without expected version",
+			session: validSession,
+			update: UpdateSecretInput{
+				ID:                   "item-id-1",
+				Type:                 SecretTypeText,
+				Metadata:             []byte("{}"),
+				Payload:              []byte("secret"),
+				PayloadSchemaVersion: 1,
+			},
+			method: "update",
+		},
+		{
+			name:    "delete without id",
+			session: validSession,
+			delete: DeleteSecretInput{
+				ExpectedVersion: 1,
+			},
+			method: "delete",
+		},
+		{
+			name:    "delete without expected version",
+			session: validSession,
+			delete: DeleteSecretInput{
+				ID: "item-id-1",
+			},
+			method: "delete",
+		},
 	}
 
 	for _, tt := range tests {
@@ -312,6 +593,12 @@ func TestVaultServiceReturnsErrorForInvalidInputAndDoesNotCallGRPC(t *testing.T)
 				_, err = service.CreateSecret(context.Background(), tt.session, tt.create)
 			case "get":
 				_, err = service.GetSecret(context.Background(), tt.session, tt.get)
+			case "list":
+				_, err = service.ListSecrets(context.Background(), tt.session, tt.list)
+			case "update":
+				_, err = service.UpdateSecret(context.Background(), tt.session, tt.update)
+			case "delete":
+				_, err = service.DeleteSecret(context.Background(), tt.session, tt.delete)
 			default:
 				t.Fatalf("unknown method %q", tt.method)
 			}
@@ -325,6 +612,18 @@ func TestVaultServiceReturnsErrorForInvalidInputAndDoesNotCallGRPC(t *testing.T)
 
 			if len(vaultClient.getItemCalls) != 0 {
 				t.Fatalf("GetItem() calls = %d, want 0", len(vaultClient.getItemCalls))
+			}
+
+			if len(vaultClient.listItemsCalls) != 0 {
+				t.Fatalf("ListItems() calls = %d, want 0", len(vaultClient.listItemsCalls))
+			}
+
+			if len(vaultClient.updateItemCalls) != 0 {
+				t.Fatalf("UpdateItem() calls = %d, want 0", len(vaultClient.updateItemCalls))
+			}
+
+			if len(vaultClient.deleteItemCalls) != 0 {
+				t.Fatalf("DeleteItem() calls = %d, want 0", len(vaultClient.deleteItemCalls))
 			}
 		})
 	}
@@ -347,6 +646,31 @@ func TestVaultServiceReturnsErrorForMissingClient(t *testing.T) {
 	_, err = service.GetSecret(context.Background(), session, GetSecretInput{ID: "item-id-1"})
 	if err == nil {
 		t.Fatalf("GetSecret() error = nil, want error")
+	}
+
+	_, err = service.ListSecrets(context.Background(), session, ListSecretsInput{})
+	if err == nil {
+		t.Fatalf("ListSecrets() error = nil, want error")
+	}
+
+	_, err = service.UpdateSecret(context.Background(), session, UpdateSecretInput{
+		ID:                   "item-id-1",
+		ExpectedVersion:      1,
+		Type:                 SecretTypeText,
+		Metadata:             []byte("{}"),
+		Payload:              []byte("secret"),
+		PayloadSchemaVersion: 1,
+	})
+	if err == nil {
+		t.Fatalf("UpdateSecret() error = nil, want error")
+	}
+
+	_, err = service.DeleteSecret(context.Background(), session, DeleteSecretInput{
+		ID:              "item-id-1",
+		ExpectedVersion: 1,
+	})
+	if err == nil {
+		t.Fatalf("DeleteSecret() error = nil, want error")
 	}
 }
 
@@ -398,5 +722,29 @@ func assertEncryptedDataDecrypts(t *testing.T, vaultKey []byte, data *gophkeeper
 
 	if !bytes.Equal(plaintext, want) {
 		t.Fatalf("decrypted data = %q, want %q", plaintext, want)
+	}
+}
+
+func encryptedVaultItem(t *testing.T, vaultKey []byte, id string, itemType gophkeeperv1.ItemType, metadataPlaintext []byte, payloadPlaintext []byte) *gophkeeperv1.VaultItem {
+	t.Helper()
+
+	encryptedMetadata, err := payload.Encrypt(vaultKey, metadataPlaintext)
+	if err != nil {
+		t.Fatalf("encrypt metadata: %v", err)
+	}
+
+	encryptedPayload, err := payload.Encrypt(vaultKey, payloadPlaintext)
+	if err != nil {
+		t.Fatalf("encrypt payload: %v", err)
+	}
+
+	return &gophkeeperv1.VaultItem{
+		Id:                   id,
+		Type:                 itemType,
+		Metadata:             encryptedDataToProto(encryptedMetadata),
+		Payload:              encryptedDataToProto(encryptedPayload),
+		EncryptionAlg:        payload.EncryptionAlgorithm,
+		PayloadSchemaVersion: 1,
+		Version:              1,
 	}
 }
