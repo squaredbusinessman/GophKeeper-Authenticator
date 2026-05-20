@@ -18,6 +18,9 @@ import (
 type VaultUseCase interface {
 	CreateItem(context.Context, vault.CreateItemInput) (vault.Item, error)
 	GetItem(context.Context, vault.GetItemInput) (vault.Item, error)
+	ListItems(context.Context, vault.ListItemsInput) ([]vault.Item, error)
+	UpdateItem(context.Context, vault.UpdateItemInput) (vault.Item, error)
+	DeleteItem(context.Context, vault.DeleteItemInput) (vault.DeleteItemResult, error)
 }
 
 // VaultHandler обрабатывает запросы сервиса хранилища
@@ -86,6 +89,90 @@ func (h *VaultHandler) GetItem(ctx context.Context, req *gophkeeperv1.GetItemReq
 	}, nil
 }
 
+// ListItems возвращает encrypted vault items через gRPC API
+func (h *VaultHandler) ListItems(ctx context.Context, req *gophkeeperv1.ListItemsRequest) (*gophkeeperv1.ListItemsResponse, error) {
+	userID, ok := authcontext.UserIDFromContext(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "user id is required")
+	}
+
+	if h.vaultUseCase == nil {
+		return nil, status.Error(codes.Internal, "vault use case is not configured")
+	}
+
+	items, err := h.vaultUseCase.ListItems(ctx, vault.ListItemsInput{
+		UserID:         userID,
+		IncludeDeleted: req.GetIncludeDeleted(),
+	})
+	if err != nil {
+		return nil, vaultStatusError(err)
+	}
+
+	response := &gophkeeperv1.ListItemsResponse{
+		Items: make([]*gophkeeperv1.VaultItem, 0, len(items)),
+	}
+
+	for _, item := range items {
+		response.Items = append(response.Items, vaultItemToProto(item))
+	}
+
+	return response, nil
+}
+
+// UpdateItem обновляет encrypted vault item через gRPC API
+func (h *VaultHandler) UpdateItem(ctx context.Context, req *gophkeeperv1.UpdateItemRequest) (*gophkeeperv1.UpdateItemResponse, error) {
+	userID, ok := authcontext.UserIDFromContext(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "user id is required")
+	}
+
+	input, err := updateItemInputFromProto(userID, req)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	if h.vaultUseCase == nil {
+		return nil, status.Error(codes.Internal, "vault use case is not configured")
+	}
+
+	item, err := h.vaultUseCase.UpdateItem(ctx, input)
+	if err != nil {
+		return nil, vaultStatusError(err)
+	}
+
+	return &gophkeeperv1.UpdateItemResponse{
+		Item: vaultItemToProto(item),
+	}, nil
+}
+
+// DeleteItem мягко удаляет vault item через gRPC API
+func (h *VaultHandler) DeleteItem(ctx context.Context, req *gophkeeperv1.DeleteItemRequest) (*gophkeeperv1.DeleteItemResponse, error) {
+	userID, ok := authcontext.UserIDFromContext(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "user id is required")
+	}
+
+	input, err := deleteItemInputFromProto(userID, req)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	if h.vaultUseCase == nil {
+		return nil, status.Error(codes.Internal, "vault use case is not configured")
+	}
+
+	result, err := h.vaultUseCase.DeleteItem(ctx, input)
+	if err != nil {
+		return nil, vaultStatusError(err)
+	}
+
+	return &gophkeeperv1.DeleteItemResponse{
+		Id:        result.ItemID,
+		Version:   result.Version,
+		DeletedAt: timestamppb.New(result.DeletedAt),
+	}, nil
+}
+
 func createItemInputFromProto(userID string, req *gophkeeperv1.CreateItemRequest) (vault.CreateItemInput, error) {
 	if req == nil {
 		return vault.CreateItemInput{}, fmt.Errorf("create item request is required")
@@ -135,6 +222,73 @@ func getItemInputFromProto(userID string, req *gophkeeperv1.GetItemRequest) (vau
 	return vault.GetItemInput{
 		UserID: userID,
 		ItemID: req.GetId(),
+	}, nil
+}
+
+func updateItemInputFromProto(userID string, req *gophkeeperv1.UpdateItemRequest) (vault.UpdateItemInput, error) {
+	if req == nil {
+		return vault.UpdateItemInput{}, fmt.Errorf("update item request is required")
+	}
+
+	if strings.TrimSpace(req.GetId()) == "" {
+		return vault.UpdateItemInput{}, fmt.Errorf("item id is required")
+	}
+
+	if req.GetExpectedVersion() <= 0 {
+		return vault.UpdateItemInput{}, fmt.Errorf("expected version is required")
+	}
+
+	if req.GetType() == gophkeeperv1.ItemType_ITEM_TYPE_UNSPECIFIED {
+		return vault.UpdateItemInput{}, fmt.Errorf("item type is required")
+	}
+
+	metadata, err := encryptedDataFromProto(req.GetMetadata(), "metadata")
+	if err != nil {
+		return vault.UpdateItemInput{}, err
+	}
+
+	payload, err := encryptedDataFromProto(req.GetPayload(), "payload")
+	if err != nil {
+		return vault.UpdateItemInput{}, err
+	}
+
+	if strings.TrimSpace(req.GetEncryptionAlg()) == "" {
+		return vault.UpdateItemInput{}, fmt.Errorf("encryption algorithm is required")
+	}
+
+	if req.GetPayloadSchemaVersion() == 0 {
+		return vault.UpdateItemInput{}, fmt.Errorf("payload schema version is required")
+	}
+
+	return vault.UpdateItemInput{
+		UserID:               userID,
+		ItemID:               req.GetId(),
+		ExpectedVersion:      req.GetExpectedVersion(),
+		Type:                 itemTypeFromProto(req.GetType()),
+		Metadata:             metadata,
+		Payload:              payload,
+		EncryptionAlg:        req.GetEncryptionAlg(),
+		PayloadSchemaVersion: req.GetPayloadSchemaVersion(),
+	}, nil
+}
+
+func deleteItemInputFromProto(userID string, req *gophkeeperv1.DeleteItemRequest) (vault.DeleteItemInput, error) {
+	if req == nil {
+		return vault.DeleteItemInput{}, fmt.Errorf("delete item request is required")
+	}
+
+	if strings.TrimSpace(req.GetId()) == "" {
+		return vault.DeleteItemInput{}, fmt.Errorf("item id is required")
+	}
+
+	if req.GetExpectedVersion() <= 0 {
+		return vault.DeleteItemInput{}, fmt.Errorf("expected version is required")
+	}
+
+	return vault.DeleteItemInput{
+		UserID:          userID,
+		ItemID:          req.GetId(),
+		ExpectedVersion: req.GetExpectedVersion(),
 	}, nil
 }
 
@@ -224,6 +378,8 @@ func vaultStatusError(err error) error {
 		return status.Error(codes.NotFound, err.Error())
 	case errors.Is(err, vault.ErrAccessDenied):
 		return status.Error(codes.PermissionDenied, err.Error())
+	case errors.Is(err, vault.ErrVersionConflict):
+		return status.Error(codes.Aborted, err.Error())
 	default:
 		return status.Error(codes.Internal, "vault operation failed")
 	}
