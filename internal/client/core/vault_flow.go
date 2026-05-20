@@ -423,7 +423,7 @@ func (s *VaultService) DeleteSecret(ctx context.Context, session Session, input 
 	if response.GetDeletedAt() == nil {
 		return DeleteSecretResult{}, fmt.Errorf("deleted secret timestamp is required")
 	}
-	
+
 	return DeleteSecretResult{
 		ID:        response.GetId(),
 		Version:   response.GetVersion(),
