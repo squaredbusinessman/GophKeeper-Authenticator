@@ -1,7 +1,10 @@
 package core
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -18,7 +21,11 @@ const (
 
 	// BinaryPayloadSchemaVersion версия схемы payload для бинарного секрета
 	BinaryPayloadSchemaVersion uint32 = 1
+
+	MaxInlineBinaryPayloadSize = 5 * 1024 * 1024
 )
+
+var ErrBinaryFileTooLarge = errors.New("binary file too large")
 
 // LoginPasswordPayload описывает payload секрета с логином и паролем
 type LoginPasswordPayload struct {
@@ -45,9 +52,11 @@ type BankCardPayload struct {
 
 // BinaryPayload описывает payload бинарного секрета
 type BinaryPayload struct {
-	FileName    string `json:"file_name"`
-	ContentType string `json:"content_type,omitempty"`
-	Data        []byte `json:"data"`
+	FileName       string `json:"file_name"`
+	ContentType    string `json:"content_type,omitempty"`
+	SizeBytes      int64  `json:"size_bytes"`
+	ChecksumSHA256 string `json:"checksum_sha256"`
+	Data           []byte `json:"data"`
 }
 
 func EncodeLoginPasswordPayload(value LoginPasswordPayload) ([]byte, uint32, error) {
@@ -96,14 +105,53 @@ func DecodeBankCardPayload(raw []byte, version uint32) (BankCardPayload, error) 
 }
 
 func EncodeBinaryPayload(value BinaryPayload) ([]byte, uint32, error) {
+	if strings.TrimSpace(value.FileName) == "" {
+		return nil, 0, fmt.Errorf("file name is required")
+	}
+
 	if len(value.Data) == 0 {
 		return nil, 0, fmt.Errorf("binary data is required")
 	}
+
+	if len(value.Data) > MaxInlineBinaryPayloadSize {
+		return nil, 0, fmt.Errorf("%w: size %d bytes exceeds limit %d bytes", ErrBinaryFileTooLarge, len(value.Data), MaxInlineBinaryPayloadSize)
+	}
+
+	checksum := sha256.Sum256(value.Data)
+	value.SizeBytes = int64(len(value.Data))
+	value.ChecksumSHA256 = hex.EncodeToString(checksum[:])
+
 	return encodePayload(value, BinaryPayloadSchemaVersion)
 }
 
 func DecodeBinaryPayload(raw []byte, version uint32) (BinaryPayload, error) {
-	return decodePayload[BinaryPayload](raw, version, BinaryPayloadSchemaVersion)
+	value, err := decodePayload[BinaryPayload](raw, version, BinaryPayloadSchemaVersion)
+	if err != nil {
+		return BinaryPayload{}, err
+	}
+
+	if strings.TrimSpace(value.FileName) == "" {
+		return BinaryPayload{}, fmt.Errorf("file name is required")
+	}
+
+	if len(value.Data) == 0 {
+		return BinaryPayload{}, fmt.Errorf("binary data is required")
+	}
+
+	if len(value.Data) > MaxInlineBinaryPayloadSize {
+		return BinaryPayload{}, fmt.Errorf("%w: size %d bytes exceeds limit %d bytes", ErrBinaryFileTooLarge, len(value.Data), MaxInlineBinaryPayloadSize)
+	}
+
+	if value.SizeBytes != int64(len(value.Data)) {
+		return BinaryPayload{}, fmt.Errorf("binary size mismatch")
+	}
+
+	checksum := sha256.Sum256(value.Data)
+	if value.ChecksumSHA256 != hex.EncodeToString(checksum[:]) {
+		return BinaryPayload{}, fmt.Errorf("binary checksum mismatch")
+	}
+
+	return value, nil
 }
 
 func encodePayload[T any](value T, version uint32) ([]byte, uint32, error) {
