@@ -17,12 +17,14 @@ type fakeCLIVaultService struct {
 	listSecretsFunc  func(context.Context, core.Session, core.ListSecretsInput) ([]core.Secret, error)
 	updateSecretFunc func(context.Context, core.Session, core.UpdateSecretInput) (core.Secret, error)
 	deleteSecretFunc func(context.Context, core.Session, core.DeleteSecretInput) (core.DeleteSecretResult, error)
+	syncSecretsFunc  func(context.Context, core.Session, core.SyncSecretsInput) (core.SyncSecretsResult, error)
 
 	createSecretCalls []createSecretCall
 	getSecretCalls    []getSecretCall
 	listSecretsCalls  []listSecretsCall
 	updateSecretCalls []updateSecretCall
 	deleteSecretCalls []deleteSecretCall
+	syncSecretsCalls  []syncSecretsCall
 }
 
 type createSecretCall struct {
@@ -48,6 +50,11 @@ type updateSecretCall struct {
 type deleteSecretCall struct {
 	session core.Session
 	input   core.DeleteSecretInput
+}
+
+type syncSecretsCall struct {
+	session core.Session
+	input   core.SyncSecretsInput
 }
 
 func (s *fakeCLIVaultService) CreateSecret(ctx context.Context, session core.Session, input core.CreateSecretInput) (core.Secret, error) {
@@ -154,6 +161,42 @@ func (s *fakeCLIVaultService) DeleteSecret(ctx context.Context, session core.Ses
 		ID:        input.ID,
 		Version:   input.ExpectedVersion + 1,
 		DeletedAt: time.Date(2026, 5, 20, 12, 0, 0, 0, time.UTC),
+	}, nil
+}
+
+func (s *fakeCLIVaultService) SyncSecrets(ctx context.Context, session core.Session, input core.SyncSecretsInput) (core.SyncSecretsResult, error) {
+	s.syncSecretsCalls = append(s.syncSecretsCalls, syncSecretsCall{
+		session: session,
+		input:   input,
+	})
+	if s.syncSecretsFunc != nil {
+		return s.syncSecretsFunc(ctx, session, input)
+	}
+
+	deletedAt := time.Date(2026, 5, 20, 11, 0, 0, 0, time.UTC)
+	nextChangedAfter := time.Date(2026, 5, 20, 12, 0, 0, 0, time.UTC)
+
+	return core.SyncSecretsResult{
+		Secrets: []core.Secret{
+			{
+				ID:                   "active-secret-id",
+				Type:                 core.SecretTypeText,
+				Metadata:             []byte(`{"title":"active note"}`),
+				Payload:              []byte("active secret"),
+				PayloadSchemaVersion: 1,
+				Version:              2,
+			},
+			{
+				ID:                   "deleted-secret-id",
+				Type:                 core.SecretTypeText,
+				Metadata:             []byte(`{"title":"deleted note"}`),
+				Payload:              []byte("deleted secret"),
+				PayloadSchemaVersion: 1,
+				Version:              3,
+				DeletedAt:            &deletedAt,
+			},
+		},
+		NextChangedAfter: nextChangedAfter,
 	}, nil
 }
 
@@ -405,6 +448,57 @@ func TestDeleteTextSecretCommandPromptsVersionAndCallsVaultService(t *testing.T)
 	}
 }
 
+func TestSyncCommandLogsInCallsVaultServiceAndPrintsSummary(t *testing.T) {
+	authService := &fakeCLIAuthService{}
+	vaultService := &fakeCLIVaultService{}
+	prompter := &fakePrompter{
+		values: []string{
+			"user@example.com",
+			"login-password",
+			"master-password",
+		},
+	}
+	var stdout bytes.Buffer
+
+	err := runCLI(context.Background(), []string{"sync"}, authService, vaultService, prompter, &stdout, &bytes.Buffer{})
+	if err != nil {
+		t.Fatalf("runCLI() error = %v", err)
+	}
+
+	if len(authService.loginCalls) != 1 {
+		t.Fatalf("Login() calls = %d, want 1", len(authService.loginCalls))
+	}
+
+	if len(vaultService.syncSecretsCalls) != 1 {
+		t.Fatalf("SyncSecrets() calls = %d, want 1", len(vaultService.syncSecretsCalls))
+	}
+
+	if !vaultService.syncSecretsCalls[0].input.ChangedAfter.IsZero() {
+		t.Fatalf("ChangedAfter = %s, want zero time for sync without offline cache", vaultService.syncSecretsCalls[0].input.ChangedAfter)
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, "Синхронизация выполнена") {
+		t.Fatalf("stdout = %q, want sync success message", output)
+	}
+
+	if !strings.Contains(output, "Получено изменений: 2") {
+		t.Fatalf("stdout = %q, want changed count", output)
+	}
+
+	if !strings.Contains(output, "active-secret-id") {
+		t.Fatalf("stdout = %q, want active secret id", output)
+	}
+
+	if !strings.Contains(output, "deleted-secret-id") {
+		t.Fatalf("stdout = %q, want deleted secret id", output)
+	}
+
+	if !strings.Contains(output, "удален") {
+		t.Fatalf("stdout = %q, want deleted marker", output)
+	}
+}
+
 func TestUpdateTextSecretCommandReturnsClearConflictError(t *testing.T) {
 	authService := &fakeCLIAuthService{}
 	vaultService := &fakeCLIVaultService{
@@ -515,5 +609,10 @@ func TestVaultCommandsRequireDependencies(t *testing.T) {
 	err = runCLI(context.Background(), []string{"delete"}, &fakeCLIAuthService{}, nil, prompter, &bytes.Buffer{}, &bytes.Buffer{})
 	if err == nil {
 		t.Fatalf("runCLI(delete) error = nil, want error")
+	}
+
+	err = runCLI(context.Background(), []string{"sync"}, &fakeCLIAuthService{}, nil, prompter, &bytes.Buffer{}, &bytes.Buffer{})
+	if err == nil {
+		t.Fatalf("runCLI(sync) error = nil, want error")
 	}
 }

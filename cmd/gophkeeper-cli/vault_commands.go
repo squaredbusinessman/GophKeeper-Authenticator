@@ -7,6 +7,7 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/client/core"
 )
@@ -18,6 +19,7 @@ type CLIVaultService interface {
 	ListSecrets(context.Context, core.Session, core.ListSecretsInput) ([]core.Secret, error)
 	UpdateSecret(context.Context, core.Session, core.UpdateSecretInput) (core.Secret, error)
 	DeleteSecret(context.Context, core.Session, core.DeleteSecretInput) (core.DeleteSecretResult, error)
+	SyncSecrets(context.Context, core.Session, core.SyncSecretsInput) (core.SyncSecretsResult, error)
 }
 
 type textSecretMetadata struct {
@@ -153,6 +155,45 @@ func runListTextSecrets(ctx context.Context, authService CLIAuthService, vaultSe
 		}
 
 		fmt.Fprintf(stdout, "%s | version %d | %s\n", secret.ID, secret.Version, title)
+	}
+
+	return nil
+}
+
+func runSyncSecrets(ctx context.Context, authService CLIAuthService, vaultService CLIVaultService, prompter Prompter, stdout io.Writer) error {
+	if vaultService == nil {
+		return fmt.Errorf("vault service is required")
+	}
+
+	session, err := openVaultSession(ctx, authService, prompter)
+	if err != nil {
+		return fmt.Errorf("open vault: %w", err)
+	}
+
+	result, err := vaultService.SyncSecrets(ctx, session, core.SyncSecretsInput{})
+	if err != nil {
+		return fmt.Errorf("sync secrets: %w", err)
+	}
+
+	fmt.Fprintln(stdout, "Синхронизация выполнена")
+	fmt.Fprintf(stdout, "Получено изменений: %d\n", len(result.Secrets))
+
+	for _, secret := range result.Secrets {
+		title := decodeTextSecretTitle(secret.Metadata)
+		if title == "" {
+			title = "<без названия>"
+		}
+
+		status := "active"
+		if secret.DeletedAt != nil {
+			status = "удален"
+		}
+
+		fmt.Fprintf(stdout, "%s | version %d | %s | %s\n", secret.ID, secret.Version, status, title)
+	}
+
+	if !result.NextChangedAfter.IsZero() {
+		fmt.Fprintf(stdout, "Next changed after: %s\n", result.NextChangedAfter.Format(time.RFC3339))
 	}
 
 	return nil

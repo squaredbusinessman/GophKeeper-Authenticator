@@ -151,6 +151,9 @@ func runCLI(
 		return runUpdateTextSecret(ctx, authService, vaultService, prompter, stdout)
 	case "delete":
 		return runDeleteTextSecret(ctx, authService, vaultService, prompter, stdout)
+	case "sync":
+		return runSyncSecrets(ctx, authService, vaultService, prompter, stdout)
+
 	case "version":
 		printVersionTo(stdout)
 		return nil

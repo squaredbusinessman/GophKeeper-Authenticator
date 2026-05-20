@@ -20,6 +20,7 @@ type VaultServiceClient interface {
 	ListItems(context.Context, *gophkeeperv1.ListItemsRequest, ...grpc.CallOption) (*gophkeeperv1.ListItemsResponse, error)
 	UpdateItem(context.Context, *gophkeeperv1.UpdateItemRequest, ...grpc.CallOption) (*gophkeeperv1.UpdateItemResponse, error)
 	DeleteItem(context.Context, *gophkeeperv1.DeleteItemRequest, ...grpc.CallOption) (*gophkeeperv1.DeleteItemResponse, error)
+	Sync(context.Context, *gophkeeperv1.SyncRequest, ...grpc.CallOption) (*gophkeeperv1.SyncResponse, error)
 }
 
 // SecretType описывает тип секрета внутри client core без прямой зависимости UI от proto enum
@@ -70,6 +71,15 @@ type Secret struct {
 
 type ListSecretsInput struct {
 	IncludeDeleted bool
+}
+
+type SyncSecretsInput struct {
+	ChangedAfter time.Time
+}
+
+type SyncSecretsResult struct {
+	Secrets          []Secret
+	NextChangedAfter time.Time
 }
 
 type UpdateSecretInput struct {
@@ -461,4 +471,42 @@ func (i *DeleteSecretInput) validate() error {
 	}
 
 	return nil
+}
+
+// SyncSecrets получает изменения с сервера и расшифровывает их на клиенте
+func (s *VaultService) SyncSecrets(ctx context.Context, session Session, input SyncSecretsInput) (SyncSecretsResult, error) {
+	if err := s.validateDependencies(); err != nil {
+		return SyncSecretsResult{}, err
+	}
+
+	if err := validateSession(session); err != nil {
+		return SyncSecretsResult{}, err
+	}
+
+	ctx = contextWithAccessToken(ctx, session.AccessToken)
+
+	request := &gophkeeperv1.SyncRequest{}
+	if !input.ChangedAfter.IsZero() {
+		request.ChangedAfter = timestamppb.New(input.ChangedAfter)
+	}
+
+	response, err := s.vaultClient.Sync(ctx, request)
+	if err != nil {
+		return SyncSecretsResult{}, fmt.Errorf("sync secrets: %w", err)
+	}
+
+	secrets := make([]Secret, 0, len(response.GetItems()))
+	for _, item := range response.GetItems() {
+		secret, err := secretFromProto(session.VaultKey, item)
+		if err != nil {
+			return SyncSecretsResult{}, fmt.Errorf("decode synced secret: %w", err)
+		}
+
+		secrets = append(secrets, secret)
+	}
+
+	return SyncSecretsResult{
+		Secrets:          secrets,
+		NextChangedAfter: timestampToTime(response.GetNextChangedAfter()),
+	}, nil
 }
