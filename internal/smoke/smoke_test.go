@@ -92,18 +92,79 @@ func TestSmokeAuthVaultAndSyncFlow(t *testing.T) {
 		t.Fatalf("encode text payload: %v", err)
 	}
 
-	created, err := vaultService.CreateSecret(ctx, session, core.CreateSecretInput{
+	createdText, err := vaultService.CreateSecret(ctx, session, core.CreateSecretInput{
 		Type:                 core.SecretTypeText,
 		Metadata:             metadata,
 		Payload:              textPayload,
 		PayloadSchemaVersion: schemaVersion,
 	})
 	if err != nil {
-		t.Fatalf("create secret: %v", err)
+		t.Fatalf("create text secret: %v", err)
 	}
 
-	if created.ID == "" {
-		t.Fatalf("created secret id is empty")
+	if createdText.ID == "" {
+		t.Fatalf("created text secret id is empty")
+	}
+
+	loginPasswordPayload, loginPasswordSchemaVersion, err := core.EncodeLoginPasswordPayload(core.LoginPasswordPayload{
+		Login:    "smoke-login",
+		Password: "smoke-password",
+		URL:      "https://example.com",
+		Notes:    "smoke credentials",
+	})
+	if err != nil {
+		t.Fatalf("encode login/password payload: %v", err)
+	}
+
+	createdLoginPassword, err := vaultService.CreateSecret(ctx, session, core.CreateSecretInput{
+		Type:                 core.SecretTypeLoginPassword,
+		Metadata:             []byte(`{"title":"smoke login password"}`),
+		Payload:              loginPasswordPayload,
+		PayloadSchemaVersion: loginPasswordSchemaVersion,
+	})
+	if err != nil {
+		t.Fatalf("create login/password secret: %v", err)
+	}
+
+	bankCardPayload, bankCardSchemaVersion, err := core.EncodeBankCardPayload(core.BankCardPayload{
+		Number:          "4111111111111111",
+		CardholderName:  "SMOKE USER",
+		ExpirationMonth: "05",
+		ExpirationYear:  "2030",
+		CVV:             "123",
+		Notes:           "smoke card",
+	})
+	if err != nil {
+		t.Fatalf("encode bank card payload: %v", err)
+	}
+
+	createdBankCard, err := vaultService.CreateSecret(ctx, session, core.CreateSecretInput{
+		Type:                 core.SecretTypeBankCard,
+		Metadata:             []byte(`{"title":"smoke bank card"}`),
+		Payload:              bankCardPayload,
+		PayloadSchemaVersion: bankCardSchemaVersion,
+	})
+	if err != nil {
+		t.Fatalf("create bank card secret: %v", err)
+	}
+
+	binaryPayload, binarySchemaVersion, err := core.EncodeBinaryPayload(core.BinaryPayload{
+		FileName:    "smoke.bin",
+		ContentType: "application/octet-stream",
+		Data:        []byte{0x01, 0x02, 0x03},
+	})
+	if err != nil {
+		t.Fatalf("encode binary payload: %v", err)
+	}
+
+	createdBinary, err := vaultService.CreateSecret(ctx, session, core.CreateSecretInput{
+		Type:                 core.SecretTypeBinary,
+		Metadata:             []byte(`{"title":"smoke binary"}`),
+		Payload:              binaryPayload,
+		PayloadSchemaVersion: binarySchemaVersion,
+	})
+	if err != nil {
+		t.Fatalf("create binary secret: %v", err)
 	}
 
 	listed, err := vaultService.ListSecrets(ctx, session, core.ListSecretsInput{})
@@ -111,20 +172,21 @@ func TestSmokeAuthVaultAndSyncFlow(t *testing.T) {
 		t.Fatalf("list secrets: %v", err)
 	}
 
-	if len(listed) != 1 {
-		t.Fatalf("listed secrets = %d, want 1", len(listed))
+	if len(listed) != 4 {
+		t.Fatalf("listed secrets = %d, want 4", len(listed))
 	}
 
-	if listed[0].ID != created.ID {
-		t.Fatalf("listed id = %q, want %q", listed[0].ID, created.ID)
-	}
+	assertSmokeListContains(t, listed, createdText.ID)
+	assertSmokeListContains(t, listed, createdLoginPassword.ID)
+	assertSmokeListContains(t, listed, createdBankCard.ID)
+	assertSmokeListContains(t, listed, createdBinary.ID)
 
-	got, err := vaultService.GetSecret(ctx, session, core.GetSecretInput{ID: created.ID})
+	gotText, err := vaultService.GetSecret(ctx, session, core.GetSecretInput{ID: createdText.ID})
 	if err != nil {
-		t.Fatalf("get secret: %v", err)
+		t.Fatalf("get text secret: %v", err)
 	}
 
-	decodedText, err := core.DecodeTextPayload(got.Payload, got.PayloadSchemaVersion)
+	decodedText, err := core.DecodeTextPayload(gotText.Payload, gotText.PayloadSchemaVersion)
 	if err != nil {
 		t.Fatalf("decode text payload: %v", err)
 	}
@@ -133,14 +195,56 @@ func TestSmokeAuthVaultAndSyncFlow(t *testing.T) {
 		t.Fatalf("payload text = %q, want smoke secret", decodedText.Text)
 	}
 
+	gotLoginPassword, err := vaultService.GetSecret(ctx, session, core.GetSecretInput{ID: createdLoginPassword.ID})
+	if err != nil {
+		t.Fatalf("get login/password secret: %v", err)
+	}
+
+	decodedLoginPassword, err := core.DecodeLoginPasswordPayload(gotLoginPassword.Payload, gotLoginPassword.PayloadSchemaVersion)
+	if err != nil {
+		t.Fatalf("decode login/password payload: %v", err)
+	}
+
+	if decodedLoginPassword.Login != "smoke-login" || decodedLoginPassword.Password != "smoke-password" {
+		t.Fatalf("decoded login/password = %+v, want smoke credentials", decodedLoginPassword)
+	}
+
+	gotBankCard, err := vaultService.GetSecret(ctx, session, core.GetSecretInput{ID: createdBankCard.ID})
+	if err != nil {
+		t.Fatalf("get bank card secret: %v", err)
+	}
+
+	decodedBankCard, err := core.DecodeBankCardPayload(gotBankCard.Payload, gotBankCard.PayloadSchemaVersion)
+	if err != nil {
+		t.Fatalf("decode bank card payload: %v", err)
+	}
+
+	if decodedBankCard.Number != "4111111111111111" || decodedBankCard.CardholderName != "SMOKE USER" {
+		t.Fatalf("decoded bank card = %+v, want smoke bank card", decodedBankCard)
+	}
+
+	gotBinary, err := vaultService.GetSecret(ctx, session, core.GetSecretInput{ID: createdBinary.ID})
+	if err != nil {
+		t.Fatalf("get binary secret: %v", err)
+	}
+
+	decodedBinary, err := core.DecodeBinaryPayload(gotBinary.Payload, gotBinary.PayloadSchemaVersion)
+	if err != nil {
+		t.Fatalf("decode binary payload: %v", err)
+	}
+
+	if decodedBinary.FileName != "smoke.bin" || !bytes.Equal(decodedBinary.Data, []byte{0x01, 0x02, 0x03}) {
+		t.Fatalf("decoded binary = %+v, want smoke binary", decodedBinary)
+	}
+
 	updatedPayload, updatedSchemaVersion, err := core.EncodeTextPayload(core.TextPayload{Text: "updated smoke secret"})
 	if err != nil {
 		t.Fatalf("encode updated text payload: %v", err)
 	}
 
 	updated, err := vaultService.UpdateSecret(ctx, session, core.UpdateSecretInput{
-		ID:                   created.ID,
-		ExpectedVersion:      got.Version,
+		ID:                   createdText.ID,
+		ExpectedVersion:      gotText.Version,
 		Type:                 core.SecretTypeText,
 		Metadata:             []byte(`{"title":"updated smoke note"}`),
 		Payload:              updatedPayload,
@@ -150,20 +254,20 @@ func TestSmokeAuthVaultAndSyncFlow(t *testing.T) {
 		t.Fatalf("update secret: %v", err)
 	}
 
-	if updated.Version != got.Version+1 {
-		t.Fatalf("updated version = %d, want %d", updated.Version, got.Version+1)
+	if updated.Version != gotText.Version+1 {
+		t.Fatalf("updated version = %d, want %d", updated.Version, gotText.Version+1)
 	}
 
 	deleted, err := vaultService.DeleteSecret(ctx, session, core.DeleteSecretInput{
-		ID:              created.ID,
+		ID:              createdText.ID,
 		ExpectedVersion: updated.Version,
 	})
 	if err != nil {
 		t.Fatalf("delete secret: %v", err)
 	}
 
-	if deleted.ID != created.ID {
-		t.Fatalf("deleted id = %q, want %q", deleted.ID, created.ID)
+	if deleted.ID != createdText.ID {
+		t.Fatalf("deleted id = %q, want %q", deleted.ID, createdText.ID)
 	}
 
 	activeAfterDelete, err := vaultService.ListSecrets(ctx, session, core.ListSecretsInput{})
@@ -171,8 +275,8 @@ func TestSmokeAuthVaultAndSyncFlow(t *testing.T) {
 		t.Fatalf("list after delete: %v", err)
 	}
 
-	if len(activeAfterDelete) != 0 {
-		t.Fatalf("active secrets after delete = %d, want 0", len(activeAfterDelete))
+	if len(activeAfterDelete) != 3 {
+		t.Fatalf("active secrets after delete = %d, want 3", len(activeAfterDelete))
 	}
 
 	synced, err := vaultService.SyncSecrets(ctx, session, core.SyncSecretsInput{})
@@ -182,15 +286,27 @@ func TestSmokeAuthVaultAndSyncFlow(t *testing.T) {
 
 	var foundDeleted bool
 	for _, secret := range synced.Secrets {
-		if secret.ID == created.ID && secret.DeletedAt != nil {
+		if secret.ID == createdText.ID && secret.DeletedAt != nil {
 			foundDeleted = true
 			break
 		}
 	}
 
 	if !foundDeleted {
-		t.Fatalf("sync did not return deleted tombstone for %s", created.ID)
+		t.Fatalf("sync did not return deleted tombstone for %s", createdText.ID)
 	}
+}
+
+func assertSmokeListContains(t *testing.T, secrets []core.Secret, id string) {
+	t.Helper()
+
+	for _, secret := range secrets {
+		if secret.ID == id {
+			return
+		}
+	}
+
+	t.Fatalf("listed secrets do not contain %s", id)
 }
 
 func openSmokeDatabase(t *testing.T, ctx context.Context, dsn string) *sql.DB {

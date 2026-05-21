@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -431,6 +433,90 @@ func TestCreateBankCardSecretCommandPromptsCVVHiddenAndCallsVaultService(t *test
 	}
 }
 
+func TestCreateBinarySecretCommandReadsFileAndCallsVaultService(t *testing.T) {
+	authService := &fakeCLIAuthService{}
+	vaultService := &fakeCLIVaultService{}
+	inputFile := filepath.Join(t.TempDir(), "private-key.bin")
+	inputData := []byte{0x01, 0x02, 0x03, 0x04}
+	if err := os.WriteFile(inputFile, inputData, 0o600); err != nil {
+		t.Fatalf("write input file: %v", err)
+	}
+
+	prompter := &fakePrompter{
+		values: []string{
+			"user@example.com",
+			"login-password",
+			"master-password",
+			"SSH private key",
+			inputFile,
+			"application/octet-stream",
+		},
+	}
+	var stdout bytes.Buffer
+
+	err := runCLI(context.Background(), []string{"create", "binary"}, authService, vaultService, prompter, &stdout, &bytes.Buffer{})
+	if err != nil {
+		t.Fatalf("runCLI() error = %v", err)
+	}
+
+	if len(vaultService.createSecretCalls) != 1 {
+		t.Fatalf("CreateSecret() calls = %d, want 1", len(vaultService.createSecretCalls))
+	}
+
+	call := vaultService.createSecretCalls[0]
+	if call.input.Type != core.SecretTypeBinary {
+		t.Fatalf("secret type = %v, want binary", call.input.Type)
+	}
+
+	if !strings.Contains(string(call.input.Metadata), "SSH private key") {
+		t.Fatalf("metadata = %q, want title", call.input.Metadata)
+	}
+
+	binaryPayload, err := core.DecodeBinaryPayload(call.input.Payload, call.input.PayloadSchemaVersion)
+	if err != nil {
+		t.Fatalf("DecodeBinaryPayload() error = %v", err)
+	}
+
+	if binaryPayload.FileName != "private-key.bin" {
+		t.Fatalf("file name = %q, want private-key.bin", binaryPayload.FileName)
+	}
+
+	if binaryPayload.ContentType != "application/octet-stream" {
+		t.Fatalf("content type = %q, want application/octet-stream", binaryPayload.ContentType)
+	}
+
+	if !bytes.Equal(binaryPayload.Data, inputData) {
+		t.Fatalf("binary data = %v, want %v", binaryPayload.Data, inputData)
+	}
+
+	if binaryPayload.SizeBytes != int64(len(inputData)) {
+		t.Fatalf("size bytes = %d, want %d", binaryPayload.SizeBytes, len(inputData))
+	}
+
+	if binaryPayload.ChecksumSHA256 == "" {
+		t.Fatalf("checksum is empty")
+	}
+
+	if call.input.PayloadSchemaVersion != core.BinaryPayloadSchemaVersion {
+		t.Fatalf("payload schema version = %d, want %d", call.input.PayloadSchemaVersion, core.BinaryPayloadSchemaVersion)
+	}
+
+	wantHidden := []bool{false, true, true, false, false, false}
+	if len(prompter.hidden) != len(wantHidden) {
+		t.Fatalf("hidden prompts = %v, want %v", prompter.hidden, wantHidden)
+	}
+
+	for i := range wantHidden {
+		if prompter.hidden[i] != wantHidden[i] {
+			t.Fatalf("hidden prompt[%d] = %v, want %v", i, prompter.hidden[i], wantHidden[i])
+		}
+	}
+
+	if !strings.Contains(stdout.String(), "text-secret-id") {
+		t.Fatalf("stdout = %q, want created secret id", stdout.String())
+	}
+}
+
 func TestGetTextSecretCommandLogsInPromptsIDAndPrintsSecret(t *testing.T) {
 	authService := &fakeCLIAuthService{}
 	vaultService := &fakeCLIVaultService{}
@@ -479,6 +565,59 @@ func TestGetTextSecretCommandLogsInPromptsIDAndPrintsSecret(t *testing.T) {
 
 	if strings.Contains(stdout.String(), "{\"text\"") {
 		t.Fatalf("stdout = %q, want decoded text payload instead of raw json", stdout.String())
+	}
+}
+
+func TestGetBinarySecretCommandWritesFileAndPrintsMetadata(t *testing.T) {
+	authService := &fakeCLIAuthService{}
+	outputFile := filepath.Join(t.TempDir(), "restored.bin")
+	binaryData := []byte{0x05, 0x06, 0x07, 0x08}
+	vaultService := &fakeCLIVaultService{
+		getSecretFunc: func(context.Context, core.Session, core.GetSecretInput) (core.Secret, error) {
+			return core.Secret{
+				ID:                   "binary-secret-id",
+				Type:                 core.SecretTypeBinary,
+				Metadata:             []byte(`{"title":"SSH private key"}`),
+				Payload:              mustEncodeBinaryPayload(core.BinaryPayload{FileName: "private-key.bin", ContentType: "application/octet-stream", Data: binaryData}),
+				PayloadSchemaVersion: core.BinaryPayloadSchemaVersion,
+				Version:              6,
+			}, nil
+		},
+	}
+	prompter := &fakePrompter{
+		values: []string{
+			"user@example.com",
+			"login-password",
+			"master-password",
+			"binary-secret-id",
+			outputFile,
+		},
+	}
+	var stdout bytes.Buffer
+
+	err := runCLI(context.Background(), []string{"get"}, authService, vaultService, prompter, &stdout, &bytes.Buffer{})
+	if err != nil {
+		t.Fatalf("runCLI() error = %v", err)
+	}
+
+	restoredData, err := os.ReadFile(outputFile)
+	if err != nil {
+		t.Fatalf("read restored file: %v", err)
+	}
+
+	if !bytes.Equal(restoredData, binaryData) {
+		t.Fatalf("restored data = %v, want %v", restoredData, binaryData)
+	}
+
+	output := stdout.String()
+	for _, want := range []string{"SSH private key", "binary", "private-key.bin", "application/octet-stream", "4", outputFile} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("stdout = %q, want %q", output, want)
+		}
+	}
+
+	if strings.Contains(output, "{\"file_name\"") {
+		t.Fatalf("stdout = %q, want decoded binary payload instead of raw json", output)
 	}
 }
 
@@ -690,6 +829,50 @@ func TestListSecretsCommandPrintsBankCardItems(t *testing.T) {
 	}
 }
 
+func TestListSecretsCommandPrintsBinaryItems(t *testing.T) {
+	authService := &fakeCLIAuthService{}
+	vaultService := &fakeCLIVaultService{
+		listSecretsFunc: func(context.Context, core.Session, core.ListSecretsInput) ([]core.Secret, error) {
+			return []core.Secret{
+				{
+					ID:                   "binary-secret-id",
+					Type:                 core.SecretTypeBinary,
+					Metadata:             []byte(`{"title":"SSH private key"}`),
+					Payload:              mustEncodeBinaryPayload(core.BinaryPayload{FileName: "private-key.bin", ContentType: "application/octet-stream", Data: []byte{0x01}}),
+					PayloadSchemaVersion: core.BinaryPayloadSchemaVersion,
+					Version:              9,
+				},
+			}, nil
+		},
+	}
+	prompter := &fakePrompter{
+		values: []string{
+			"user@example.com",
+			"login-password",
+			"master-password",
+		},
+	}
+	var stdout bytes.Buffer
+
+	err := runCLI(context.Background(), []string{"list"}, authService, vaultService, prompter, &stdout, &bytes.Buffer{})
+	if err != nil {
+		t.Fatalf("runCLI() error = %v", err)
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, "binary-secret-id") {
+		t.Fatalf("stdout = %q, want binary secret id", output)
+	}
+
+	if !strings.Contains(output, "binary") {
+		t.Fatalf("stdout = %q, want binary type marker", output)
+	}
+
+	if !strings.Contains(output, "SSH private key") {
+		t.Fatalf("stdout = %q, want title", output)
+	}
+}
+
 func TestUpdateTextSecretCommandPromptsVersionAndSecretHidden(t *testing.T) {
 	authService := &fakeCLIAuthService{}
 	vaultService := &fakeCLIVaultService{}
@@ -753,6 +936,80 @@ func TestUpdateTextSecretCommandPromptsVersionAndSecretHidden(t *testing.T) {
 	}
 
 	if !strings.Contains(stdout.String(), "3") {
+		t.Fatalf("stdout = %q, want updated version", stdout.String())
+	}
+}
+
+func TestUpdateBinarySecretCommandPromptsVersionReadsFileAndCallsVaultService(t *testing.T) {
+	authService := &fakeCLIAuthService{}
+	vaultService := &fakeCLIVaultService{}
+	inputFile := filepath.Join(t.TempDir(), "updated-key.bin")
+	inputData := []byte{0x09, 0x0a, 0x0b}
+	if err := os.WriteFile(inputFile, inputData, 0o600); err != nil {
+		t.Fatalf("write input file: %v", err)
+	}
+
+	prompter := &fakePrompter{
+		values: []string{
+			"user@example.com",
+			"login-password",
+			"master-password",
+			"binary-secret-id",
+			"5",
+			"Updated SSH private key",
+			inputFile,
+			"application/octet-stream",
+		},
+	}
+	var stdout bytes.Buffer
+
+	err := runCLI(context.Background(), []string{"update", "binary"}, authService, vaultService, prompter, &stdout, &bytes.Buffer{})
+	if err != nil {
+		t.Fatalf("runCLI() error = %v", err)
+	}
+
+	if len(vaultService.updateSecretCalls) != 1 {
+		t.Fatalf("UpdateSecret() calls = %d, want 1", len(vaultService.updateSecretCalls))
+	}
+
+	call := vaultService.updateSecretCalls[0]
+	if call.input.ID != "binary-secret-id" {
+		t.Fatalf("secret id = %q, want binary-secret-id", call.input.ID)
+	}
+
+	if call.input.ExpectedVersion != 5 {
+		t.Fatalf("expected version = %d, want 5", call.input.ExpectedVersion)
+	}
+
+	if call.input.Type != core.SecretTypeBinary {
+		t.Fatalf("secret type = %v, want binary", call.input.Type)
+	}
+
+	binaryPayload, err := core.DecodeBinaryPayload(call.input.Payload, call.input.PayloadSchemaVersion)
+	if err != nil {
+		t.Fatalf("DecodeBinaryPayload() error = %v", err)
+	}
+
+	if binaryPayload.FileName != "updated-key.bin" {
+		t.Fatalf("file name = %q, want updated-key.bin", binaryPayload.FileName)
+	}
+
+	if !bytes.Equal(binaryPayload.Data, inputData) {
+		t.Fatalf("binary data = %v, want %v", binaryPayload.Data, inputData)
+	}
+
+	wantHidden := []bool{false, true, true, false, false, false, false, false}
+	if len(prompter.hidden) != len(wantHidden) {
+		t.Fatalf("hidden prompts = %v, want %v", prompter.hidden, wantHidden)
+	}
+
+	for i := range wantHidden {
+		if prompter.hidden[i] != wantHidden[i] {
+			t.Fatalf("hidden prompt[%d] = %v, want %v", i, prompter.hidden[i], wantHidden[i])
+		}
+	}
+
+	if !strings.Contains(stdout.String(), "6") {
 		t.Fatalf("stdout = %q, want updated version", stdout.String())
 	}
 }
@@ -1125,6 +1382,15 @@ func mustEncodeLoginPasswordPayload(value core.LoginPasswordPayload) []byte {
 
 func mustEncodeBankCardPayload(value core.BankCardPayload) []byte {
 	payload, _, err := core.EncodeBankCardPayload(value)
+	if err != nil {
+		panic(err)
+	}
+
+	return payload
+}
+
+func mustEncodeBinaryPayload(value core.BinaryPayload) []byte {
+	payload, _, err := core.EncodeBinaryPayload(value)
 	if err != nil {
 		panic(err)
 	}

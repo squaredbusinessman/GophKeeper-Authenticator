@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -28,6 +30,7 @@ const (
 	secretKindText          secretKind = "text"
 	secretKindLoginPassword secretKind = "login-password"
 	secretKindBankCard      secretKind = "bank-card"
+	secretKindBinary        secretKind = "binary"
 )
 
 type textSecretMetadata struct {
@@ -112,6 +115,8 @@ func runCreateSecret(
 		return runCreateLoginPasswordSecret(ctx, authService, vaultService, prompter, stdout)
 	case secretKindBankCard:
 		return runCreateBankCardSecret(ctx, authService, vaultService, prompter, stdout)
+	case secretKindBinary:
+		return runCreateBinarySecret(ctx, authService, vaultService, prompter, stdout)
 
 	default:
 		return fmt.Errorf("unsupported secret type: %s", kind)
@@ -274,6 +279,70 @@ func runCreateBankCardSecret(
 	return nil
 }
 
+func runCreateBinarySecret(
+	ctx context.Context,
+	authService CLIAuthService,
+	vaultService CLIVaultService,
+	prompter Prompter,
+	stdout io.Writer,
+) error {
+	if vaultService == nil {
+		return fmt.Errorf("vault service is required")
+	}
+
+	session, err := openVaultSession(ctx, authService, prompter)
+	if err != nil {
+		return fmt.Errorf("open vault: %w", err)
+	}
+
+	title, err := promptRequired(prompter, "Title")
+	if err != nil {
+		return fmt.Errorf("read title: %w", err)
+	}
+
+	filePath, err := promptRequired(prompter, "File path")
+	if err != nil {
+		return fmt.Errorf("read file path: %w", err)
+	}
+
+	contentType, err := prompter.Prompt("Content type")
+	if err != nil {
+		return fmt.Errorf("read content type: %w", err)
+	}
+
+	fileData, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("read binary file: %w", err)
+	}
+
+	metadata, err := encodeTextSecretMetadata(title)
+	if err != nil {
+		return fmt.Errorf("encode binary metadata: %w", err)
+	}
+
+	payload, schemaVersion, err := core.EncodeBinaryPayload(core.BinaryPayload{
+		FileName:    filepath.Base(filePath),
+		ContentType: strings.TrimSpace(contentType),
+		Data:        fileData,
+	})
+	if err != nil {
+		return fmt.Errorf("encode binary payload: %w", err)
+	}
+
+	secret, err := vaultService.CreateSecret(ctx, session, core.CreateSecretInput{
+		Type:                 core.SecretTypeBinary,
+		Metadata:             metadata,
+		Payload:              payload,
+		PayloadSchemaVersion: schemaVersion,
+	})
+	if err != nil {
+		return fmt.Errorf("create binary secret: %w", err)
+	}
+
+	fmt.Fprintf(stdout, "Секрет создан: %s\n", secret.ID)
+	return nil
+}
+
 func runGetSecret(
 	ctx context.Context,
 	authService CLIAuthService,
@@ -300,7 +369,7 @@ func runGetSecret(
 		return fmt.Errorf("get secret: %w", err)
 	}
 
-	return printSecret(stdout, secret)
+	return printSecret(stdout, prompter, secret)
 }
 
 func runListSecrets(ctx context.Context, authService CLIAuthService, vaultService CLIVaultService, prompter Prompter, stdout io.Writer) error {
@@ -351,6 +420,8 @@ func runUpdateSecret(
 		return runUpdateLoginPasswordSecret(ctx, authService, vaultService, prompter, stdout)
 	case secretKindBankCard:
 		return runUpdateBankCardSecret(ctx, authService, vaultService, prompter, stdout)
+	case secretKindBinary:
+		return runUpdateBinarySecret(ctx, authService, vaultService, prompter, stdout)
 	default:
 		return fmt.Errorf("unsupported secret type: %s", kind)
 	}
@@ -508,6 +579,71 @@ func runUpdateBankCardSecret(ctx context.Context, authService CLIAuthService, va
 	})
 	if err != nil {
 		return fmt.Errorf("version conflict: update bank card secret: %w", err)
+	}
+
+	fmt.Fprintf(stdout, "Секрет обновлен: %s, version: %d\n", secret.ID, secret.Version)
+	return nil
+}
+
+func runUpdateBinarySecret(ctx context.Context, authService CLIAuthService, vaultService CLIVaultService, prompter Prompter, stdout io.Writer) error {
+	if vaultService == nil {
+		return fmt.Errorf("vault service is required")
+	}
+
+	session, err := openVaultSession(ctx, authService, prompter)
+	if err != nil {
+		return fmt.Errorf("open vault: %w", err)
+	}
+
+	id, expectedVersion, err := promptSecretIDAndVersion(prompter)
+	if err != nil {
+		return err
+	}
+
+	title, err := promptRequired(prompter, "Title")
+	if err != nil {
+		return fmt.Errorf("read title: %w", err)
+	}
+
+	filePath, err := promptRequired(prompter, "File path")
+	if err != nil {
+		return fmt.Errorf("read file path: %w", err)
+	}
+
+	contentType, err := prompter.Prompt("Content type")
+	if err != nil {
+		return fmt.Errorf("read content type: %w", err)
+	}
+
+	fileData, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("read binary file: %w", err)
+	}
+
+	metadata, err := encodeTextSecretMetadata(title)
+	if err != nil {
+		return fmt.Errorf("encode binary metadata: %w", err)
+	}
+
+	payload, schemaVersion, err := core.EncodeBinaryPayload(core.BinaryPayload{
+		FileName:    filepath.Base(filePath),
+		ContentType: strings.TrimSpace(contentType),
+		Data:        fileData,
+	})
+	if err != nil {
+		return fmt.Errorf("encode binary payload: %w", err)
+	}
+
+	secret, err := vaultService.UpdateSecret(ctx, session, core.UpdateSecretInput{
+		ID:                   id,
+		ExpectedVersion:      expectedVersion,
+		Type:                 core.SecretTypeBinary,
+		Metadata:             metadata,
+		Payload:              payload,
+		PayloadSchemaVersion: schemaVersion,
+	})
+	if err != nil {
+		return fmt.Errorf("version conflict: update binary secret: %w", err)
 	}
 
 	fmt.Fprintf(stdout, "Секрет обновлен: %s, version: %d\n", secret.ID, secret.Version)
@@ -739,6 +875,8 @@ func parseSecretKind(args []string) secretKind {
 		return secretKindLoginPassword
 	case "bank-card", "bank_card":
 		return secretKindBankCard
+	case "binary":
+		return secretKindBinary
 	default:
 		return secretKind(args[0])
 	}
@@ -758,7 +896,7 @@ func promptRequired(prompter Prompter, label string) (string, error) {
 	return value, nil
 }
 
-func printSecret(stdout io.Writer, secret core.Secret) error {
+func printSecret(stdout io.Writer, prompter Prompter, secret core.Secret) error {
 	title := decodeTextSecretTitle(secret.Metadata)
 	if title != "" {
 		fmt.Fprintf(stdout, "Title: %s\n", title)
@@ -814,6 +952,28 @@ func printSecret(stdout io.Writer, secret core.Secret) error {
 			fmt.Fprintf(stdout, "Notes: %s\n", bankCardPayload.Notes)
 		}
 
+		return nil
+	case core.SecretTypeBinary:
+		binaryPayload, err := core.DecodeBinaryPayload(secret.Payload, secret.PayloadSchemaVersion)
+		if err != nil {
+			return fmt.Errorf("decode binary payload: %w", err)
+		}
+
+		outputPath, err := promptRequired(prompter, "Output path")
+		if err != nil {
+			return fmt.Errorf("read output path: %w", err)
+		}
+
+		if err = os.WriteFile(outputPath, binaryPayload.Data, 0o600); err != nil {
+			return fmt.Errorf("write binary file: %w", err)
+		}
+
+		fmt.Fprintf(stdout, "Type: %s\n", secretTypeLabel(secret.Type))
+		fmt.Fprintf(stdout, "File name: %s\n", binaryPayload.FileName)
+		fmt.Fprintf(stdout, "Content type: %s\n", binaryPayload.ContentType)
+		fmt.Fprintf(stdout, "Size bytes: %d\n", binaryPayload.SizeBytes)
+		fmt.Fprintf(stdout, "Checksum SHA256: %s\n", binaryPayload.ChecksumSHA256)
+		fmt.Fprintf(stdout, "Written to: %s\n", outputPath)
 		return nil
 	default:
 		return fmt.Errorf("unsupported secret type: %s", secretTypeLabel(secret.Type))

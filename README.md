@@ -474,7 +474,7 @@ docker compose -f deploy/docker-compose.yml down -v
 
 Сейчас сервер умеет стартовать, подключаться к PostgreSQL, применять миграции, регистрировать gRPC-сервисы и корректно завершаться по `SIGINT` или `SIGTERM`.
 
-В `AuthService` реализованы `Register` и `Login`. `VaultService` пока остается заглушкой через `UnimplementedVaultServiceServer`, потому что CRUD секретов будет добавляться следующими шагами.
+В `AuthService` реализованы `Register` и `Login`. В `VaultService` реализованы protected методы `CreateItem`, `GetItem`, `ListItems`, `UpdateItem`, `DeleteItem` и `Sync`.
 
 Перед запуском сервера нужно передать обязательные переменные окружения:
 
@@ -507,7 +507,7 @@ go run ./cmd/gophkeeper-server
 
 ## CLI
 
-Сейчас CLI умеет показывать версию, регистрировать пользователя, выполнять вход, создавать текстовый секрет, получать секрет по ID, выводить список активных секретов, обновлять секрет, мягко удалять секрет и запускать server-side sync.
+Сейчас CLI умеет показывать версию, регистрировать пользователя, выполнять вход, создавать и обновлять секреты типов `text`, `login_password`, `bank_card` и `binary`, получать секрет по ID, выводить список активных секретов, мягко удалять секрет и запускать server-side sync.
 
 Запуск через Go:
 
@@ -533,13 +533,31 @@ go run ./cmd/gophkeeper-cli login
 go run ./cmd/gophkeeper-cli create
 ```
 
-Получение текстового секрета:
+Создание пары логин и пароль:
+
+```bash
+go run ./cmd/gophkeeper-cli create login-password
+```
+
+Создание банковской карты:
+
+```bash
+go run ./cmd/gophkeeper-cli create bank-card
+```
+
+Создание бинарного секрета из файла:
+
+```bash
+go run ./cmd/gophkeeper-cli create binary
+```
+
+Получение секрета:
 
 ```bash
 go run ./cmd/gophkeeper-cli get
 ```
 
-Список активных текстовых секретов:
+Список активных секретов:
 
 ```bash
 go run ./cmd/gophkeeper-cli list
@@ -549,6 +567,24 @@ go run ./cmd/gophkeeper-cli list
 
 ```bash
 go run ./cmd/gophkeeper-cli update
+```
+
+Обновление пары логин и пароль:
+
+```bash
+go run ./cmd/gophkeeper-cli update login-password
+```
+
+Обновление банковской карты:
+
+```bash
+go run ./cmd/gophkeeper-cli update bank-card
+```
+
+Обновление бинарного секрета из файла:
+
+```bash
+go run ./cmd/gophkeeper-cli update binary
 ```
 
 Мягкое удаление текстового секрета:
@@ -572,11 +608,11 @@ go run ./cmd/gophkeeper-cli sync
 - пароль входа и мастер-пароль не должны совпадать;
 - при регистрации CLI предупреждает, что мастер-пароль невозможно восстановить.
 
-Команда `create` сейчас создает текстовый секрет. CLI запрашивает title обычным prompt, а само секретное значение скрытым prompt. Title сохраняется как encrypted metadata, секретный текст кодируется в client payload schema `TextPayload`, а затем шифруется на клиенте через vault key.
+Команда `create` без указания типа создает текстовый секрет. Для остальных обязательных типов используются команды `create login-password`, `create bank-card` и `create binary`. Title сохраняется как encrypted metadata, а содержимое кодируется в одну из client payload schemas: `TextPayload`, `LoginPasswordPayload`, `BankCardPayload` или `BinaryPayload`. После кодирования metadata и payload шифруются на клиенте через vault key.
 
-Команда `get` запрашивает ID секрета, получает encrypted item с сервера и расшифровывает metadata и payload на клиенте. Для открытия vault команды заново запрашивают login, пароль входа и мастер-пароль. Это нужно потому, что текущий CLI сохраняет только access token, но не хранит открытый vault key между запусками.
+Команда `get` запрашивает ID секрета, получает encrypted item с сервера и расшифровывает metadata и payload на клиенте. Для `binary` команда дополнительно запрашивает `Output path` и записывает расшифрованный файл на диск с правами `0600`. Для открытия vault команды заново запрашивают login, пароль входа и мастер-пароль. Это нужно потому, что текущий CLI сохраняет только access token, но не хранит открытый vault key между запусками.
 
-Команды `update` и `delete` требуют `Expected version`. Версию нужно брать из `list`, `get` или результата предыдущей команды. Если версия устарела, сервер возвращает version conflict.
+Команда `update` без указания типа обновляет текстовый секрет. Для остальных обязательных типов используются команды `update login-password`, `update bank-card` и `update binary`. Команды `update` и `delete` требуют `Expected version`. Версию нужно брать из `list`, `get` или результата предыдущей команды. Если версия устарела, сервер возвращает version conflict.
 
 Команда `sync` получает изменения с сервера, включая tombstones для удаленных записей. На текущем этапе offline cache еще нет, поэтому CLI не сохраняет sync cursor локально и отправляет пустой `changed_after`.
 
@@ -627,9 +663,15 @@ gophkeeper version
 gophkeeper register
 gophkeeper login
 gophkeeper create
+gophkeeper create login-password
+gophkeeper create bank-card
+gophkeeper create binary
 gophkeeper get
 gophkeeper list
 gophkeeper update
+gophkeeper update login-password
+gophkeeper update bank-card
+gophkeeper update binary
 gophkeeper delete
 gophkeeper sync
 ```
@@ -749,6 +791,7 @@ make smoke
 - обработка version conflicts;
 - преобразование доменных ошибок в gRPC status codes;
 - поведение CLI-команд через fake client core.
+- smoke flow для всех обязательных типов секретов: `text`, `login_password`, `bank_card`, `binary`.
 
 Generated protobuf code напрямую тестировать не планируется.
 
@@ -801,7 +844,7 @@ make smoke
 - `go vet` завершается без ошибок;
 - coverage не ниже 70%;
 - generated protobuf code не учитывается в coverage threshold.
-- smoke-сценарий проходит register, login, create, list, get, update, delete и sync через реальный gRPC-сервер и PostgreSQL.
+- smoke-сценарий проходит register, login, create/list/get для `text`, `login_password`, `bank_card` и `binary`, а также update, delete и sync через реальный gRPC-сервер и PostgreSQL.
 
 ### 4. Собрать CLI
 
@@ -912,7 +955,9 @@ Repeat master password: master-password-123
 - сохранение token state в `$HOME/.gophkeeper/token.json`;
 - расшифровка vault key на клиенте.
 
-### 9. Создать текстовый секрет
+### 9. Создать секреты всех обязательных типов
+
+Текстовый секрет:
 
 ```bash
 ./bin/gophkeeper-cli create
@@ -931,31 +976,144 @@ Secret text: very secret text
 Ожидаемый результат:
 
 ```text
-Секрет создан: <secret-id>
+Секрет создан: <text-secret-id>
 ```
 
-Сохранить `<secret-id>` для следующих шагов.
+Сохранить `<text-secret-id>` для следующих шагов.
+
+Пара логин и пароль:
+
+```bash
+./bin/gophkeeper-cli create login-password
+```
+
+Пример вводимых данных:
+
+```text
+Login: user@example.com
+Login password: login-password-123
+Master password: master-password-123
+Title: GitHub account
+Secret login: octocat
+Secret password: github-secret-password
+URL: https://github.com
+Notes: work account
+```
+
+Сохранить `<login-password-secret-id>`.
+
+Банковская карта:
+
+```bash
+./bin/gophkeeper-cli create bank-card
+```
+
+Пример вводимых данных:
+
+```text
+Login: user@example.com
+Login password: login-password-123
+Master password: master-password-123
+Title: salary card
+Card number: 4111111111111111
+Cardholder name: IVAN IVANOV
+Expiration month: 05
+Expiration year: 2030
+CVV: 123
+Notes: main bank card
+```
+
+Сохранить `<bank-card-secret-id>`.
+
+Бинарный секрет:
+
+```bash
+printf 'binary secret content' > /tmp/gophkeeper-binary-secret.txt
+./bin/gophkeeper-cli create binary
+```
+
+Пример вводимых данных:
+
+```text
+Login: user@example.com
+Login password: login-password-123
+Master password: master-password-123
+Title: private file
+File path: /tmp/gophkeeper-binary-secret.txt
+Content type: text/plain
+```
+
+Сохранить `<binary-secret-id>`.
 
 Проверяется:
 
 - protected gRPC method;
 - client-side encryption metadata и payload;
-- `TextPayload` schema;
+- payload schemas `TextPayload`, `LoginPasswordPayload`, `BankCardPayload` и `BinaryPayload`;
+- inline binary metadata, checksum и size limit;
 - сохранение encrypted item на сервере.
 
-### 10. Получить секрет по ID
+### 10. Получить секреты по ID
 
 ```bash
 ./bin/gophkeeper-cli get
 ```
 
-Ввести `<secret-id>` из предыдущего шага.
+Ввести `<text-secret-id>` из предыдущего шага.
 
 Ожидаемый результат:
 
 ```text
 Title: first note
+Type: text
 Secret text: very secret text
+```
+
+Для `<login-password-secret-id>` ожидаемый результат содержит:
+
+```text
+Title: GitHub account
+Type: login_password
+Login: octocat
+Password: github-secret-password
+URL: https://github.com
+Notes: work account
+```
+
+Для `<bank-card-secret-id>` ожидаемый результат содержит:
+
+```text
+Title: salary card
+Type: bank_card
+Card number: 4111111111111111
+Cardholder name: IVAN IVANOV
+Expiration: 05/2030
+CVV: 123
+Notes: main bank card
+```
+
+Для `<binary-secret-id>` команда дополнительно спросит `Output path`:
+
+```text
+Output path: /tmp/gophkeeper-restored-binary-secret.txt
+```
+
+Ожидаемый результат содержит:
+
+```text
+Title: private file
+Type: binary
+File name: gophkeeper-binary-secret.txt
+Content type: text/plain
+Size bytes: <size>
+Checksum SHA256: <checksum>
+Written to: /tmp/gophkeeper-restored-binary-secret.txt
+```
+
+Проверить восстановленный файл:
+
+```bash
+cat /tmp/gophkeeper-restored-binary-secret.txt
 ```
 
 Проверяется:
@@ -973,10 +1131,13 @@ Secret text: very secret text
 Ожидаемый результат:
 
 ```text
-<secret-id> | version 1 | first note
+<text-secret-id> | version 1 | text | first note
+<login-password-secret-id> | version 1 | login_password | GitHub account
+<bank-card-secret-id> | version 1 | bank_card | salary card
+<binary-secret-id> | version 1 | binary | private file
 ```
 
-Сохранить актуальную `version`. Она нужна для optimistic locking.
+Сохранить актуальную `version` текстового секрета. Она нужна для optimistic locking в следующих шагах.
 
 Проверяется:
 
@@ -993,7 +1154,7 @@ Secret text: very secret text
 Пример вводимых данных:
 
 ```text
-Secret ID: <secret-id>
+Secret ID: <text-secret-id>
 Expected version: 1
 Title: updated note
 Secret text: updated secret text
@@ -1002,7 +1163,7 @@ Secret text: updated secret text
 Ожидаемый результат:
 
 ```text
-Секрет обновлен: <secret-id>, version: 2
+Секрет обновлен: <text-secret-id>, version: 2
 ```
 
 Проверяется:
@@ -1019,7 +1180,7 @@ Secret text: updated secret text
 ./bin/gophkeeper-cli get
 ```
 
-Ввести `<secret-id>`.
+Ввести `<text-secret-id>`.
 
 Ожидаемый результат:
 
@@ -1037,14 +1198,14 @@ Secret text: updated secret text
 Пример вводимых данных:
 
 ```text
-Secret ID: <secret-id>
+Secret ID: <text-secret-id>
 Expected version: 2
 ```
 
 Ожидаемый результат:
 
 ```text
-Секрет удален: <secret-id>, version: 3
+Секрет удален: <text-secret-id>, version: 3
 ```
 
 Проверяется:
@@ -1060,7 +1221,7 @@ Expected version: 2
 ./bin/gophkeeper-cli list
 ```
 
-Ожидаемый результат: удаленный `<secret-id>` отсутствует в списке.
+Ожидаемый результат: удаленный `<text-secret-id>` отсутствует в списке, а остальные активные секреты остаются видимыми.
 
 ### 16. Проверить sync и tombstones
 
