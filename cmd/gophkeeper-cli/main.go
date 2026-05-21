@@ -12,7 +12,9 @@ import (
 	gophkeeperv1 "github.com/squaredbusinessman/gophkeeper-authenticator/internal/gen/proto/gophkeeper/v1"
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/shared/version"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 )
 
 func main() {
@@ -72,6 +74,14 @@ func userFacingError(err error) string {
 	lowerMessage := strings.ToLower(message)
 
 	switch {
+	case strings.Contains(lowerMessage, "string field contains invalid utf-8"):
+		return "введенные данные содержат недопустимые символы. Используйте UTF-8 символы для login и пароля входа"
+	case strings.Contains(lowerMessage, "output file already exists"):
+		return "файл для сохранения binary-секрета уже существует. Укажите другой Output path, чтобы не перезаписать существующий файл"
+	case strings.Contains(lowerMessage, "invalid credentials"):
+		return "неверный login или пароль входа"
+	case strings.Contains(lowerMessage, "login already exists"):
+		return "пользователь с таким login уже существует. Выполните login или выберите другой login для регистрации"
 	case strings.Contains(lowerMessage, "connection refused") ||
 		strings.Contains(lowerMessage, "error while dialing") ||
 		strings.Contains(lowerMessage, "code = unavailable"):
@@ -82,6 +92,25 @@ func userFacingError(err error) string {
 	case strings.Contains(lowerMessage, "could not decrypt vault key") ||
 		strings.Contains(lowerMessage, "message authentication failed"):
 		return "неверный мастер-пароль: vault key не удалось расшифровать"
+	}
+
+	switch status.Code(err) {
+	case codes.AlreadyExists:
+		return "пользователь с таким login уже существует. Выполните login или выберите другой login для регистрации"
+	case codes.Unauthenticated:
+		return "неверный login или пароль входа"
+	case codes.Unavailable:
+		return "не удалось подключиться к серверу. Проверьте, что gophkeeper-server запущен и адрес GOPHKEEPER_SERVER_ADDRESS указан верно"
+	case codes.FailedPrecondition:
+		return "version conflict: версия секрета устарела. Выполните gophkeeper list или gophkeeper sync и повторите команду с актуальной version"
+	case codes.NotFound:
+		return "секрет не найден. Проверьте Secret ID через gophkeeper list или gophkeeper sync"
+	case codes.PermissionDenied:
+		return "нет доступа к этому секрету"
+	case codes.InvalidArgument:
+		return "некорректные данные команды. Проверьте обязательные поля и повторите ввод"
+	case codes.Internal:
+		return "внутренняя ошибка сервера. Проверьте логи gophkeeper-server"
 	default:
 		return message
 	}

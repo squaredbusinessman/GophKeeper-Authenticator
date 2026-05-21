@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/client/core"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type fakeCLIAuthService struct {
@@ -169,6 +171,36 @@ func TestUserFacingErrorMapsCommonCLIProblems(t *testing.T) {
 			name: "wrong_master_password",
 			err:  errors.New("open vault: login: could not decrypt vault key: cipher: message authentication failed"),
 			want: "неверный мастер-пароль",
+		},
+		{
+			name: "invalid_credentials",
+			err:  errors.New("open vault: login: could not login: rpc error: code = Unauthenticated desc = invalid credentials"),
+			want: "неверный login или пароль входа",
+		},
+		{
+			name: "login_already_exists",
+			err:  errors.New("register: could not register user: rpc error: code = AlreadyExists desc = login already exists"),
+			want: "пользователь с таким login уже существует",
+		},
+		{
+			name: "invalid_utf8",
+			err:  errors.New("register: could not register user: rpc error: code = Internal desc = grpc: error while marshaling: string field contains invalid UTF-8"),
+			want: "недопустимые символы",
+		},
+		{
+			name: "not_found_status",
+			err:  status.Error(codes.NotFound, "item not found"),
+			want: "секрет не найден",
+		},
+		{
+			name: "internal_status",
+			err:  status.Error(codes.Internal, "register failed"),
+			want: "внутренняя ошибка сервера",
+		},
+		{
+			name: "binary_output_exists",
+			err:  errors.New("output file already exists: /tmp/secret.bin"),
+			want: "файл для сохранения binary-секрета уже существует",
 		},
 	}
 
