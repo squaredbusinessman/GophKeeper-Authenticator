@@ -587,7 +587,7 @@ go run ./cmd/gophkeeper-cli update bank-card
 go run ./cmd/gophkeeper-cli update binary
 ```
 
-Мягкое удаление текстового секрета:
+Мягкое удаление секрета любого типа:
 
 ```bash
 go run ./cmd/gophkeeper-cli delete
@@ -612,7 +612,7 @@ go run ./cmd/gophkeeper-cli sync
 
 Команда `get` запрашивает ID секрета, получает encrypted item с сервера и расшифровывает metadata и payload на клиенте. Для `binary` команда дополнительно запрашивает `Output path` и записывает расшифрованный файл на диск с правами `0600`. Для открытия vault команды заново запрашивают login, пароль входа и мастер-пароль. Это нужно потому, что текущий CLI сохраняет только access token, но не хранит открытый vault key между запусками.
 
-Команда `update` без указания типа обновляет текстовый секрет. Для остальных обязательных типов используются команды `update login-password`, `update bank-card` и `update binary`. Команды `update` и `delete` требуют `Expected version`. Версию нужно брать из `list`, `get` или результата предыдущей команды. Если версия устарела, сервер возвращает version conflict.
+Команда `update` без указания типа обновляет текстовый секрет. Для остальных обязательных типов используются команды `update login-password`, `update bank-card` и `update binary`. Команда `delete` не зависит от типа секрета: она удаляет любой item по `Secret ID` и `Expected version`. Команды `update` и `delete` требуют `Expected version`. Версию нужно брать из `list`, `get` или результата предыдущей команды. Если версия устарела, сервер возвращает version conflict.
 
 Команда `sync` получает изменения с сервера, включая tombstones для удаленных записей. На текущем этапе offline cache еще нет, поэтому CLI не сохраняет sync cursor локально и отправляет пустой `changed_after`.
 
@@ -777,6 +777,8 @@ make smoke
 
 `make smoke` запускает тесты с build tag `smoke`. Обычный `go test ./...` эти тесты не запускает, чтобы локальная быстрая проверка не требовала PostgreSQL.
 
+В GitHub Actions этот же сценарий запускается отдельной job `postgres-smoke`. Эта job является CI-проверкой основных требований ТЗ: она поднимает PostgreSQL, стартует реальный gRPC-сервер внутри теста и проходит register, login, create, list, get, update, delete и sync для обязательных типов секретов.
+
 Целевое покрытие проекта unit-тестами - не менее 70%.
 
 Наиболее важные зоны тестирования:
@@ -844,7 +846,7 @@ make smoke
 - `go vet` завершается без ошибок;
 - coverage не ниже 70%;
 - generated protobuf code не учитывается в coverage threshold.
-- smoke-сценарий проходит register, login, create/list/get для `text`, `login_password`, `bank_card` и `binary`, а также update, delete и sync через реальный gRPC-сервер и PostgreSQL.
+- smoke-сценарий проходит register, login, create/list/get/update/delete для `text`, `login_password`, `bank_card` и `binary`, а также sync tombstones через реальный gRPC-сервер и PostgreSQL.
 
 ### 4. Собрать CLI
 
@@ -1145,7 +1147,9 @@ cat /tmp/gophkeeper-restored-binary-secret.txt
 - фильтрация deleted items;
 - отображение ID, версии и title.
 
-### 12. Обновить секрет
+### 12. Обновить секреты всех обязательных типов
+
+Текстовый секрет:
 
 ```bash
 ./bin/gophkeeper-cli update
@@ -1174,7 +1178,80 @@ Secret text: updated secret text
 - повторное шифрование metadata и payload;
 - понятная ошибка при version conflict.
 
-### 13. Проверить обновленное значение
+Пара логин и пароль:
+
+```bash
+./bin/gophkeeper-cli update login-password
+```
+
+Пример вводимых данных:
+
+```text
+Secret ID: <login-password-secret-id>
+Expected version: 1
+Title: GitHub account updated
+Secret login: octocat
+Secret password: updated-github-secret-password
+URL: https://github.com
+Notes: updated work account
+```
+
+Ожидаемый результат:
+
+```text
+Секрет обновлен: <login-password-secret-id>, version: 2
+```
+
+Банковская карта:
+
+```bash
+./bin/gophkeeper-cli update bank-card
+```
+
+Пример вводимых данных:
+
+```text
+Secret ID: <bank-card-secret-id>
+Expected version: 1
+Title: salary card updated
+Card number: 5555555555554444
+Cardholder name: IVAN IVANOV
+Expiration month: 06
+Expiration year: 2031
+CVV: 321
+Notes: updated bank card
+```
+
+Ожидаемый результат:
+
+```text
+Секрет обновлен: <bank-card-secret-id>, version: 2
+```
+
+Бинарный секрет:
+
+```bash
+printf 'updated binary secret content' > /tmp/gophkeeper-binary-secret-updated.txt
+./bin/gophkeeper-cli update binary
+```
+
+Пример вводимых данных:
+
+```text
+Secret ID: <binary-secret-id>
+Expected version: 1
+Title: private file updated
+File path: /tmp/gophkeeper-binary-secret-updated.txt
+Content type: text/plain
+```
+
+Ожидаемый результат:
+
+```text
+Секрет обновлен: <binary-secret-id>, version: 2
+```
+
+### 13. Проверить обновленные значения
 
 ```bash
 ./bin/gophkeeper-cli get
@@ -1186,10 +1263,21 @@ Secret text: updated secret text
 
 ```text
 Title: updated note
+Type: text
 Secret text: updated secret text
 ```
 
-### 14. Удалить секрет
+Повторить `get` для `<login-password-secret-id>`, `<bank-card-secret-id>` и `<binary-secret-id>`. Для binary указать новый output path и проверить содержимое файла:
+
+```text
+Output path: /tmp/gophkeeper-restored-binary-secret-updated.txt
+```
+
+```bash
+cat /tmp/gophkeeper-restored-binary-secret-updated.txt
+```
+
+### 14. Удалить секреты всех обязательных типов
 
 ```bash
 ./bin/gophkeeper-cli delete
@@ -1208,6 +1296,8 @@ Expected version: 2
 Секрет удален: <text-secret-id>, version: 3
 ```
 
+Повторить ту же команду для `<login-password-secret-id>`, `<bank-card-secret-id>` и `<binary-secret-id>`, используя актуальную версию `2`.
+
 Проверяется:
 
 - soft delete;
@@ -1221,7 +1311,7 @@ Expected version: 2
 ./bin/gophkeeper-cli list
 ```
 
-Ожидаемый результат: удаленный `<text-secret-id>` отсутствует в списке, а остальные активные секреты остаются видимыми.
+Ожидаемый результат: удаленные `<text-secret-id>`, `<login-password-secret-id>`, `<bank-card-secret-id>` и `<binary-secret-id>` отсутствуют в списке активных секретов.
 
 ### 16. Проверить sync и tombstones
 
@@ -1229,7 +1319,7 @@ Expected version: 2
 ./bin/gophkeeper-cli sync
 ```
 
-Ожидаемый результат: в выводе есть изменения пользователя, включая удаленный item со статусом `удален`.
+Ожидаемый результат: в выводе есть изменения пользователя, включая tombstones для всех четырех удаленных items со статусом `удален`.
 
 Проверяется:
 

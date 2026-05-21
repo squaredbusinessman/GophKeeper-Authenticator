@@ -751,7 +751,7 @@ func runUpdateTextSecret(ctx context.Context, authService CLIAuthService, vaultS
 	return nil
 }
 
-func runDeleteTextSecret(ctx context.Context, authService CLIAuthService, vaultService CLIVaultService, prompter Prompter, stdout io.Writer) error {
+func runDeleteSecret(ctx context.Context, authService CLIAuthService, vaultService CLIVaultService, prompter Prompter, stdout io.Writer) error {
 	if vaultService == nil {
 		return fmt.Errorf("vault service is required")
 	}
@@ -771,7 +771,7 @@ func runDeleteTextSecret(ctx context.Context, authService CLIAuthService, vaultS
 		ExpectedVersion: expectedVersion,
 	})
 	if err != nil {
-		return fmt.Errorf("version conflict: delete text secret: %w", err)
+		return fmt.Errorf("version conflict: delete secret: %w", err)
 	}
 
 	fmt.Fprintf(stdout, "Секрет удален: %s, version: %d\n", result.ID, result.Version)

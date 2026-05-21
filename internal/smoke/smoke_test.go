@@ -237,37 +237,208 @@ func TestSmokeAuthVaultAndSyncFlow(t *testing.T) {
 		t.Fatalf("decoded binary = %+v, want smoke binary", decodedBinary)
 	}
 
-	updatedPayload, updatedSchemaVersion, err := core.EncodeTextPayload(core.TextPayload{Text: "updated smoke secret"})
+	updatedTextPayload, updatedTextSchemaVersion, err := core.EncodeTextPayload(core.TextPayload{Text: "updated smoke secret"})
 	if err != nil {
 		t.Fatalf("encode updated text payload: %v", err)
 	}
 
-	updated, err := vaultService.UpdateSecret(ctx, session, core.UpdateSecretInput{
+	updatedText, err := vaultService.UpdateSecret(ctx, session, core.UpdateSecretInput{
 		ID:                   createdText.ID,
 		ExpectedVersion:      gotText.Version,
 		Type:                 core.SecretTypeText,
 		Metadata:             []byte(`{"title":"updated smoke note"}`),
-		Payload:              updatedPayload,
-		PayloadSchemaVersion: updatedSchemaVersion,
+		Payload:              updatedTextPayload,
+		PayloadSchemaVersion: updatedTextSchemaVersion,
 	})
 	if err != nil {
-		t.Fatalf("update secret: %v", err)
+		t.Fatalf("update text secret: %v", err)
 	}
 
-	if updated.Version != gotText.Version+1 {
-		t.Fatalf("updated version = %d, want %d", updated.Version, gotText.Version+1)
+	if updatedText.Version != gotText.Version+1 {
+		t.Fatalf("updated text version = %d, want %d", updatedText.Version, gotText.Version+1)
 	}
 
-	deleted, err := vaultService.DeleteSecret(ctx, session, core.DeleteSecretInput{
+	updatedLoginPasswordPayload, updatedLoginPasswordSchemaVersion, err := core.EncodeLoginPasswordPayload(core.LoginPasswordPayload{
+		Login:    "updated-smoke-login",
+		Password: "updated-smoke-password",
+		URL:      "https://updated.example.com",
+		Notes:    "updated smoke credentials",
+	})
+	if err != nil {
+		t.Fatalf("encode updated login/password payload: %v", err)
+	}
+
+	updatedLoginPassword, err := vaultService.UpdateSecret(ctx, session, core.UpdateSecretInput{
+		ID:                   createdLoginPassword.ID,
+		ExpectedVersion:      gotLoginPassword.Version,
+		Type:                 core.SecretTypeLoginPassword,
+		Metadata:             []byte(`{"title":"updated smoke login password"}`),
+		Payload:              updatedLoginPasswordPayload,
+		PayloadSchemaVersion: updatedLoginPasswordSchemaVersion,
+	})
+	if err != nil {
+		t.Fatalf("update login/password secret: %v", err)
+	}
+
+	if updatedLoginPassword.Version != gotLoginPassword.Version+1 {
+		t.Fatalf("updated login/password version = %d, want %d", updatedLoginPassword.Version, gotLoginPassword.Version+1)
+	}
+
+	updatedBankCardPayload, updatedBankCardSchemaVersion, err := core.EncodeBankCardPayload(core.BankCardPayload{
+		Number:          "5555555555554444",
+		CardholderName:  "UPDATED SMOKE USER",
+		ExpirationMonth: "06",
+		ExpirationYear:  "2031",
+		CVV:             "321",
+		Notes:           "updated smoke card",
+	})
+	if err != nil {
+		t.Fatalf("encode updated bank card payload: %v", err)
+	}
+
+	updatedBankCard, err := vaultService.UpdateSecret(ctx, session, core.UpdateSecretInput{
+		ID:                   createdBankCard.ID,
+		ExpectedVersion:      gotBankCard.Version,
+		Type:                 core.SecretTypeBankCard,
+		Metadata:             []byte(`{"title":"updated smoke bank card"}`),
+		Payload:              updatedBankCardPayload,
+		PayloadSchemaVersion: updatedBankCardSchemaVersion,
+	})
+	if err != nil {
+		t.Fatalf("update bank card secret: %v", err)
+	}
+
+	if updatedBankCard.Version != gotBankCard.Version+1 {
+		t.Fatalf("updated bank card version = %d, want %d", updatedBankCard.Version, gotBankCard.Version+1)
+	}
+
+	updatedBinaryPayload, updatedBinarySchemaVersion, err := core.EncodeBinaryPayload(core.BinaryPayload{
+		FileName:    "updated-smoke.bin",
+		ContentType: "application/octet-stream",
+		Data:        []byte{0x04, 0x05, 0x06},
+	})
+	if err != nil {
+		t.Fatalf("encode updated binary payload: %v", err)
+	}
+
+	updatedBinary, err := vaultService.UpdateSecret(ctx, session, core.UpdateSecretInput{
+		ID:                   createdBinary.ID,
+		ExpectedVersion:      gotBinary.Version,
+		Type:                 core.SecretTypeBinary,
+		Metadata:             []byte(`{"title":"updated smoke binary"}`),
+		Payload:              updatedBinaryPayload,
+		PayloadSchemaVersion: updatedBinarySchemaVersion,
+	})
+	if err != nil {
+		t.Fatalf("update binary secret: %v", err)
+	}
+
+	if updatedBinary.Version != gotBinary.Version+1 {
+		t.Fatalf("updated binary version = %d, want %d", updatedBinary.Version, gotBinary.Version+1)
+	}
+
+	gotUpdatedText, err := vaultService.GetSecret(ctx, session, core.GetSecretInput{ID: createdText.ID})
+	if err != nil {
+		t.Fatalf("get updated text secret: %v", err)
+	}
+
+	decodedUpdatedText, err := core.DecodeTextPayload(gotUpdatedText.Payload, gotUpdatedText.PayloadSchemaVersion)
+	if err != nil {
+		t.Fatalf("decode updated text payload: %v", err)
+	}
+
+	if decodedUpdatedText.Text != "updated smoke secret" {
+		t.Fatalf("updated text = %q, want updated smoke secret", decodedUpdatedText.Text)
+	}
+
+	gotUpdatedLoginPassword, err := vaultService.GetSecret(ctx, session, core.GetSecretInput{ID: createdLoginPassword.ID})
+	if err != nil {
+		t.Fatalf("get updated login/password secret: %v", err)
+	}
+
+	decodedUpdatedLoginPassword, err := core.DecodeLoginPasswordPayload(gotUpdatedLoginPassword.Payload, gotUpdatedLoginPassword.PayloadSchemaVersion)
+	if err != nil {
+		t.Fatalf("decode updated login/password payload: %v", err)
+	}
+
+	if decodedUpdatedLoginPassword.Login != "updated-smoke-login" || decodedUpdatedLoginPassword.Password != "updated-smoke-password" {
+		t.Fatalf("updated login/password = %+v, want updated smoke credentials", decodedUpdatedLoginPassword)
+	}
+
+	gotUpdatedBankCard, err := vaultService.GetSecret(ctx, session, core.GetSecretInput{ID: createdBankCard.ID})
+	if err != nil {
+		t.Fatalf("get updated bank card secret: %v", err)
+	}
+
+	decodedUpdatedBankCard, err := core.DecodeBankCardPayload(gotUpdatedBankCard.Payload, gotUpdatedBankCard.PayloadSchemaVersion)
+	if err != nil {
+		t.Fatalf("decode updated bank card payload: %v", err)
+	}
+
+	if decodedUpdatedBankCard.Number != "5555555555554444" || decodedUpdatedBankCard.CardholderName != "UPDATED SMOKE USER" {
+		t.Fatalf("updated bank card = %+v, want updated smoke bank card", decodedUpdatedBankCard)
+	}
+
+	gotUpdatedBinary, err := vaultService.GetSecret(ctx, session, core.GetSecretInput{ID: createdBinary.ID})
+	if err != nil {
+		t.Fatalf("get updated binary secret: %v", err)
+	}
+
+	decodedUpdatedBinary, err := core.DecodeBinaryPayload(gotUpdatedBinary.Payload, gotUpdatedBinary.PayloadSchemaVersion)
+	if err != nil {
+		t.Fatalf("decode updated binary payload: %v", err)
+	}
+
+	if decodedUpdatedBinary.FileName != "updated-smoke.bin" || !bytes.Equal(decodedUpdatedBinary.Data, []byte{0x04, 0x05, 0x06}) {
+		t.Fatalf("updated binary = %+v, want updated smoke binary", decodedUpdatedBinary)
+	}
+
+	deletedText, err := vaultService.DeleteSecret(ctx, session, core.DeleteSecretInput{
 		ID:              createdText.ID,
-		ExpectedVersion: updated.Version,
+		ExpectedVersion: updatedText.Version,
 	})
 	if err != nil {
-		t.Fatalf("delete secret: %v", err)
+		t.Fatalf("delete text secret: %v", err)
 	}
 
-	if deleted.ID != createdText.ID {
-		t.Fatalf("deleted id = %q, want %q", deleted.ID, createdText.ID)
+	if deletedText.ID != createdText.ID {
+		t.Fatalf("deleted text id = %q, want %q", deletedText.ID, createdText.ID)
+	}
+
+	deletedLoginPassword, err := vaultService.DeleteSecret(ctx, session, core.DeleteSecretInput{
+		ID:              createdLoginPassword.ID,
+		ExpectedVersion: updatedLoginPassword.Version,
+	})
+	if err != nil {
+		t.Fatalf("delete login/password secret: %v", err)
+	}
+
+	if deletedLoginPassword.ID != createdLoginPassword.ID {
+		t.Fatalf("deleted login/password id = %q, want %q", deletedLoginPassword.ID, createdLoginPassword.ID)
+	}
+
+	deletedBankCard, err := vaultService.DeleteSecret(ctx, session, core.DeleteSecretInput{
+		ID:              createdBankCard.ID,
+		ExpectedVersion: updatedBankCard.Version,
+	})
+	if err != nil {
+		t.Fatalf("delete bank card secret: %v", err)
+	}
+
+	if deletedBankCard.ID != createdBankCard.ID {
+		t.Fatalf("deleted bank card id = %q, want %q", deletedBankCard.ID, createdBankCard.ID)
+	}
+
+	deletedBinary, err := vaultService.DeleteSecret(ctx, session, core.DeleteSecretInput{
+		ID:              createdBinary.ID,
+		ExpectedVersion: updatedBinary.Version,
+	})
+	if err != nil {
+		t.Fatalf("delete binary secret: %v", err)
+	}
+
+	if deletedBinary.ID != createdBinary.ID {
+		t.Fatalf("deleted binary id = %q, want %q", deletedBinary.ID, createdBinary.ID)
 	}
 
 	activeAfterDelete, err := vaultService.ListSecrets(ctx, session, core.ListSecretsInput{})
@@ -275,8 +446,8 @@ func TestSmokeAuthVaultAndSyncFlow(t *testing.T) {
 		t.Fatalf("list after delete: %v", err)
 	}
 
-	if len(activeAfterDelete) != 3 {
-		t.Fatalf("active secrets after delete = %d, want 3", len(activeAfterDelete))
+	if len(activeAfterDelete) != 0 {
+		t.Fatalf("active secrets after delete = %d, want 0", len(activeAfterDelete))
 	}
 
 	synced, err := vaultService.SyncSecrets(ctx, session, core.SyncSecretsInput{})
@@ -284,17 +455,10 @@ func TestSmokeAuthVaultAndSyncFlow(t *testing.T) {
 		t.Fatalf("sync secrets: %v", err)
 	}
 
-	var foundDeleted bool
-	for _, secret := range synced.Secrets {
-		if secret.ID == createdText.ID && secret.DeletedAt != nil {
-			foundDeleted = true
-			break
-		}
-	}
-
-	if !foundDeleted {
-		t.Fatalf("sync did not return deleted tombstone for %s", createdText.ID)
-	}
+	assertSmokeTombstoneContains(t, synced.Secrets, createdText.ID)
+	assertSmokeTombstoneContains(t, synced.Secrets, createdLoginPassword.ID)
+	assertSmokeTombstoneContains(t, synced.Secrets, createdBankCard.ID)
+	assertSmokeTombstoneContains(t, synced.Secrets, createdBinary.ID)
 }
 
 func assertSmokeListContains(t *testing.T, secrets []core.Secret, id string) {
@@ -307,6 +471,18 @@ func assertSmokeListContains(t *testing.T, secrets []core.Secret, id string) {
 	}
 
 	t.Fatalf("listed secrets do not contain %s", id)
+}
+
+func assertSmokeTombstoneContains(t *testing.T, secrets []core.Secret, id string) {
+	t.Helper()
+
+	for _, secret := range secrets {
+		if secret.ID == id && secret.DeletedAt != nil {
+			return
+		}
+	}
+
+	t.Fatalf("synced secrets do not contain deleted tombstone for %s", id)
 }
 
 func openSmokeDatabase(t *testing.T, ctx context.Context, dsn string) *sql.DB {
