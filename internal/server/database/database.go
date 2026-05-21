@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	// Регистрирует pgx driver для database/sql
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/server/config"
 )

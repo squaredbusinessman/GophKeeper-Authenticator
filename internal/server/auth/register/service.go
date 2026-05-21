@@ -79,6 +79,7 @@ func NewService(repository Repository, passwordHasher PasswordHasher, idGenerato
 	}
 }
 
+// Register создает пользователя, сохраняет encrypted vault key metadata и выпускает access token
 func (s *Service) Register(ctx context.Context, input Input) (Result, error) {
 	login := strings.TrimSpace(input.Login)
 	if login == "" {

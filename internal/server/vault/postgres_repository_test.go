@@ -15,7 +15,7 @@ import (
 func TestPostgresRepositoryCreateItem(t *testing.T) {
 	db := openTestDB(t)
 	ctx := context.Background()
-	userID := createTestUser(t, ctx, db)
+	userID := createTestUser(ctx, t, db)
 	itemID, err := NewUUID()
 	if err != nil {
 		t.Fatalf("NewUUID() error = %v", err)
@@ -103,7 +103,7 @@ func TestPostgresRepositoryCreateItem(t *testing.T) {
 func TestPostgresRepositoryFindItemByID(t *testing.T) {
 	db := openTestDB(t)
 	ctx := context.Background()
-	userID := createTestUser(t, ctx, db)
+	userID := createTestUser(ctx, t, db)
 	itemID, err := NewUUID()
 	if err != nil {
 		t.Fatalf("NewUUID() error = %v", err)
@@ -203,8 +203,8 @@ func TestPostgresRepositoryFindItemByIDReturnsItemNotFound(t *testing.T) {
 func TestPostgresRepositoryListItemsReturnsOnlyUserActiveItemsByDefault(t *testing.T) {
 	db := openTestDB(t)
 	ctx := context.Background()
-	userID := createTestUser(t, ctx, db)
-	anotherUserID := createTestUser(t, ctx, db)
+	userID := createTestUser(ctx, t, db)
+	anotherUserID := createTestUser(ctx, t, db)
 	activeItemID := newTestUUID(t)
 	deletedItemID := newTestUUID(t)
 	anotherUserItemID := newTestUUID(t)
@@ -214,9 +214,9 @@ func TestPostgresRepositoryListItemsReturnsOnlyUserActiveItemsByDefault(t *testi
 		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id = $1`, anotherUserID)
 	}()
 
-	insertTestVaultItem(t, ctx, db, userID, activeItemID, 1, false)
-	insertTestVaultItem(t, ctx, db, userID, deletedItemID, 1, true)
-	insertTestVaultItem(t, ctx, db, anotherUserID, anotherUserItemID, 1, false)
+	insertTestVaultItem(ctx, t, db, userID, activeItemID, 1, false)
+	insertTestVaultItem(ctx, t, db, userID, deletedItemID, 1, true)
+	insertTestVaultItem(ctx, t, db, anotherUserID, anotherUserItemID, 1, false)
 
 	repository := NewPostgresRepository(db)
 
@@ -243,7 +243,7 @@ func TestPostgresRepositoryListItemsReturnsOnlyUserActiveItemsByDefault(t *testi
 func TestPostgresRepositoryListItemsCanIncludeDeletedItems(t *testing.T) {
 	db := openTestDB(t)
 	ctx := context.Background()
-	userID := createTestUser(t, ctx, db)
+	userID := createTestUser(ctx, t, db)
 	activeItemID := newTestUUID(t)
 	deletedItemID := newTestUUID(t)
 
@@ -251,8 +251,8 @@ func TestPostgresRepositoryListItemsCanIncludeDeletedItems(t *testing.T) {
 		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id = $1`, userID)
 	}()
 
-	insertTestVaultItem(t, ctx, db, userID, activeItemID, 1, false)
-	insertTestVaultItem(t, ctx, db, userID, deletedItemID, 1, true)
+	insertTestVaultItem(ctx, t, db, userID, activeItemID, 1, false)
+	insertTestVaultItem(ctx, t, db, userID, deletedItemID, 1, true)
 
 	repository := NewPostgresRepository(db)
 
@@ -280,14 +280,14 @@ func TestPostgresRepositoryListItemsCanIncludeDeletedItems(t *testing.T) {
 func TestPostgresRepositoryUpdateItemUpdatesEncryptedDataAndIncrementsVersion(t *testing.T) {
 	db := openTestDB(t)
 	ctx := context.Background()
-	userID := createTestUser(t, ctx, db)
+	userID := createTestUser(ctx, t, db)
 	itemID := newTestUUID(t)
 
 	defer func() {
 		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id = $1`, userID)
 	}()
 
-	insertTestVaultItem(t, ctx, db, userID, itemID, 1, false)
+	insertTestVaultItem(ctx, t, db, userID, itemID, 1, false)
 
 	repository := NewPostgresRepository(db)
 
@@ -335,14 +335,14 @@ func TestPostgresRepositoryUpdateItemUpdatesEncryptedDataAndIncrementsVersion(t 
 func TestPostgresRepositoryUpdateItemReturnsVersionConflict(t *testing.T) {
 	db := openTestDB(t)
 	ctx := context.Background()
-	userID := createTestUser(t, ctx, db)
+	userID := createTestUser(ctx, t, db)
 	itemID := newTestUUID(t)
 
 	defer func() {
 		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id = $1`, userID)
 	}()
 
-	insertTestVaultItem(t, ctx, db, userID, itemID, 1, false)
+	insertTestVaultItem(ctx, t, db, userID, itemID, 1, false)
 
 	repository := NewPostgresRepository(db)
 
@@ -379,14 +379,14 @@ func TestPostgresRepositoryUpdateItemReturnsVersionConflict(t *testing.T) {
 func TestPostgresRepositoryDeleteItemSoftDeletesAndIncrementsVersion(t *testing.T) {
 	db := openTestDB(t)
 	ctx := context.Background()
-	userID := createTestUser(t, ctx, db)
+	userID := createTestUser(ctx, t, db)
 	itemID := newTestUUID(t)
 
 	defer func() {
 		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id = $1`, userID)
 	}()
 
-	insertTestVaultItem(t, ctx, db, userID, itemID, 3, false)
+	insertTestVaultItem(ctx, t, db, userID, itemID, 3, false)
 
 	repository := NewPostgresRepository(db)
 
@@ -424,14 +424,14 @@ func TestPostgresRepositoryDeleteItemSoftDeletesAndIncrementsVersion(t *testing.
 func TestPostgresRepositoryDeleteItemReturnsVersionConflict(t *testing.T) {
 	db := openTestDB(t)
 	ctx := context.Background()
-	userID := createTestUser(t, ctx, db)
+	userID := createTestUser(ctx, t, db)
 	itemID := newTestUUID(t)
 
 	defer func() {
 		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id = $1`, userID)
 	}()
 
-	insertTestVaultItem(t, ctx, db, userID, itemID, 3, false)
+	insertTestVaultItem(ctx, t, db, userID, itemID, 3, false)
 
 	repository := NewPostgresRepository(db)
 
@@ -457,8 +457,8 @@ func TestPostgresRepositoryDeleteItemReturnsVersionConflict(t *testing.T) {
 func TestPostgresRepositorySyncItemsReturnsChangedItemsIncludingDeletedForUserOnly(t *testing.T) {
 	db := openTestDB(t)
 	ctx := context.Background()
-	userID := createTestUser(t, ctx, db)
-	anotherUserID := createTestUser(t, ctx, db)
+	userID := createTestUser(ctx, t, db)
+	anotherUserID := createTestUser(ctx, t, db)
 	oldItemID := newTestUUID(t)
 	activeItemID := newTestUUID(t)
 	deletedItemID := newTestUUID(t)
@@ -475,10 +475,10 @@ func TestPostgresRepositorySyncItemsReturnsChangedItemsIncludingDeletedForUserOn
 	deletedUpdatedAt := time.Date(2026, 5, 20, 10, 2, 0, 0, time.UTC)
 	anotherUserUpdatedAt := time.Date(2026, 5, 20, 10, 3, 0, 0, time.UTC)
 
-	insertTestVaultItemWithUpdatedAt(t, ctx, db, userID, oldItemID, 1, oldUpdatedAt, nil)
-	insertTestVaultItemWithUpdatedAt(t, ctx, db, userID, activeItemID, 2, activeUpdatedAt, nil)
-	insertTestVaultItemWithUpdatedAt(t, ctx, db, userID, deletedItemID, 3, deletedUpdatedAt, &deletedUpdatedAt)
-	insertTestVaultItemWithUpdatedAt(t, ctx, db, anotherUserID, anotherUserItemID, 4, anotherUserUpdatedAt, nil)
+	insertTestVaultItemWithUpdatedAt(ctx, t, db, userID, oldItemID, 1, oldUpdatedAt, nil)
+	insertTestVaultItemWithUpdatedAt(ctx, t, db, userID, activeItemID, 2, activeUpdatedAt, nil)
+	insertTestVaultItemWithUpdatedAt(ctx, t, db, userID, deletedItemID, 3, deletedUpdatedAt, &deletedUpdatedAt)
+	insertTestVaultItemWithUpdatedAt(ctx, t, db, anotherUserID, anotherUserItemID, 4, anotherUserUpdatedAt, nil)
 
 	repository := NewPostgresRepository(db)
 
@@ -523,7 +523,7 @@ func TestPostgresRepositorySyncItemsReturnsChangedItemsIncludingDeletedForUserOn
 func TestPostgresRepositorySyncItemsReturnsChangedAfterWhenNoChanges(t *testing.T) {
 	db := openTestDB(t)
 	ctx := context.Background()
-	userID := createTestUser(t, ctx, db)
+	userID := createTestUser(ctx, t, db)
 
 	defer func() {
 		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id = $1`, userID)
@@ -576,7 +576,7 @@ func openTestDB(t *testing.T) *sql.DB {
 	return db
 }
 
-func createTestUser(t *testing.T, ctx context.Context, db *sql.DB) string {
+func createTestUser(ctx context.Context, t *testing.T, db *sql.DB) string {
 	t.Helper()
 
 	userID, err := NewUUID()
@@ -610,7 +610,7 @@ func newTestUUID(t *testing.T) string {
 	return id
 }
 
-func insertTestVaultItem(t *testing.T, ctx context.Context, db *sql.DB, userID string, itemID string, version int64, deleted bool) {
+func insertTestVaultItem(ctx context.Context, t *testing.T, db *sql.DB, userID string, itemID string, version int64, deleted bool) {
 	t.Helper()
 
 	var deletedAt any
@@ -653,7 +653,7 @@ func insertTestVaultItem(t *testing.T, ctx context.Context, db *sql.DB, userID s
 	}
 }
 
-func insertTestVaultItemWithUpdatedAt(t *testing.T, ctx context.Context, db *sql.DB, userID string, itemID string, version int64, updatedAt time.Time, deletedAt *time.Time) {
+func insertTestVaultItemWithUpdatedAt(ctx context.Context, t *testing.T, db *sql.DB, userID string, itemID string, version int64, updatedAt time.Time, deletedAt *time.Time) {
 	t.Helper()
 
 	_, err := db.ExecContext(
