@@ -142,13 +142,13 @@ func runCLI(
 	case "login":
 		return runLogin(ctx, authService, prompter, stdout)
 	case "create":
-		return runCreateTextSecret(ctx, authService, vaultService, prompter, stdout)
+		return runCreateSecret(ctx, args[1:], authService, vaultService, prompter, stdout)
 	case "get":
-		return runGetTextSecret(ctx, authService, vaultService, prompter, stdout)
+		return runGetSecret(ctx, authService, vaultService, prompter, stdout)
 	case "list":
-		return runListTextSecrets(ctx, authService, vaultService, prompter, stdout)
+		return runListSecrets(ctx, authService, vaultService, prompter, stdout)
 	case "update":
-		return runUpdateTextSecret(ctx, authService, vaultService, prompter, stdout)
+		return runUpdateSecret(ctx, args[1:], authService, vaultService, prompter, stdout)
 	case "delete":
 		return runDeleteTextSecret(ctx, authService, vaultService, prompter, stdout)
 	case "sync":
