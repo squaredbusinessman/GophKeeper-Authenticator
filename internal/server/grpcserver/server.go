@@ -36,7 +36,10 @@ func New(cfg *config.Config, logger *zap.Logger, db *sql.DB) (*Server, error) {
 	tokenIssuer := token.NewIssuer(cfg.AccessTokenSecret, cfg.AccessTokenTTL)
 
 	grpcServer := grpc.NewServer(
-		grpc.UnaryInterceptor(AuthUnaryInterceptor(tokenIssuer)),
+		grpc.ChainUnaryInterceptor(
+			AuthUnaryInterceptor(tokenIssuer),
+			LoggingUnaryInterceptor(logger),
+		),
 	)
 
 	registerRepository := register.NewPostgresRepository(db)

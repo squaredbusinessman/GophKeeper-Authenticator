@@ -503,6 +503,21 @@ go run ./cmd/gophkeeper-server
 
 Ожидаемый результат при старте в `dev` режиме - цветной console log от `zap` с полями `service`, `address` и `tls_enabled`.
 
+После каждого unary gRPC-запроса сервер пишет access-log:
+
+```text
+grpc request completed
+```
+
+В нем есть:
+
+- `grpc_method` - полный gRPC-метод;
+- `grpc_code` - итоговый status code;
+- `duration` - время обработки запроса;
+- `user_id` - только для запросов, где пользователь уже аутентифицирован.
+
+Сервер не логирует request body, пароли, access token, vault key, payload, ciphertext и данные секретов. Это важно, потому что логи часто попадают в CI, терминал, файлы или внешние системы наблюдаемости.
+
 Остановить сервер можно через `Ctrl+C`.
 
 ## CLI
