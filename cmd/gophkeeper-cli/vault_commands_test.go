@@ -563,6 +563,12 @@ func TestGetTextSecretCommandLogsInPromptsIDAndPrintsSecret(t *testing.T) {
 		t.Fatalf("stdout = %q, want secret payload", stdout.String())
 	}
 
+	for _, want := range []string{"ID: text-secret-id", "Type: text", "Version: 2"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("stdout = %q, want %q", stdout.String(), want)
+		}
+	}
+
 	if strings.Contains(stdout.String(), "{\"text\"") {
 		t.Fatalf("stdout = %q, want decoded text payload instead of raw json", stdout.String())
 	}
@@ -618,6 +624,55 @@ func TestGetBinarySecretCommandWritesFileAndPrintsMetadata(t *testing.T) {
 
 	if strings.Contains(output, "{\"file_name\"") {
 		t.Fatalf("stdout = %q, want decoded binary payload instead of raw json", output)
+	}
+}
+
+func TestGetBinarySecretCommandDoesNotOverwriteExistingOutputFile(t *testing.T) {
+	authService := &fakeCLIAuthService{}
+	outputFile := filepath.Join(t.TempDir(), "restored.bin")
+	originalData := []byte("already exists")
+	if err := os.WriteFile(outputFile, originalData, 0o600); err != nil {
+		t.Fatalf("write existing output file: %v", err)
+	}
+
+	vaultService := &fakeCLIVaultService{
+		getSecretFunc: func(context.Context, core.Session, core.GetSecretInput) (core.Secret, error) {
+			return core.Secret{
+				ID:                   "binary-secret-id",
+				Type:                 core.SecretTypeBinary,
+				Metadata:             []byte(`{"title":"SSH private key"}`),
+				Payload:              mustEncodeBinaryPayload(core.BinaryPayload{FileName: "private-key.bin", ContentType: "application/octet-stream", Data: []byte("new data")}),
+				PayloadSchemaVersion: core.BinaryPayloadSchemaVersion,
+				Version:              6,
+			}, nil
+		},
+	}
+	prompter := &fakePrompter{
+		values: []string{
+			"user@example.com",
+			"login-password",
+			"master-password",
+			"binary-secret-id",
+			outputFile,
+		},
+	}
+
+	err := runCLI(context.Background(), []string{"get"}, authService, vaultService, prompter, &bytes.Buffer{}, &bytes.Buffer{})
+	if err == nil {
+		t.Fatalf("runCLI() error = nil, want error")
+	}
+
+	if !strings.Contains(err.Error(), "output file already exists") {
+		t.Fatalf("error = %q, want output file already exists", err.Error())
+	}
+
+	restoredData, err := os.ReadFile(outputFile)
+	if err != nil {
+		t.Fatalf("read output file: %v", err)
+	}
+
+	if !bytes.Equal(restoredData, originalData) {
+		t.Fatalf("output file data = %q, want original data %q", restoredData, originalData)
 	}
 }
 
@@ -734,6 +789,12 @@ func TestListTextSecretsCommandLogsInAndPrintsOnlyActiveSecrets(t *testing.T) {
 
 	if !strings.Contains(stdout.String(), "active-secret-id") {
 		t.Fatalf("stdout = %q, want active secret id", stdout.String())
+	}
+
+	for _, want := range []string{"ID", "VERSION", "TYPE", "TITLE"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("stdout = %q, want table header %q", stdout.String(), want)
+		}
 	}
 
 	if strings.Contains(stdout.String(), "deleted-secret-id") {

@@ -128,6 +128,60 @@ func TestRegisterCommandPromptsPasswordsHiddenAndCallsAuthService(t *testing.T) 
 	}
 }
 
+func TestUsageMentionsSecretTypesAndVersionSource(t *testing.T) {
+	var stdout bytes.Buffer
+
+	err := runCLI(context.Background(), nil, nil, nil, nil, &stdout, &bytes.Buffer{})
+	if err != nil {
+		t.Fatalf("runCLI() error = %v", err)
+	}
+
+	output := stdout.String()
+	for _, want := range []string{
+		"create [text|login-password|bank-card|binary]",
+		"update [text|login-password|bank-card|binary]",
+		"delete работает для любого типа секрета",
+		"version для update/delete",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("stdout = %q, want %q", output, want)
+		}
+	}
+}
+
+func TestUserFacingErrorMapsCommonCLIProblems(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{
+			name: "connection_refused",
+			err:  errors.New(`login: rpc error: code = Unavailable desc = connection error: dial tcp 127.0.0.1:9090: connect: connection refused`),
+			want: "не удалось подключиться к серверу",
+		},
+		{
+			name: "version_conflict",
+			err:  errors.New("version conflict: update text secret: rpc error: code = FailedPrecondition desc = version conflict"),
+			want: "актуальной version",
+		},
+		{
+			name: "wrong_master_password",
+			err:  errors.New("open vault: login: could not decrypt vault key: cipher: message authentication failed"),
+			want: "неверный мастер-пароль",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := userFacingError(tt.err)
+			if !strings.Contains(got, tt.want) {
+				t.Fatalf("userFacingError() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestRegisterCommandRejectsDifferentMasterPasswordRepeat(t *testing.T) {
 	authService := &fakeCLIAuthService{}
 	prompter := &fakePrompter{

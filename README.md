@@ -610,9 +610,9 @@ go run ./cmd/gophkeeper-cli sync
 
 Команда `create` без указания типа создает текстовый секрет. Для остальных обязательных типов используются команды `create login-password`, `create bank-card` и `create binary`. Title сохраняется как encrypted metadata, а содержимое кодируется в одну из client payload schemas: `TextPayload`, `LoginPasswordPayload`, `BankCardPayload` или `BinaryPayload`. После кодирования metadata и payload шифруются на клиенте через vault key.
 
-Команда `get` запрашивает ID секрета, получает encrypted item с сервера и расшифровывает metadata и payload на клиенте. Для `binary` команда дополнительно запрашивает `Output path` и записывает расшифрованный файл на диск с правами `0600`. Для открытия vault команды заново запрашивают login, пароль входа и мастер-пароль. Это нужно потому, что текущий CLI сохраняет только access token, но не хранит открытый vault key между запусками.
+Команда `get` запрашивает ID секрета, получает encrypted item с сервера и расшифровывает metadata и payload на клиенте. В выводе всегда есть `ID`, `Type` и `Version`, чтобы пользователь мог сразу использовать актуальную версию для update/delete. Для `binary` команда дополнительно запрашивает `Output path` и записывает расшифрованный файл на диск с правами `0600`. Если файл по этому пути уже существует, CLI не перезаписывает его без явного выбора нового пути. Для открытия vault команды заново запрашивают login, пароль входа и мастер-пароль. Это нужно потому, что текущий CLI сохраняет только access token, но не хранит открытый vault key между запусками.
 
-Команда `update` без указания типа обновляет текстовый секрет. Для остальных обязательных типов используются команды `update login-password`, `update bank-card` и `update binary`. Команда `delete` не зависит от типа секрета: она удаляет любой item по `Secret ID` и `Expected version`. Команды `update` и `delete` требуют `Expected version`. Версию нужно брать из `list`, `get` или результата предыдущей команды. Если версия устарела, сервер возвращает version conflict.
+Команда `update` без указания типа обновляет текстовый секрет. Для остальных обязательных типов используются команды `update login-password`, `update bank-card` и `update binary`. Перед create/update CLI показывает подсказку по полям выбранного типа секрета. Команда `delete` не зависит от типа секрета: она удаляет любой item по `Secret ID` и `Expected version`. Команды `update` и `delete` требуют `Expected version`. Версию нужно брать из `list`, `get` или результата предыдущей команды. Если версия устарела, сервер возвращает version conflict.
 
 Команда `sync` получает изменения с сервера, включая tombstones для удаленных записей. На текущем этапе offline cache еще нет, поэтому CLI не сохраняет sync cursor локально и отправляет пустой `changed_after`.
 
@@ -1103,8 +1103,10 @@ Output path: /tmp/gophkeeper-restored-binary-secret.txt
 Ожидаемый результат содержит:
 
 ```text
-Title: private file
+ID: <binary-secret-id>
 Type: binary
+Version: 1
+Title: private file
 File name: gophkeeper-binary-secret.txt
 Content type: text/plain
 Size bytes: <size>
@@ -1133,10 +1135,14 @@ cat /tmp/gophkeeper-restored-binary-secret.txt
 Ожидаемый результат:
 
 ```text
-<text-secret-id> | version 1 | text | first note
-<login-password-secret-id> | version 1 | login_password | GitHub account
-<bank-card-secret-id> | version 1 | bank_card | salary card
-<binary-secret-id> | version 1 | binary | private file
++----------------------------+---------+----------------+----------------+
+| ID                         | VERSION | TYPE           | TITLE          |
++----------------------------+---------+----------------+----------------+
+| <text-secret-id>           | 1       | text           | first note     |
+| <login-password-secret-id> | 1       | login_password | GitHub account |
+| <bank-card-secret-id>      | 1       | bank_card      | salary card    |
+| <binary-secret-id>         | 1       | binary         | private file   |
++----------------------------+---------+----------------+----------------+
 ```
 
 Сохранить актуальную `version` текстового секрета. Она нужна для optimistic locking в следующих шагах.

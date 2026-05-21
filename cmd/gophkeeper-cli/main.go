@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/client/config"
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/client/core"
@@ -16,7 +17,7 @@ import (
 
 func main() {
 	if err := run(context.Background(), os.Args[1:], os.Stdout, os.Stderr); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error: %s\n", userFacingError(err))
 		os.Exit(1)
 	}
 }
@@ -43,12 +44,47 @@ func printUsageTo(stdout io.Writer) {
 	fmt.Fprintln(stdout, "  gophkeeper version")
 	fmt.Fprintln(stdout, "  gophkeeper register")
 	fmt.Fprintln(stdout, "  gophkeeper login")
-	fmt.Fprintln(stdout, "  gophkeeper create")
+	fmt.Fprintln(stdout, "  gophkeeper create [text|login-password|bank-card|binary]")
 	fmt.Fprintln(stdout, "  gophkeeper get")
 	fmt.Fprintln(stdout, "  gophkeeper list")
-	fmt.Fprintln(stdout, "  gophkeeper update")
+	fmt.Fprintln(stdout, "  gophkeeper update [text|login-password|bank-card|binary]")
 	fmt.Fprintln(stdout, "  gophkeeper delete")
 	fmt.Fprintln(stdout, "  gophkeeper sync")
+	fmt.Fprintln(stdout)
+	fmt.Fprintln(stdout, "Examples:")
+	fmt.Fprintln(stdout, "  gophkeeper create text")
+	fmt.Fprintln(stdout, "  gophkeeper create login-password")
+	fmt.Fprintln(stdout, "  gophkeeper create bank-card")
+	fmt.Fprintln(stdout, "  gophkeeper create binary")
+	fmt.Fprintln(stdout, "  gophkeeper update text")
+	fmt.Fprintln(stdout)
+	fmt.Fprintln(stdout, "Notes:")
+	fmt.Fprintln(stdout, "  delete работает для любого типа секрета")
+	fmt.Fprintln(stdout, "  version для update/delete берите из get, list или sync")
+}
+
+func userFacingError(err error) string {
+	if err == nil {
+		return ""
+	}
+
+	message := err.Error()
+	lowerMessage := strings.ToLower(message)
+
+	switch {
+	case strings.Contains(lowerMessage, "connection refused") ||
+		strings.Contains(lowerMessage, "error while dialing") ||
+		strings.Contains(lowerMessage, "code = unavailable"):
+		return "не удалось подключиться к серверу. Проверьте, что gophkeeper-server запущен и адрес GOPHKEEPER_SERVER_ADDRESS указан верно"
+	case strings.Contains(lowerMessage, "version conflict") ||
+		strings.Contains(lowerMessage, "code = failedprecondition"):
+		return "version conflict: версия секрета устарела. Выполните gophkeeper list или gophkeeper sync и повторите команду с актуальной version"
+	case strings.Contains(lowerMessage, "could not decrypt vault key") ||
+		strings.Contains(lowerMessage, "message authentication failed"):
+		return "неверный мастер-пароль: vault key не удалось расшифровать"
+	default:
+		return message
+	}
 }
 
 func run(ctx context.Context, args []string, stdout io.Writer, stderr io.Writer) error {
