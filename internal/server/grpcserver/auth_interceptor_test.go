@@ -244,7 +244,7 @@ func TestAuthUnaryInterceptorAddsUserIDToContextForProtectedMethod(t *testing.T)
 func TestNewProtectsVaultServiceWithAuthInterceptor(t *testing.T) {
 	cfg := &config.Config{
 		GRPCAddress:       "127.0.0.1:0",
-		AccessTokenSecret: "test-secret",
+		AccessTokenSecret: "test-access-token-secret-32-bytes",
 		AccessTokenTTL:    time.Minute,
 	}
 

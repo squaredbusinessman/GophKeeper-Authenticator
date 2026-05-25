@@ -2,6 +2,7 @@ package vault
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -127,6 +128,10 @@ func (s *Service) UpdateItem(ctx context.Context, input UpdateItemInput) (Item, 
 		return Item{}, ErrAccessDenied
 	}
 
+	if item.DeletedAt != nil {
+		return Item{}, ErrItemNotFound
+	}
+
 	if item.Version != input.ExpectedVersion {
 		return Item{}, ErrVersionConflict
 	}
@@ -142,6 +147,13 @@ func (s *Service) UpdateItem(ctx context.Context, input UpdateItemInput) (Item, 
 		PayloadSchemaVersion: input.PayloadSchemaVersion,
 	})
 	if err != nil {
+		if errors.Is(err, ErrVersionConflict) {
+			deletedItem, findErr := s.repository.FindItemByID(ctx, itemID)
+			if findErr == nil && deletedItem.DeletedAt != nil {
+				return Item{}, ErrItemNotFound
+			}
+		}
+
 		return Item{}, fmt.Errorf("update vault item: %w", err)
 	}
 
@@ -166,6 +178,10 @@ func (s *Service) DeleteItem(ctx context.Context, input DeleteItemInput) (Delete
 		return DeleteItemResult{}, ErrAccessDenied
 	}
 
+	if item.DeletedAt != nil {
+		return DeleteItemResult{}, ErrItemNotFound
+	}
+
 	if item.Version != input.ExpectedVersion {
 		return DeleteItemResult{}, ErrVersionConflict
 	}
@@ -176,6 +192,13 @@ func (s *Service) DeleteItem(ctx context.Context, input DeleteItemInput) (Delete
 		ExpectedVersion: input.ExpectedVersion,
 	})
 	if err != nil {
+		if errors.Is(err, ErrVersionConflict) {
+			deletedItem, findErr := s.repository.FindItemByID(ctx, itemID)
+			if findErr == nil && deletedItem.DeletedAt != nil {
+				return DeleteItemResult{}, ErrItemNotFound
+			}
+		}
+
 		return DeleteItemResult{}, fmt.Errorf("delete vault item: %w", err)
 	}
 

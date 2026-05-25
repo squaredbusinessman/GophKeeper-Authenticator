@@ -39,6 +39,10 @@ func TestLoggingUnaryInterceptorWritesAccessLogWithoutRequestPayload(t *testing.
 		t.Fatalf("message = %q, want grpc request completed", entry.Message)
 	}
 
+	if entry.Level != zap.WarnLevel {
+		t.Fatalf("level = %s, want warn", entry.Level)
+	}
+
 	fields := entry.ContextMap()
 	if fields["grpc_method"] != "/gophkeeper.v1.VaultService/ListItems" {
 		t.Fatalf("grpc_method = %v, want full method", fields["grpc_method"])
@@ -80,5 +84,32 @@ func TestLoggingUnaryInterceptorHandlesNilLoggerAndNilInfo(t *testing.T) {
 
 	if response != "ok" {
 		t.Fatalf("response = %v, want ok", response)
+	}
+}
+
+func TestLoggingUnaryInterceptorLogsInternalErrorsAtErrorLevel(t *testing.T) {
+	core, logs := observer.New(zap.InfoLevel)
+	logger := zap.New(core)
+	interceptor := LoggingUnaryInterceptor(logger)
+
+	_, err := interceptor(
+		context.Background(),
+		nil,
+		&grpc.UnaryServerInfo{FullMethod: "/gophkeeper.v1.AuthService/Login"},
+		func(context.Context, any) (any, error) {
+			return nil, status.Error(codes.Internal, "internal error")
+		},
+	)
+	if status.Code(err) != codes.Internal {
+		t.Fatalf("code = %s, want %s", status.Code(err), codes.Internal)
+	}
+
+	if logs.Len() != 1 {
+		t.Fatalf("logs count = %d, want 1", logs.Len())
+	}
+
+	entry := logs.All()[0]
+	if entry.Level != zap.ErrorLevel {
+		t.Fatalf("level = %s, want error", entry.Level)
 	}
 }

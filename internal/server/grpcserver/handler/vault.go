@@ -421,7 +421,7 @@ func vaultStatusError(err error) error {
 	case errors.Is(err, vault.ErrAccessDenied):
 		return status.Error(codes.PermissionDenied, err.Error())
 	case errors.Is(err, vault.ErrVersionConflict):
-		return status.Error(codes.Aborted, err.Error())
+		return status.Error(codes.FailedPrecondition, err.Error())
 	default:
 		return status.Error(codes.Internal, "vault operation failed")
 	}

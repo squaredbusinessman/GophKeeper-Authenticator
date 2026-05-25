@@ -519,7 +519,7 @@ func runUpdateLoginPasswordSecret(ctx context.Context, authService CLIAuthServic
 		PayloadSchemaVersion: schemaVersion,
 	})
 	if err != nil {
-		return fmt.Errorf("version conflict: update login/password secret: %w", err)
+		return fmt.Errorf("update login/password secret: %w", err)
 	}
 
 	fmt.Fprintf(stdout, "Секрет обновлен: %s, version: %d\n", secret.ID, secret.Version)
@@ -604,7 +604,7 @@ func runUpdateBankCardSecret(ctx context.Context, authService CLIAuthService, va
 		PayloadSchemaVersion: schemaVersion,
 	})
 	if err != nil {
-		return fmt.Errorf("version conflict: update bank card secret: %w", err)
+		return fmt.Errorf("update bank card secret: %w", err)
 	}
 
 	fmt.Fprintf(stdout, "Секрет обновлен: %s, version: %d\n", secret.ID, secret.Version)
@@ -671,7 +671,7 @@ func runUpdateBinarySecret(ctx context.Context, authService CLIAuthService, vaul
 		PayloadSchemaVersion: schemaVersion,
 	})
 	if err != nil {
-		return fmt.Errorf("version conflict: update binary secret: %w", err)
+		return fmt.Errorf("update binary secret: %w", err)
 	}
 
 	fmt.Fprintf(stdout, "Секрет обновлен: %s, version: %d\n", secret.ID, secret.Version)
@@ -774,7 +774,7 @@ func runUpdateTextSecret(ctx context.Context, authService CLIAuthService, vaultS
 		PayloadSchemaVersion: schemaVersion,
 	})
 	if err != nil {
-		return fmt.Errorf("version conflict: update text secret: %w", err)
+		return fmt.Errorf("update text secret: %w", err)
 	}
 
 	fmt.Fprintf(stdout, "Секрет обновлен: %s, version: %d\n", secret.ID, secret.Version)
@@ -801,7 +801,7 @@ func runDeleteSecret(ctx context.Context, authService CLIAuthService, vaultServi
 		ExpectedVersion: expectedVersion,
 	})
 	if err != nil {
-		return fmt.Errorf("version conflict: delete secret: %w", err)
+		return fmt.Errorf("delete secret: %w", err)
 	}
 
 	fmt.Fprintf(stdout, "Секрет удален: %s, version: %d\n", result.ID, result.Version)

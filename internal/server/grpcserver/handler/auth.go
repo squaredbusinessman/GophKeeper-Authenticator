@@ -60,7 +60,7 @@ func (h *AuthHandler) Register(ctx context.Context, req *gophkeeperv1.RegisterRe
 	return &gophkeeperv1.RegisterResponse{
 		AccessToken:          result.AccessToken,
 		AccessTokenExpiresAt: timestamppb.New(result.AccessTokenExpiresAt),
-		VaultKey:             req.GetVaultKey(),
+		VaultKey:             registerVaultKeyToProto(result.VaultKey),
 	}, nil
 }
 
@@ -155,6 +155,22 @@ func loginInputFromProto(req *gophkeeperv1.LoginRequest) (login.Input, error) {
 }
 
 func vaultKeyToProto(vaultKey login.VaultKeyEnvelope) *gophkeeperv1.VaultKeyEnvelope {
+	return &gophkeeperv1.VaultKeyEnvelope{
+		EncryptedVaultKey: vaultKey.EncryptedVaultKey,
+		Nonce:             vaultKey.Nonce,
+		EncryptionAlg:     vaultKey.EncryptionAlg,
+		KdfParams: &gophkeeperv1.KDFParams{
+			Algorithm:   vaultKey.KDFParams.Algorithm,
+			Salt:        vaultKey.KDFParams.Salt,
+			TimeCost:    vaultKey.KDFParams.TimeCost,
+			MemoryKib:   vaultKey.KDFParams.MemoryKiB,
+			Parallelism: vaultKey.KDFParams.Parallelism,
+			KeyLength:   vaultKey.KDFParams.KeyLength,
+		},
+	}
+}
+
+func registerVaultKeyToProto(vaultKey register.VaultKeyEnvelope) *gophkeeperv1.VaultKeyEnvelope {
 	return &gophkeeperv1.VaultKeyEnvelope{
 		EncryptedVaultKey: vaultKey.EncryptedVaultKey,
 		Nonce:             vaultKey.Nonce,

@@ -515,7 +515,7 @@ func startSmokeServer(t *testing.T, db *sql.DB, dsn string, address string) *grp
 		GRPCAddress:       address,
 		DatabaseDSN:       dsn,
 		DatabasePingTTL:   5 * time.Second,
-		AccessTokenSecret: "smoke-local-secret",
+		AccessTokenSecret: "smoke-local-secret-32-bytes-value",
 		AccessTokenTTL:    5 * time.Minute,
 		LogMode:           "prod",
 	}, zap.NewNop(), db)

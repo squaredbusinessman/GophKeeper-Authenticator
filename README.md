@@ -229,6 +229,8 @@ Token подписывается через HMAC SHA-256 (`HS256`) с секре
 GOPHKEEPER_ACCESS_TOKEN_SECRET
 ```
 
+Минимальная длина секрета: 32 символа.
+
 Срок действия token задается через:
 
 ```text
@@ -480,7 +482,7 @@ docker compose -f deploy/docker-compose.yml down -v
 
 ```bash
 GOPHKEEPER_DATABASE_DSN='postgres://gophkeeper:gophkeeper@localhost:5432/gophkeeper?sslmode=disable' \
-GOPHKEEPER_ACCESS_TOKEN_SECRET='local-dev-secret-change-me' \
+GOPHKEEPER_ACCESS_TOKEN_SECRET='local-dev-access-token-secret-32-bytes' \
 GOPHKEEPER_LOG_MODE='dev' \
 go run ./cmd/gophkeeper-server
 ```
@@ -496,7 +498,7 @@ go run ./cmd/gophkeeper-server
 ```bash
 GOPHKEEPER_GRPC_ADDRESS=':9091' \
 GOPHKEEPER_DATABASE_DSN='postgres://gophkeeper:gophkeeper@localhost:5432/gophkeeper?sslmode=disable' \
-GOPHKEEPER_ACCESS_TOKEN_SECRET='local-dev-secret-change-me' \
+GOPHKEEPER_ACCESS_TOKEN_SECRET='local-dev-access-token-secret-32-bytes' \
 GOPHKEEPER_LOG_MODE='dev' \
 go run ./cmd/gophkeeper-server
 ```
@@ -898,7 +900,7 @@ gophkeeper-cli_windows_amd64.exe
 
 ```bash
 GOPHKEEPER_DATABASE_DSN='postgres://gophkeeper:gophkeeper@localhost:5432/gophkeeper?sslmode=disable' \
-GOPHKEEPER_ACCESS_TOKEN_SECRET='local-dev-secret-change-me' \
+GOPHKEEPER_ACCESS_TOKEN_SECRET='local-dev-access-token-secret-32-bytes' \
 GOPHKEEPER_LOG_MODE='dev' \
 go run ./cmd/gophkeeper-server
 ```

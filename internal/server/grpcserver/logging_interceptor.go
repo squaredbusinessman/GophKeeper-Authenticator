@@ -6,6 +6,7 @@ import (
 
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
@@ -35,7 +36,14 @@ func LoggingUnaryInterceptor(logger *zap.Logger) grpc.UnaryServerInterceptor {
 			fields = append(fields, zap.String("user_id", userID))
 		}
 
-		logger.Info("grpc request completed", fields...)
+		code := status.Code(err)
+		if err == nil {
+			logger.Info("grpc request completed", fields...)
+		} else if code == codes.Internal || code == codes.Unknown || code == codes.DataLoss {
+			logger.Error("grpc request completed", append(fields, zap.Error(err))...)
+		} else {
+			logger.Warn("grpc request completed", append(fields, zap.Error(err))...)
+		}
 
 		return response, err
 	}

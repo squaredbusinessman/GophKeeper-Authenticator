@@ -164,7 +164,7 @@ func TestUserFacingErrorMapsCommonCLIProblems(t *testing.T) {
 		},
 		{
 			name: "version_conflict",
-			err:  errors.New("version conflict: update text secret: rpc error: code = FailedPrecondition desc = version conflict"),
+			err:  errors.New("update text secret: rpc error: code = FailedPrecondition desc = version conflict"),
 			want: "актуальной version",
 		},
 		{

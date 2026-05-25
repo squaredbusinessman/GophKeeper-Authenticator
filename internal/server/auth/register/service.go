@@ -94,6 +94,10 @@ func (s *Service) Register(ctx context.Context, input Input) (Result, error) {
 		return Result{}, err
 	}
 
+	if s.tokenIssuer == nil {
+		return Result{}, fmt.Errorf("token issuer is required")
+	}
+
 	userID, err := s.idGenerator.NewID()
 	if err != nil {
 		return Result{}, fmt.Errorf("generate user id: %w", err)
@@ -111,10 +115,6 @@ func (s *Service) Register(ctx context.Context, input Input) (Result, error) {
 		VaultKey:     input.VaultKey,
 	}
 
-	if s.tokenIssuer == nil {
-		return Result{}, fmt.Errorf("token issuer is required")
-	}
-
 	if err = s.repository.CreateUserWithVault(ctx, params); err != nil {
 		return Result{}, fmt.Errorf("create user with vault: %w", err)
 	}
@@ -128,5 +128,6 @@ func (s *Service) Register(ctx context.Context, input Input) (Result, error) {
 		UserID:               userID,
 		AccessToken:          accessToken.Value,
 		AccessTokenExpiresAt: accessToken.ExpiresAt,
+		VaultKey:             input.VaultKey,
 	}, nil
 }
