@@ -22,8 +22,14 @@ const (
 	// BinaryPayloadSchemaVersion версия схемы payload для бинарного секрета
 	BinaryPayloadSchemaVersion uint32 = 1
 
+	// OTPPayloadSchemaVersion версия схемы payload для OTP секрета
+	OTPPayloadSchemaVersion uint32 = 1
+
 	// MaxInlineBinaryPayloadSize задает максимальный размер binary payload для inline-хранения
 	MaxInlineBinaryPayloadSize = 5 * 1024 * 1024
+
+	// DefaultOTPPeriodSeconds задает период ротации OTP-кода по умолчанию
+	DefaultOTPPeriodSeconds = 30
 )
 
 // ErrBinaryFileTooLarge означает превышение лимита inline binary payload
@@ -59,6 +65,17 @@ type BinaryPayload struct {
 	SizeBytes      int64  `json:"size_bytes"`
 	ChecksumSHA256 string `json:"checksum_sha256"`
 	Data           []byte `json:"data"`
+}
+
+// OTPPayload описывает payload секрета с одноразовым паролем
+type OTPPayload struct {
+	Issuer        string `json:"issuer,omitempty"`
+	AccountName   string `json:"account_name"`
+	Secret        string `json:"secret"`
+	Algorithm     string `json:"algorithm"`
+	Digits        uint32 `json:"digits"`
+	PeriodSeconds uint32 `json:"period_seconds"`
+	Notes         string `json:"notes,omitempty"`
 }
 
 // EncodeLoginPasswordPayload валидирует и кодирует login/password payload в JSON-схему
@@ -159,6 +176,56 @@ func DecodeBinaryPayload(raw []byte, version uint32) (BinaryPayload, error) {
 	checksum := sha256.Sum256(value.Data)
 	if value.ChecksumSHA256 != hex.EncodeToString(checksum[:]) {
 		return BinaryPayload{}, fmt.Errorf("binary checksum mismatch")
+	}
+
+	return value, nil
+}
+
+// EncodeOTPPayload валидирует и кодирует OTP payload в JSON-схему
+func EncodeOTPPayload(value OTPPayload) ([]byte, uint32, error) {
+	normalized, err := normalizeOTPPayload(value)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return encodePayload(normalized, OTPPayloadSchemaVersion)
+}
+
+// DecodeOTPPayload декодирует OTP payload с проверкой версии схемы
+func DecodeOTPPayload(raw []byte, version uint32) (OTPPayload, error) {
+	value, err := decodePayload[OTPPayload](raw, version, OTPPayloadSchemaVersion)
+	if err != nil {
+		return OTPPayload{}, err
+	}
+
+	return normalizeOTPPayload(value)
+}
+
+func normalizeOTPPayload(value OTPPayload) (OTPPayload, error) {
+	value.Issuer = strings.TrimSpace(value.Issuer)
+	value.AccountName = strings.TrimSpace(value.AccountName)
+	value.Secret = strings.TrimSpace(value.Secret)
+	value.Algorithm = strings.ToUpper(strings.TrimSpace(value.Algorithm))
+	value.Notes = strings.TrimSpace(value.Notes)
+
+	if value.Secret == "" {
+		return OTPPayload{}, fmt.Errorf("otp secret is required")
+	}
+
+	switch value.Algorithm {
+	case "SHA1", "SHA256", "SHA512":
+	default:
+		return OTPPayload{}, fmt.Errorf("unsupported otp algorithm: %s", value.Algorithm)
+	}
+
+	switch value.Digits {
+	case 6, 8:
+	default:
+		return OTPPayload{}, fmt.Errorf("otp digits must be 6 or 8")
+	}
+
+	if value.PeriodSeconds == 0 {
+		value.PeriodSeconds = DefaultOTPPeriodSeconds
 	}
 
 	return value, nil

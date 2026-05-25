@@ -129,6 +129,51 @@ func TestSecretPayloadSchemasRoundTrip(t *testing.T) {
 			t.Fatalf("decoded data = %v, want %v", decoded.Data, rawData)
 		}
 	})
+
+	t.Run("otp normalizes algorithm and default period", func(t *testing.T) {
+		payloadBytes, version, err := EncodeOTPPayload(OTPPayload{
+			Issuer:      " Example ",
+			AccountName: " user@example.com ",
+			Secret:      " BASE32SECRET ",
+			Algorithm:   "sha1",
+			Digits:      6,
+			Notes:       " work account ",
+		})
+		if err != nil {
+			t.Fatalf("EncodeOTPPayload() error = %v", err)
+		}
+
+		if version != OTPPayloadSchemaVersion {
+			t.Fatalf("schema version = %d, want %d", version, OTPPayloadSchemaVersion)
+		}
+
+		assertJSONPayload(t, payloadBytes)
+
+		decoded, err := DecodeOTPPayload(payloadBytes, version)
+		if err != nil {
+			t.Fatalf("DecodeOTPPayload() error = %v", err)
+		}
+
+		if decoded.Issuer != "Example" {
+			t.Fatalf("issuer = %q, want Example", decoded.Issuer)
+		}
+
+		if decoded.AccountName != "user@example.com" {
+			t.Fatalf("account name = %q, want user@example.com", decoded.AccountName)
+		}
+
+		if decoded.Secret != "BASE32SECRET" {
+			t.Fatalf("secret = %q, want BASE32SECRET", decoded.Secret)
+		}
+
+		if decoded.Algorithm != "SHA1" {
+			t.Fatalf("algorithm = %q, want SHA1", decoded.Algorithm)
+		}
+
+		if decoded.PeriodSeconds != DefaultOTPPeriodSeconds {
+			t.Fatalf("period seconds = %d, want %d", decoded.PeriodSeconds, DefaultOTPPeriodSeconds)
+		}
+	})
 }
 
 func TestBinaryPayloadSchemaAddsFileMetadataAndChecksum(t *testing.T) {
@@ -284,6 +329,38 @@ func TestSecretPayloadSchemasValidateRequiredFields(t *testing.T) {
 				return err
 			},
 		},
+		{
+			name: "otp without secret",
+			run: func() error {
+				_, _, err := EncodeOTPPayload(OTPPayload{
+					Algorithm: "SHA1",
+					Digits:    6,
+				})
+				return err
+			},
+		},
+		{
+			name: "otp with unsupported algorithm",
+			run: func() error {
+				_, _, err := EncodeOTPPayload(OTPPayload{
+					Secret:    "BASE32SECRET",
+					Algorithm: "MD5",
+					Digits:    6,
+				})
+				return err
+			},
+		},
+		{
+			name: "otp with unsupported digits",
+			run: func() error {
+				_, _, err := EncodeOTPPayload(OTPPayload{
+					Secret:    "BASE32SECRET",
+					Algorithm: "SHA1",
+					Digits:    7,
+				})
+				return err
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -346,6 +423,20 @@ func TestSecretPayloadSchemasRejectUnsupportedVersion(t *testing.T) {
 	_, err = DecodeBinaryPayload(binaryPayload, BinaryPayloadSchemaVersion+1)
 	if err == nil {
 		t.Fatalf("DecodeBinaryPayload() error = nil, want unsupported version error")
+	}
+
+	otpPayload, _, err := EncodeOTPPayload(OTPPayload{
+		Secret:    "BASE32SECRET",
+		Algorithm: "SHA1",
+		Digits:    6,
+	})
+	if err != nil {
+		t.Fatalf("EncodeOTPPayload() error = %v", err)
+	}
+
+	_, err = DecodeOTPPayload(otpPayload, OTPPayloadSchemaVersion+1)
+	if err == nil {
+		t.Fatalf("DecodeOTPPayload() error = nil, want unsupported version error")
 	}
 }
 

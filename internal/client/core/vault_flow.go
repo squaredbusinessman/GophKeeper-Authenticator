@@ -41,6 +41,9 @@ const (
 
 	// SecretTypeBankCard хранит данные банковской карты
 	SecretTypeBankCard
+
+	// SecretTypeOTP хранит данные одноразовых паролей
+	SecretTypeOTP
 )
 
 // CreateSecretInput содержит plaintext-данные секрета для создания
@@ -288,6 +291,8 @@ func secretTypeToProto(secretType SecretType) gophkeeperv1.ItemType {
 		return gophkeeperv1.ItemType_ITEM_TYPE_BINARY
 	case SecretTypeBankCard:
 		return gophkeeperv1.ItemType_ITEM_TYPE_BANK_CARD
+	case SecretTypeOTP:
+		return gophkeeperv1.ItemType_ITEM_TYPE_OTP
 	default:
 		return gophkeeperv1.ItemType_ITEM_TYPE_UNSPECIFIED
 	}
@@ -303,6 +308,8 @@ func secretTypeFromProto(itemType gophkeeperv1.ItemType) SecretType {
 		return SecretTypeBinary
 	case gophkeeperv1.ItemType_ITEM_TYPE_BANK_CARD:
 		return SecretTypeBankCard
+	case gophkeeperv1.ItemType_ITEM_TYPE_OTP:
+		return SecretTypeOTP
 	default:
 		return SecretTypeUnspecified
 	}

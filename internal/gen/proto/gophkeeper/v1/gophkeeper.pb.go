@@ -22,20 +22,22 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// ItemType задает тип приватных данных в хранилище.
+// ItemType задает тип приватных данных в хранилище
 type ItemType int32
 
 const (
-	// ITEM_TYPE_UNSPECIFIED используется, когда тип записи не задан.
+	// ITEM_TYPE_UNSPECIFIED используется, когда тип записи не задан
 	ItemType_ITEM_TYPE_UNSPECIFIED ItemType = 0
-	// ITEM_TYPE_LOGIN_PASSWORD хранит пару логин и пароль.
+	// ITEM_TYPE_LOGIN_PASSWORD хранит пару логин и пароль
 	ItemType_ITEM_TYPE_LOGIN_PASSWORD ItemType = 1
-	// ITEM_TYPE_TEXT хранит произвольные текстовые данные.
+	// ITEM_TYPE_TEXT хранит произвольные текстовые данные
 	ItemType_ITEM_TYPE_TEXT ItemType = 2
-	// ITEM_TYPE_BINARY хранит произвольные бинарные данные.
+	// ITEM_TYPE_BINARY хранит произвольные бинарные данные
 	ItemType_ITEM_TYPE_BINARY ItemType = 3
-	// ITEM_TYPE_BANK_CARD хранит данные банковской карты.
+	// ITEM_TYPE_BANK_CARD хранит данные банковской карты
 	ItemType_ITEM_TYPE_BANK_CARD ItemType = 4
+	// ITEM_TYPE_OTP хранит данные одноразовых паролей
+	ItemType_ITEM_TYPE_OTP ItemType = 5
 )
 
 // Enum value maps for ItemType.
@@ -46,6 +48,7 @@ var (
 		2: "ITEM_TYPE_TEXT",
 		3: "ITEM_TYPE_BINARY",
 		4: "ITEM_TYPE_BANK_CARD",
+		5: "ITEM_TYPE_OTP",
 	}
 	ItemType_value = map[string]int32{
 		"ITEM_TYPE_UNSPECIFIED":    0,
@@ -53,6 +56,7 @@ var (
 		"ITEM_TYPE_TEXT":           2,
 		"ITEM_TYPE_BINARY":         3,
 		"ITEM_TYPE_BANK_CARD":      4,
+		"ITEM_TYPE_OTP":            5,
 	}
 )
 
@@ -83,20 +87,20 @@ func (ItemType) EnumDescriptor() ([]byte, []int) {
 	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{0}
 }
 
-// KDFParams описывает параметры функции формирования ключа из мастер-пароля.
+// KDFParams описывает параметры функции формирования ключа из мастер-пароля
 type KDFParams struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// algorithm содержит название алгоритма KDF.
+	// algorithm содержит название алгоритма KDF
 	Algorithm string `protobuf:"bytes,1,opt,name=algorithm,proto3" json:"algorithm,omitempty"`
-	// salt содержит соль для формирования ключа.
+	// salt содержит соль для формирования ключа
 	Salt []byte `protobuf:"bytes,2,opt,name=salt,proto3" json:"salt,omitempty"`
-	// time_cost задает вычислительную стоимость KDF.
+	// time_cost задает вычислительную стоимость KDF
 	TimeCost uint32 `protobuf:"varint,3,opt,name=time_cost,json=timeCost,proto3" json:"time_cost,omitempty"`
-	// memory_kib задает объем памяти для KDF в KiB.
+	// memory_kib задает объем памяти для KDF в KiB
 	MemoryKib uint32 `protobuf:"varint,4,opt,name=memory_kib,json=memoryKib,proto3" json:"memory_kib,omitempty"`
-	// parallelism задает уровень параллелизма KDF.
+	// parallelism задает уровень параллелизма KDF
 	Parallelism uint32 `protobuf:"varint,5,opt,name=parallelism,proto3" json:"parallelism,omitempty"`
-	// key_length задает длину результирующего ключа в байтах.
+	// key_length задает длину результирующего ключа в байтах
 	KeyLength     uint32 `protobuf:"varint,6,opt,name=key_length,json=keyLength,proto3" json:"key_length,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -174,16 +178,16 @@ func (x *KDFParams) GetKeyLength() uint32 {
 	return 0
 }
 
-// VaultKeyEnvelope хранит зашифрованный ключ пользовательского хранилища.
+// VaultKeyEnvelope хранит зашифрованный ключ пользовательского хранилища
 type VaultKeyEnvelope struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// encrypted_vault_key содержит ключ хранилища, зашифрованный ключом из мастер-пароля.
+	// encrypted_vault_key содержит ключ хранилища, зашифрованный ключом из мастер-пароля
 	EncryptedVaultKey []byte `protobuf:"bytes,1,opt,name=encrypted_vault_key,json=encryptedVaultKey,proto3" json:"encrypted_vault_key,omitempty"`
-	// nonce содержит одноразовое значение для расшифровки ключа хранилища.
+	// nonce содержит одноразовое значение для расшифровки ключа хранилища
 	Nonce []byte `protobuf:"bytes,2,opt,name=nonce,proto3" json:"nonce,omitempty"`
-	// encryption_alg содержит название алгоритма шифрования ключа хранилища.
+	// encryption_alg содержит название алгоритма шифрования ключа хранилища
 	EncryptionAlg string `protobuf:"bytes,3,opt,name=encryption_alg,json=encryptionAlg,proto3" json:"encryption_alg,omitempty"`
-	// kdf_params содержит параметры получения ключа из мастер-пароля.
+	// kdf_params содержит параметры получения ключа из мастер-пароля
 	KdfParams     *KDFParams `protobuf:"bytes,4,opt,name=kdf_params,json=kdfParams,proto3" json:"kdf_params,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -247,14 +251,14 @@ func (x *VaultKeyEnvelope) GetKdfParams() *KDFParams {
 	return nil
 }
 
-// RegisterResponse содержит результат успешной регистрации пользователя.
+// RegisterResponse содержит результат успешной регистрации пользователя
 type RegisterResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// access_token содержит токен доступа к API.
+	// access_token содержит токен доступа к API
 	AccessToken string `protobuf:"bytes,1,opt,name=access_token,json=accessToken,proto3" json:"access_token,omitempty"`
-	// access_token_expires_at содержит момент истечения токена доступа.
+	// access_token_expires_at содержит момент истечения токена доступа
 	AccessTokenExpiresAt *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=access_token_expires_at,json=accessTokenExpiresAt,proto3" json:"access_token_expires_at,omitempty"`
-	// vault_key содержит зашифрованный ключ хранилища пользователя.
+	// vault_key содержит зашифрованный ключ хранилища пользователя
 	VaultKey      *VaultKeyEnvelope `protobuf:"bytes,3,opt,name=vault_key,json=vaultKey,proto3" json:"vault_key,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -311,14 +315,14 @@ func (x *RegisterResponse) GetVaultKey() *VaultKeyEnvelope {
 	return nil
 }
 
-// LoginResponse содержит результат успешной аутентификации пользователя.
+// LoginResponse содержит результат успешной аутентификации пользователя
 type LoginResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// access_token содержит токен доступа к API.
+	// access_token содержит токен доступа к API
 	AccessToken string `protobuf:"bytes,1,opt,name=access_token,json=accessToken,proto3" json:"access_token,omitempty"`
-	// access_token_expires_at содержит момент истечения токена доступа.
+	// access_token_expires_at содержит момент истечения токена доступа
 	AccessTokenExpiresAt *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=access_token_expires_at,json=accessTokenExpiresAt,proto3" json:"access_token_expires_at,omitempty"`
-	// vault_key содержит зашифрованный ключ хранилища пользователя.
+	// vault_key содержит зашифрованный ключ хранилища пользователя
 	VaultKey      *VaultKeyEnvelope `protobuf:"bytes,3,opt,name=vault_key,json=vaultKey,proto3" json:"vault_key,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -375,14 +379,14 @@ func (x *LoginResponse) GetVaultKey() *VaultKeyEnvelope {
 	return nil
 }
 
-// RegisterRequest содержит данные для регистрации нового пользователя.
+// RegisterRequest содержит данные для регистрации нового пользователя
 type RegisterRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// login содержит уникальный логин пользователя.
+	// login содержит уникальный логин пользователя
 	Login string `protobuf:"bytes,1,opt,name=login,proto3" json:"login,omitempty"`
-	// login_password содержит пароль входа, который не используется для шифрования секретов.
+	// login_password содержит пароль входа, который не используется для шифрования секретов
 	LoginPassword string `protobuf:"bytes,2,opt,name=login_password,json=loginPassword,proto3" json:"login_password,omitempty"`
-	// vault_key содержит зашифрованный ключ хранилища, подготовленный клиентом.
+	// vault_key содержит зашифрованный ключ хранилища, подготовленный клиентом
 	VaultKey      *VaultKeyEnvelope `protobuf:"bytes,3,opt,name=vault_key,json=vaultKey,proto3" json:"vault_key,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -439,12 +443,12 @@ func (x *RegisterRequest) GetVaultKey() *VaultKeyEnvelope {
 	return nil
 }
 
-// LoginRequest содержит данные для аутентификации пользователя.
+// LoginRequest содержит данные для аутентификации пользователя
 type LoginRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// login содержит логин пользователя.
+	// login содержит логин пользователя
 	Login string `protobuf:"bytes,1,opt,name=login,proto3" json:"login,omitempty"`
-	// login_password содержит пароль входа пользователя.
+	// login_password содержит пароль входа пользователя
 	LoginPassword string `protobuf:"bytes,2,opt,name=login_password,json=loginPassword,proto3" json:"login_password,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -494,12 +498,12 @@ func (x *LoginRequest) GetLoginPassword() string {
 	return ""
 }
 
-// EncryptedData описывает зашифрованный блок данных.
+// EncryptedData описывает зашифрованный блок данных
 type EncryptedData struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// ciphertext содержит зашифрованные данные.
+	// ciphertext содержит зашифрованные данные
 	Ciphertext []byte `protobuf:"bytes,1,opt,name=ciphertext,proto3" json:"ciphertext,omitempty"`
-	// nonce содержит одноразовое значение для расшифровки данных.
+	// nonce содержит одноразовое значение для расшифровки данных
 	Nonce         []byte `protobuf:"bytes,2,opt,name=nonce,proto3" json:"nonce,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -549,28 +553,28 @@ func (x *EncryptedData) GetNonce() []byte {
 	return nil
 }
 
-// VaultItem описывает одну запись зашифрованного хранилища пользователя.
+// VaultItem описывает одну запись зашифрованного хранилища пользователя
 type VaultItem struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// id содержит уникальный идентификатор записи.
+	// id содержит уникальный идентификатор записи
 	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	// type содержит тип приватных данных.
+	// type содержит тип приватных данных
 	Type ItemType `protobuf:"varint,2,opt,name=type,proto3,enum=gophkeeper.v1.ItemType" json:"type,omitempty"`
-	// metadata содержит зашифрованную произвольную метаинформацию записи.
+	// metadata содержит зашифрованную произвольную метаинформацию записи
 	Metadata *EncryptedData `protobuf:"bytes,3,opt,name=metadata,proto3" json:"metadata,omitempty"`
-	// payload содержит зашифрованное содержимое записи.
+	// payload содержит зашифрованное содержимое записи
 	Payload *EncryptedData `protobuf:"bytes,4,opt,name=payload,proto3" json:"payload,omitempty"`
-	// encryption_alg содержит название алгоритма шифрования записи.
+	// encryption_alg содержит название алгоритма шифрования записи
 	EncryptionAlg string `protobuf:"bytes,5,opt,name=encryption_alg,json=encryptionAlg,proto3" json:"encryption_alg,omitempty"`
-	// payload_schema_version содержит версию схемы зашифрованного содержимого.
+	// payload_schema_version содержит версию схемы зашифрованного содержимого
 	PayloadSchemaVersion uint32 `protobuf:"varint,6,opt,name=payload_schema_version,json=payloadSchemaVersion,proto3" json:"payload_schema_version,omitempty"`
-	// version содержит версию записи для оптимистичной блокировки.
+	// version содержит версию записи для оптимистичной блокировки
 	Version int64 `protobuf:"varint,7,opt,name=version,proto3" json:"version,omitempty"`
-	// created_at содержит момент создания записи на сервере.
+	// created_at содержит момент создания записи на сервере
 	CreatedAt *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	// updated_at содержит момент последнего обновления записи на сервере.
+	// updated_at содержит момент последнего обновления записи на сервере
 	UpdatedAt *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	// deleted_at содержит момент мягкого удаления записи, если запись удалена.
+	// deleted_at содержит момент мягкого удаления записи, если запись удалена
 	DeletedAt     *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=deleted_at,json=deletedAt,proto3" json:"deleted_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -676,18 +680,18 @@ func (x *VaultItem) GetDeletedAt() *timestamppb.Timestamp {
 	return nil
 }
 
-// CreateItemRequest содержит данные для создания новой записи хранилища.
+// CreateItemRequest содержит данные для создания новой записи хранилища
 type CreateItemRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// type содержит тип создаваемых приватных данных.
+	// type содержит тип создаваемых приватных данных
 	Type ItemType `protobuf:"varint,1,opt,name=type,proto3,enum=gophkeeper.v1.ItemType" json:"type,omitempty"`
-	// metadata содержит зашифрованную метаинформацию записи.
+	// metadata содержит зашифрованную метаинформацию записи
 	Metadata *EncryptedData `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
-	// payload содержит зашифрованное содержимое записи.
+	// payload содержит зашифрованное содержимое записи
 	Payload *EncryptedData `protobuf:"bytes,3,opt,name=payload,proto3" json:"payload,omitempty"`
-	// encryption_alg содержит название алгоритма шифрования записи.
+	// encryption_alg содержит название алгоритма шифрования записи
 	EncryptionAlg string `protobuf:"bytes,4,opt,name=encryption_alg,json=encryptionAlg,proto3" json:"encryption_alg,omitempty"`
-	// payload_schema_version содержит версию схемы зашифрованного содержимого.
+	// payload_schema_version содержит версию схемы зашифрованного содержимого
 	PayloadSchemaVersion uint32 `protobuf:"varint,5,opt,name=payload_schema_version,json=payloadSchemaVersion,proto3" json:"payload_schema_version,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
@@ -758,22 +762,22 @@ func (x *CreateItemRequest) GetPayloadSchemaVersion() uint32 {
 	return 0
 }
 
-// UpdateItemRequest содержит данные для обновления существующей записи.
+// UpdateItemRequest содержит данные для обновления существующей записи
 type UpdateItemRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// id содержит идентификатор обновляемой записи.
+	// id содержит идентификатор обновляемой записи
 	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	// expected_version содержит версию записи, которую клиент ожидает изменить.
+	// expected_version содержит версию записи, которую клиент ожидает изменить
 	ExpectedVersion int64 `protobuf:"varint,2,opt,name=expected_version,json=expectedVersion,proto3" json:"expected_version,omitempty"`
-	// type содержит новый тип приватных данных.
+	// type содержит новый тип приватных данных
 	Type ItemType `protobuf:"varint,3,opt,name=type,proto3,enum=gophkeeper.v1.ItemType" json:"type,omitempty"`
-	// metadata содержит новую зашифрованную метаинформацию записи.
+	// metadata содержит новую зашифрованную метаинформацию записи
 	Metadata *EncryptedData `protobuf:"bytes,4,opt,name=metadata,proto3" json:"metadata,omitempty"`
-	// payload содержит новое зашифрованное содержимое записи.
+	// payload содержит новое зашифрованное содержимое записи
 	Payload *EncryptedData `protobuf:"bytes,5,opt,name=payload,proto3" json:"payload,omitempty"`
-	// encryption_alg содержит название алгоритма шифрования записи.
+	// encryption_alg содержит название алгоритма шифрования записи
 	EncryptionAlg string `protobuf:"bytes,6,opt,name=encryption_alg,json=encryptionAlg,proto3" json:"encryption_alg,omitempty"`
-	// payload_schema_version содержит версию схемы зашифрованного содержимого.
+	// payload_schema_version содержит версию схемы зашифрованного содержимого
 	PayloadSchemaVersion uint32 `protobuf:"varint,7,opt,name=payload_schema_version,json=payloadSchemaVersion,proto3" json:"payload_schema_version,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
@@ -858,12 +862,12 @@ func (x *UpdateItemRequest) GetPayloadSchemaVersion() uint32 {
 	return 0
 }
 
-// DeleteItemRequest содержит данные для мягкого удаления записи.
+// DeleteItemRequest содержит данные для мягкого удаления записи
 type DeleteItemRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// id содержит идентификатор удаляемой записи.
+	// id содержит идентификатор удаляемой записи
 	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	// expected_version содержит версию записи, которую клиент ожидает удалить.
+	// expected_version содержит версию записи, которую клиент ожидает удалить
 	ExpectedVersion int64 `protobuf:"varint,2,opt,name=expected_version,json=expectedVersion,proto3" json:"expected_version,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
@@ -913,10 +917,10 @@ func (x *DeleteItemRequest) GetExpectedVersion() int64 {
 	return 0
 }
 
-// GetItemRequest содержит данные для получения одной записи.
+// GetItemRequest содержит данные для получения одной записи
 type GetItemRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// id содержит идентификатор запрашиваемой записи.
+	// id содержит идентификатор запрашиваемой записи
 	Id            string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -959,14 +963,14 @@ func (x *GetItemRequest) GetId() string {
 	return ""
 }
 
-// ListItemsRequest содержит параметры постраничного получения записей.
+// ListItemsRequest содержит параметры постраничного получения записей
 type ListItemsRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// page_size задает максимальное количество записей в ответе.
+	// page_size задает максимальное количество записей в ответе
 	PageSize int32 `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	// page_token содержит токен следующей страницы.
+	// page_token содержит токен следующей страницы
 	PageToken string `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
-	// include_deleted указывает, нужно ли возвращать мягко удаленные записи.
+	// include_deleted указывает, нужно ли возвращать мягко удаленные записи
 	IncludeDeleted bool `protobuf:"varint,3,opt,name=include_deleted,json=includeDeleted,proto3" json:"include_deleted,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
@@ -1023,12 +1027,12 @@ func (x *ListItemsRequest) GetIncludeDeleted() bool {
 	return false
 }
 
-// ListItemsResponse содержит страницу записей хранилища.
+// ListItemsResponse содержит страницу записей хранилища
 type ListItemsResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// items содержит записи текущей страницы.
+	// items содержит записи текущей страницы
 	Items []*VaultItem `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
-	// next_page_token содержит токен следующей страницы.
+	// next_page_token содержит токен следующей страницы
 	NextPageToken string `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1078,10 +1082,10 @@ func (x *ListItemsResponse) GetNextPageToken() string {
 	return ""
 }
 
-// CreateItemResponse содержит созданную запись хранилища.
+// CreateItemResponse содержит созданную запись хранилища
 type CreateItemResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// item содержит созданную запись с серверными полями.
+	// item содержит созданную запись с серверными полями
 	Item          *VaultItem `protobuf:"bytes,1,opt,name=item,proto3" json:"item,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1124,10 +1128,10 @@ func (x *CreateItemResponse) GetItem() *VaultItem {
 	return nil
 }
 
-// GetItemResponse содержит найденную запись хранилища.
+// GetItemResponse содержит найденную запись хранилища
 type GetItemResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// item содержит найденную запись.
+	// item содержит найденную запись
 	Item          *VaultItem `protobuf:"bytes,1,opt,name=item,proto3" json:"item,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1170,10 +1174,10 @@ func (x *GetItemResponse) GetItem() *VaultItem {
 	return nil
 }
 
-// UpdateItemResponse содержит обновленную запись хранилища.
+// UpdateItemResponse содержит обновленную запись хранилища
 type UpdateItemResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// item содержит обновленную запись с новой версией.
+	// item содержит обновленную запись с новой версией
 	Item          *VaultItem `protobuf:"bytes,1,opt,name=item,proto3" json:"item,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1216,14 +1220,14 @@ func (x *UpdateItemResponse) GetItem() *VaultItem {
 	return nil
 }
 
-// DeleteItemResponse содержит результат мягкого удаления записи.
+// DeleteItemResponse содержит результат мягкого удаления записи
 type DeleteItemResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// id содержит идентификатор удаленной записи.
+	// id содержит идентификатор удаленной записи
 	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	// version содержит новую версию удаленной записи.
+	// version содержит новую версию удаленной записи
 	Version int64 `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"`
-	// deleted_at содержит момент мягкого удаления записи.
+	// deleted_at содержит момент мягкого удаления записи
 	DeletedAt     *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=deleted_at,json=deletedAt,proto3" json:"deleted_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1280,14 +1284,14 @@ func (x *DeleteItemResponse) GetDeletedAt() *timestamppb.Timestamp {
 	return nil
 }
 
-// SyncRequest содержит параметры синхронизации клиентского хранилища.
+// SyncRequest содержит параметры синхронизации клиентского хранилища
 type SyncRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// changed_after задает нижнюю границу времени изменения записей.
+	// changed_after задает нижнюю границу времени изменения записей
 	ChangedAfter *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=changed_after,json=changedAfter,proto3" json:"changed_after,omitempty"`
-	// page_size задает максимальное количество изменений в ответе.
+	// page_size задает максимальное количество изменений в ответе
 	PageSize int32 `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	// page_token содержит токен следующей страницы изменений.
+	// page_token содержит токен следующей страницы изменений
 	PageToken     string `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1344,14 +1348,14 @@ func (x *SyncRequest) GetPageToken() string {
 	return ""
 }
 
-// SyncResponse содержит страницу изменений для синхронизации клиента.
+// SyncResponse содержит страницу изменений для синхронизации клиента
 type SyncResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// items содержит измененные записи, включая мягко удаленные.
+	// items содержит измененные записи, включая мягко удаленные
 	Items []*VaultItem `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
-	// next_changed_after содержит новую границу времени для следующей синхронизации.
+	// next_changed_after содержит новую границу времени для следующей синхронизации
 	NextChangedAfter *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=next_changed_after,json=nextChangedAfter,proto3" json:"next_changed_after,omitempty"`
-	// next_page_token содержит токен следующей страницы изменений.
+	// next_page_token содержит токен следующей страницы изменений
 	NextPageToken string `protobuf:"bytes,3,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1509,13 +1513,14 @@ const file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDesc = "" +
 	"\fSyncResponse\x12.\n" +
 	"\x05items\x18\x01 \x03(\v2\x18.gophkeeper.v1.VaultItemR\x05items\x12H\n" +
 	"\x12next_changed_after\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x10nextChangedAfter\x12&\n" +
-	"\x0fnext_page_token\x18\x03 \x01(\tR\rnextPageToken*\x86\x01\n" +
+	"\x0fnext_page_token\x18\x03 \x01(\tR\rnextPageToken*\x99\x01\n" +
 	"\bItemType\x12\x19\n" +
 	"\x15ITEM_TYPE_UNSPECIFIED\x10\x00\x12\x1c\n" +
 	"\x18ITEM_TYPE_LOGIN_PASSWORD\x10\x01\x12\x12\n" +
 	"\x0eITEM_TYPE_TEXT\x10\x02\x12\x14\n" +
 	"\x10ITEM_TYPE_BINARY\x10\x03\x12\x17\n" +
-	"\x13ITEM_TYPE_BANK_CARD\x10\x042\x9e\x01\n" +
+	"\x13ITEM_TYPE_BANK_CARD\x10\x04\x12\x11\n" +
+	"\rITEM_TYPE_OTP\x10\x052\x9e\x01\n" +
 	"\vAuthService\x12K\n" +
 	"\bRegister\x12\x1e.gophkeeper.v1.RegisterRequest\x1a\x1f.gophkeeper.v1.RegisterResponse\x12B\n" +
 	"\x05Login\x12\x1b.gophkeeper.v1.LoginRequest\x1a\x1c.gophkeeper.v1.LoginResponse2\xe2\x03\n" +

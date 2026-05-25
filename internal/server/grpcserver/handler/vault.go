@@ -392,6 +392,8 @@ func itemTypeFromProto(itemType gophkeeperv1.ItemType) vault.ItemType {
 		return vault.ItemTypeBinary
 	case gophkeeperv1.ItemType_ITEM_TYPE_BANK_CARD:
 		return vault.ItemTypeBankCard
+	case gophkeeperv1.ItemType_ITEM_TYPE_OTP:
+		return vault.ItemTypeOTP
 	default:
 		return ""
 	}
@@ -407,6 +409,8 @@ func itemTypeToProto(itemType vault.ItemType) gophkeeperv1.ItemType {
 		return gophkeeperv1.ItemType_ITEM_TYPE_BINARY
 	case vault.ItemTypeBankCard:
 		return gophkeeperv1.ItemType_ITEM_TYPE_BANK_CARD
+	case vault.ItemTypeOTP:
+		return gophkeeperv1.ItemType_ITEM_TYPE_OTP
 	default:
 		return gophkeeperv1.ItemType_ITEM_TYPE_UNSPECIFIED
 	}

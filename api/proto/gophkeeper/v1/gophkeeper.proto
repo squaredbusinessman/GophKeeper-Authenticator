@@ -52,6 +52,9 @@ enum ItemType {
 
   // ITEM_TYPE_BANK_CARD хранит данные банковской карты
   ITEM_TYPE_BANK_CARD = 4;
+
+  // ITEM_TYPE_OTP хранит данные одноразовых паролей
+  ITEM_TYPE_OTP = 5;
 }
 
 // KDFParams описывает параметры функции формирования ключа из мастер-пароля

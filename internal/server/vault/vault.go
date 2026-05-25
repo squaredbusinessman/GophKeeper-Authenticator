@@ -37,6 +37,9 @@ const (
 
 	// ItemTypeBankCard хранит encrypted bank card item
 	ItemTypeBankCard ItemType = "bank_card"
+
+	// ItemTypeOTP хранит encrypted OTP item
+	ItemTypeOTP ItemType = "otp"
 )
 
 // EncryptedData содержит ciphertext и nonce для encrypted metadata или payload

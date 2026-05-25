@@ -27,11 +27,11 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// AuthService описывает регистрацию и аутентификацию пользователей.
+// AuthService описывает регистрацию и аутентификацию пользователей
 type AuthServiceClient interface {
-	// Register создает нового пользователя и возвращает данные авторизованной сессии.
+	// Register создает нового пользователя и возвращает данные авторизованной сессии
 	Register(ctx context.Context, in *RegisterRequest, opts ...grpc.CallOption) (*RegisterResponse, error)
-	// Login аутентифицирует существующего пользователя и возвращает данные авторизованной сессии.
+	// Login аутентифицирует существующего пользователя и возвращает данные авторизованной сессии
 	Login(ctx context.Context, in *LoginRequest, opts ...grpc.CallOption) (*LoginResponse, error)
 }
 
@@ -67,11 +67,11 @@ func (c *authServiceClient) Login(ctx context.Context, in *LoginRequest, opts ..
 // All implementations must embed UnimplementedAuthServiceServer
 // for forward compatibility.
 //
-// AuthService описывает регистрацию и аутентификацию пользователей.
+// AuthService описывает регистрацию и аутентификацию пользователей
 type AuthServiceServer interface {
-	// Register создает нового пользователя и возвращает данные авторизованной сессии.
+	// Register создает нового пользователя и возвращает данные авторизованной сессии
 	Register(context.Context, *RegisterRequest) (*RegisterResponse, error)
-	// Login аутентифицирует существующего пользователя и возвращает данные авторизованной сессии.
+	// Login аутентифицирует существующего пользователя и возвращает данные авторизованной сессии
 	Login(context.Context, *LoginRequest) (*LoginResponse, error)
 	mustEmbedUnimplementedAuthServiceServer()
 }
@@ -179,19 +179,19 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// VaultService описывает операции с зашифрованным хранилищем пользователя.
+// VaultService описывает операции с зашифрованным хранилищем пользователя
 type VaultServiceClient interface {
-	// CreateItem создает новую запись в хранилище пользователя.
+	// CreateItem создает новую запись в хранилище пользователя
 	CreateItem(ctx context.Context, in *CreateItemRequest, opts ...grpc.CallOption) (*CreateItemResponse, error)
-	// GetItem возвращает одну запись хранилища по идентификатору.
+	// GetItem возвращает одну запись хранилища по идентификатору
 	GetItem(ctx context.Context, in *GetItemRequest, opts ...grpc.CallOption) (*GetItemResponse, error)
-	// ListItems возвращает страницу записей хранилища пользователя.
+	// ListItems возвращает страницу записей хранилища пользователя
 	ListItems(ctx context.Context, in *ListItemsRequest, opts ...grpc.CallOption) (*ListItemsResponse, error)
-	// UpdateItem обновляет существующую запись с проверкой ожидаемой версии.
+	// UpdateItem обновляет существующую запись с проверкой ожидаемой версии
 	UpdateItem(ctx context.Context, in *UpdateItemRequest, opts ...grpc.CallOption) (*UpdateItemResponse, error)
-	// DeleteItem помечает запись как удаленную с проверкой ожидаемой версии.
+	// DeleteItem помечает запись как удаленную с проверкой ожидаемой версии
 	DeleteItem(ctx context.Context, in *DeleteItemRequest, opts ...grpc.CallOption) (*DeleteItemResponse, error)
-	// Sync возвращает изменения хранилища для синхронизации клиента.
+	// Sync возвращает изменения хранилища для синхронизации клиента
 	Sync(ctx context.Context, in *SyncRequest, opts ...grpc.CallOption) (*SyncResponse, error)
 }
 
@@ -267,19 +267,19 @@ func (c *vaultServiceClient) Sync(ctx context.Context, in *SyncRequest, opts ...
 // All implementations must embed UnimplementedVaultServiceServer
 // for forward compatibility.
 //
-// VaultService описывает операции с зашифрованным хранилищем пользователя.
+// VaultService описывает операции с зашифрованным хранилищем пользователя
 type VaultServiceServer interface {
-	// CreateItem создает новую запись в хранилище пользователя.
+	// CreateItem создает новую запись в хранилище пользователя
 	CreateItem(context.Context, *CreateItemRequest) (*CreateItemResponse, error)
-	// GetItem возвращает одну запись хранилища по идентификатору.
+	// GetItem возвращает одну запись хранилища по идентификатору
 	GetItem(context.Context, *GetItemRequest) (*GetItemResponse, error)
-	// ListItems возвращает страницу записей хранилища пользователя.
+	// ListItems возвращает страницу записей хранилища пользователя
 	ListItems(context.Context, *ListItemsRequest) (*ListItemsResponse, error)
-	// UpdateItem обновляет существующую запись с проверкой ожидаемой версии.
+	// UpdateItem обновляет существующую запись с проверкой ожидаемой версии
 	UpdateItem(context.Context, *UpdateItemRequest) (*UpdateItemResponse, error)
-	// DeleteItem помечает запись как удаленную с проверкой ожидаемой версии.
+	// DeleteItem помечает запись как удаленную с проверкой ожидаемой версии
 	DeleteItem(context.Context, *DeleteItemRequest) (*DeleteItemResponse, error)
-	// Sync возвращает изменения хранилища для синхронизации клиента.
+	// Sync возвращает изменения хранилища для синхронизации клиента
 	Sync(context.Context, *SyncRequest) (*SyncResponse, error)
 	mustEmbedUnimplementedVaultServiceServer()
 }

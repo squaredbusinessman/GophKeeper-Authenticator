@@ -196,6 +196,65 @@ func TestVaultServiceCreateSecretEncryptsPayloadAndSendsAccessToken(t *testing.T
 	}
 }
 
+func TestVaultServiceSupportsOTPSecretType(t *testing.T) {
+	session := testSession()
+	metadataPlaintext := []byte(`{"title":"Example user@example.com"}`)
+	payloadPlaintext, schemaVersion, err := EncodeOTPPayload(OTPPayload{
+		Issuer:      "Example",
+		AccountName: "user@example.com",
+		Secret:      "BASE32SECRET",
+		Algorithm:   "SHA1",
+		Digits:      6,
+	})
+	if err != nil {
+		t.Fatalf("EncodeOTPPayload() error = %v", err)
+	}
+
+	vaultClient := &fakeVaultClient{
+		createItemFunc: func(_ context.Context, req *gophkeeperv1.CreateItemRequest, _ ...grpc.CallOption) (*gophkeeperv1.CreateItemResponse, error) {
+			if req.GetType() != gophkeeperv1.ItemType_ITEM_TYPE_OTP {
+				t.Fatalf("request type = %s, want ITEM_TYPE_OTP", req.GetType())
+			}
+
+			return &gophkeeperv1.CreateItemResponse{
+				Item: &gophkeeperv1.VaultItem{
+					Id:                   "otp-id-1",
+					Type:                 req.GetType(),
+					Metadata:             req.GetMetadata(),
+					Payload:              req.GetPayload(),
+					EncryptionAlg:        req.GetEncryptionAlg(),
+					PayloadSchemaVersion: req.GetPayloadSchemaVersion(),
+					Version:              1,
+				},
+			}, nil
+		},
+	}
+	service := NewVaultService(vaultClient)
+
+	secret, err := service.CreateSecret(context.Background(), session, CreateSecretInput{
+		Type:                 SecretTypeOTP,
+		Metadata:             metadataPlaintext,
+		Payload:              payloadPlaintext,
+		PayloadSchemaVersion: schemaVersion,
+	})
+	if err != nil {
+		t.Fatalf("CreateSecret() error = %v", err)
+	}
+
+	if secret.Type != SecretTypeOTP {
+		t.Fatalf("secret type = %v, want otp", secret.Type)
+	}
+
+	otpPayload, err := DecodeOTPPayload(secret.Payload, secret.PayloadSchemaVersion)
+	if err != nil {
+		t.Fatalf("DecodeOTPPayload() error = %v", err)
+	}
+
+	if otpPayload.Secret != "BASE32SECRET" {
+		t.Fatalf("otp secret = %q, want BASE32SECRET", otpPayload.Secret)
+	}
+}
+
 func TestVaultServiceGetSecretDecryptsPayloadAndSendsAccessToken(t *testing.T) {
 	session := testSession()
 	metadataPlaintext := []byte(`{"title":"api token"}`)

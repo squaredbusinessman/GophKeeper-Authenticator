@@ -834,6 +834,16 @@ func TestVaultHandlerMapsUseCaseErrors(t *testing.T) {
 	}
 }
 
+func TestVaultHandlerMapsOTPItemType(t *testing.T) {
+	if itemTypeFromProto(gophkeeperv1.ItemType_ITEM_TYPE_OTP) != vault.ItemTypeOTP {
+		t.Fatalf("itemTypeFromProto() = %q, want %q", itemTypeFromProto(gophkeeperv1.ItemType_ITEM_TYPE_OTP), vault.ItemTypeOTP)
+	}
+
+	if itemTypeToProto(vault.ItemTypeOTP) != gophkeeperv1.ItemType_ITEM_TYPE_OTP {
+		t.Fatalf("itemTypeToProto() = %s, want ITEM_TYPE_OTP", itemTypeToProto(vault.ItemTypeOTP))
+	}
+}
+
 func validUpdateItemRequest() *gophkeeperv1.UpdateItemRequest {
 	return &gophkeeperv1.UpdateItemRequest{
 		Id:              "item-id-1",
