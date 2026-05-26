@@ -1,0 +1,18 @@
+coverage:
+  precision: 1
+  round: down
+  range: 70..90
+  status:
+    project:
+      default:
+        target: 70%
+        threshold: 1%
+    patch:
+      default:
+        target: 60%
+        threshold: 5%
+
+ignore:
+  - "internal/gen/**"
+  - "google/**"
+  - "internal/tools/**"
