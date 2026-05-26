@@ -215,6 +215,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.current = nil
 		m.screen = screenList
 		m.statusOK("секрет удален")
+		m.busy = true
 		return m, m.loadSecretsCmd(false)
 	case syncDoneMsg:
 		m.busy = false
@@ -223,6 +224,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.statusOK(fmt.Sprintf("синхронизация выполнена, изменений: %d", msg.count))
+		m.busy = true
 		return m, m.loadSecretsCmd(false)
 	case saveDoneMsg:
 		m.busy = false

@@ -167,19 +167,43 @@ func TestSmokeAuthVaultAndSyncFlow(t *testing.T) {
 		t.Fatalf("create binary secret: %v", err)
 	}
 
+	otpPayload, otpSchemaVersion, err := core.EncodeOTPPayload(core.OTPPayload{
+		Issuer:        "Smoke",
+		AccountName:   login,
+		Secret:        "JBSWY3DPEHPK3PXP",
+		Algorithm:     "SHA1",
+		Digits:        6,
+		PeriodSeconds: 30,
+		Notes:         "smoke otp",
+	})
+	if err != nil {
+		t.Fatalf("encode otp payload: %v", err)
+	}
+
+	createdOTP, err := vaultService.CreateSecret(ctx, session, core.CreateSecretInput{
+		Type:                 core.SecretTypeOTP,
+		Metadata:             []byte(`{"title":"smoke otp"}`),
+		Payload:              otpPayload,
+		PayloadSchemaVersion: otpSchemaVersion,
+	})
+	if err != nil {
+		t.Fatalf("create otp secret: %v", err)
+	}
+
 	listed, err := vaultService.ListSecrets(ctx, session, core.ListSecretsInput{})
 	if err != nil {
 		t.Fatalf("list secrets: %v", err)
 	}
 
-	if len(listed) != 4 {
-		t.Fatalf("listed secrets = %d, want 4", len(listed))
+	if len(listed) != 5 {
+		t.Fatalf("listed secrets = %d, want 5", len(listed))
 	}
 
 	assertSmokeListContains(t, listed, createdText.ID)
 	assertSmokeListContains(t, listed, createdLoginPassword.ID)
 	assertSmokeListContains(t, listed, createdBankCard.ID)
 	assertSmokeListContains(t, listed, createdBinary.ID)
+	assertSmokeListContains(t, listed, createdOTP.ID)
 
 	gotText, err := vaultService.GetSecret(ctx, session, core.GetSecretInput{ID: createdText.ID})
 	if err != nil {
@@ -235,6 +259,29 @@ func TestSmokeAuthVaultAndSyncFlow(t *testing.T) {
 
 	if decodedBinary.FileName != "smoke.bin" || !bytes.Equal(decodedBinary.Data, []byte{0x01, 0x02, 0x03}) {
 		t.Fatalf("decoded binary = %+v, want smoke binary", decodedBinary)
+	}
+
+	gotOTP, err := vaultService.GetSecret(ctx, session, core.GetSecretInput{ID: createdOTP.ID})
+	if err != nil {
+		t.Fatalf("get otp secret: %v", err)
+	}
+
+	decodedOTP, err := core.DecodeOTPPayload(gotOTP.Payload, gotOTP.PayloadSchemaVersion)
+	if err != nil {
+		t.Fatalf("decode otp payload: %v", err)
+	}
+
+	if decodedOTP.Secret != "JBSWY3DPEHPK3PXP" || decodedOTP.AccountName != login {
+		t.Fatalf("decoded otp = %+v, want smoke otp", decodedOTP)
+	}
+
+	otpCode, err := core.CurrentOTPCode(decodedOTP, time.Unix(59, 0))
+	if err != nil {
+		t.Fatalf("calculate otp code: %v", err)
+	}
+
+	if otpCode.Value == "" {
+		t.Fatalf("otp code is empty")
 	}
 
 	updatedTextPayload, updatedTextSchemaVersion, err := core.EncodeTextPayload(core.TextPayload{Text: "updated smoke secret"})
@@ -441,6 +488,18 @@ func TestSmokeAuthVaultAndSyncFlow(t *testing.T) {
 		t.Fatalf("deleted binary id = %q, want %q", deletedBinary.ID, createdBinary.ID)
 	}
 
+	deletedOTP, err := vaultService.DeleteSecret(ctx, session, core.DeleteSecretInput{
+		ID:              createdOTP.ID,
+		ExpectedVersion: gotOTP.Version,
+	})
+	if err != nil {
+		t.Fatalf("delete otp secret: %v", err)
+	}
+
+	if deletedOTP.ID != createdOTP.ID {
+		t.Fatalf("deleted otp id = %q, want %q", deletedOTP.ID, createdOTP.ID)
+	}
+
 	activeAfterDelete, err := vaultService.ListSecrets(ctx, session, core.ListSecretsInput{})
 	if err != nil {
 		t.Fatalf("list after delete: %v", err)
@@ -459,6 +518,7 @@ func TestSmokeAuthVaultAndSyncFlow(t *testing.T) {
 	assertSmokeTombstoneContains(t, synced.Secrets, createdLoginPassword.ID)
 	assertSmokeTombstoneContains(t, synced.Secrets, createdBankCard.ID)
 	assertSmokeTombstoneContains(t, synced.Secrets, createdBinary.ID)
+	assertSmokeTombstoneContains(t, synced.Secrets, createdOTP.ID)
 }
 
 func assertSmokeListContains(t *testing.T, secrets []core.Secret, id string) {

@@ -38,6 +38,9 @@ jobs:
       - name: Build CLI
         run: go build -o /tmp/gophkeeper-cli ./cmd/gophkeeper-cli
 
+      - name: Build TUI
+        run: go build -o /tmp/gophkeeper-tui ./cmd/gophkeeper-tui
+
       - name: Build CLI release targets
         run: make build-cli-all VERSION=ci
 
