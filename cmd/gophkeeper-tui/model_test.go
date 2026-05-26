@@ -571,6 +571,353 @@ func TestStartUpdateOTPFormPrepopulatesFields(t *testing.T) {
 	}
 }
 
+func TestDetailActionsUpdateDeleteSaveBinaryAndBack(t *testing.T) {
+	secret := testBinarySecret(t)
+	m := newModel(context.Background(), appDeps{})
+	m.screen = screenDetail
+	m.current = &secret
+	m.detail.SetContent(m.renderSecretDetail(secret))
+
+	updated, _ := m.Update(keyRune('s'))
+	m = updated.(model)
+	if m.screen != screenSaveBinary {
+		t.Fatalf("screen = %v, want screenSaveBinary", m.screen)
+	}
+	if len(m.inputs) != 1 || !strings.Contains(m.inputs[0].Prompt, "Путь для сохранения файла") {
+		t.Fatalf("save inputs = %+v, want output path input", m.inputs)
+	}
+
+	outputPath := filepath.Join(t.TempDir(), "nested", "secret.bin")
+	m.inputs[0].SetValue(outputPath)
+	updated, cmd := m.Update(keyEnter())
+	m = updated.(model)
+	if cmd == nil {
+		t.Fatalf("save enter command = nil")
+	}
+	updated, _ = m.Update(cmd())
+	m = updated.(model)
+	if m.screen != screenDetail {
+		t.Fatalf("screen = %v, want screenDetail after save", m.screen)
+	}
+	if !strings.Contains(m.status, "binary сохранен") {
+		t.Fatalf("status = %q, want save status", m.status)
+	}
+
+	updated, _ = m.Update(keyRune('u'))
+	m = updated.(model)
+	if m.screen != screenForm || m.formMode != formModeUpdate || m.formKind != secretKindBinary {
+		t.Fatalf("update state = screen %v mode %v kind %s, want binary update form", m.screen, m.formMode, m.formKind)
+	}
+
+	m.screen = screenDetail
+	m.current = &secret
+	updated, _ = m.Update(keyRune('d'))
+	m = updated.(model)
+	if m.screen != screenDelete {
+		t.Fatalf("screen = %v, want screenDelete", m.screen)
+	}
+
+	m.screen = screenDetail
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = updated.(model)
+	if m.screen != screenList {
+		t.Fatalf("screen = %v, want screenList after esc", m.screen)
+	}
+}
+
+func TestCommandErrorsWithoutOpenSession(t *testing.T) {
+	state := clientapp.NewSessionState()
+	m := newModel(context.Background(), appDeps{sessionState: state})
+
+	if msg := m.loadSecretsCmd(false)().(listDoneMsg); msg.err == nil || !strings.Contains(msg.err.Error(), "vault session is not open") {
+		t.Fatalf("loadSecretsCmd() err = %v, want session error", msg.err)
+	}
+	if msg := m.getSecretCmd("id")().(secretDoneMsg); msg.err == nil || !strings.Contains(msg.err.Error(), "vault session is not open") {
+		t.Fatalf("getSecretCmd() err = %v, want session error", msg.err)
+	}
+	if msg := m.syncCmd()().(syncDoneMsg); msg.err == nil || !strings.Contains(msg.err.Error(), "vault session is not open") {
+		t.Fatalf("syncCmd() err = %v, want session error", msg.err)
+	}
+	if msg := m.deleteCmd(testTextSecret(t))().(deleteDoneMsg); msg.err == nil || !strings.Contains(msg.err.Error(), "vault session is not open") {
+		t.Fatalf("deleteCmd() err = %v, want session error", msg.err)
+	}
+	if msg := m.submitFormCmd()().(secretDoneMsg); msg.err == nil || !strings.Contains(msg.err.Error(), "vault session is not open") {
+		t.Fatalf("submitFormCmd() err = %v, want session error", msg.err)
+	}
+}
+
+func TestAuthModeSwitchRegisterMismatchAndFocusNavigation(t *testing.T) {
+	m := newModel(context.Background(), appDeps{})
+	m.screen = screenAuth
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlR})
+	m = updated.(model)
+	if cmd != nil {
+		t.Fatalf("ctrl+r command = %v, want nil", cmd)
+	}
+	if m.authMode != authModeRegister || len(m.inputs) != 4 {
+		t.Fatalf("auth state = mode %v inputs %d, want register with 4 inputs", m.authMode, len(m.inputs))
+	}
+
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
+	m = updated.(model)
+	if m.focus != len(m.inputs)-1 {
+		t.Fatalf("focus = %d, want last input", m.focus)
+	}
+
+	m.inputs[0].SetValue("user@example.com")
+	m.inputs[1].SetValue("login-password")
+	m.inputs[2].SetValue("master-password")
+	m.inputs[3].SetValue("other-master-password")
+	m.focus = len(m.inputs) - 1
+	updated, cmd = m.Update(keyEnter())
+	m = updated.(model)
+	if cmd == nil {
+		t.Fatalf("register submit command = nil")
+	}
+	msg := cmd().(authDoneMsg)
+	if msg.err == nil || !strings.Contains(msg.err.Error(), "master passwords do not match") {
+		t.Fatalf("auth error = %v, want master password mismatch", msg.err)
+	}
+	updated, _ = m.Update(msg)
+	m = updated.(model)
+
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlL})
+	m = updated.(model)
+	if m.authMode != authModeLogin || len(m.inputs) != 3 {
+		t.Fatalf("auth state = mode %v inputs %d, want login with 3 inputs", m.authMode, len(m.inputs))
+	}
+}
+
+func TestListNavigationAndCommands(t *testing.T) {
+	session := testSession()
+	state := clientapp.NewSessionState()
+	if err := state.SetSession(session); err != nil {
+		t.Fatalf("SetSession() error = %v", err)
+	}
+	first := testTextSecret(t)
+	second := testLoginPasswordSecret(t)
+	vaultService := &fakeVaultService{listSecrets: []core.Secret{first, second}}
+	m := newModel(context.Background(), appDeps{
+		vaultService: vaultService,
+		sessionState: state,
+	})
+	m.screen = screenList
+	m.secrets = []core.Secret{first, second}
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = updated.(model)
+	if m.selected != 1 {
+		t.Fatalf("selected = %d, want 1", m.selected)
+	}
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m = updated.(model)
+	if m.selected != 0 {
+		t.Fatalf("selected = %d, want 0", m.selected)
+	}
+
+	updated, cmd := m.Update(keyEnter())
+	m = updated.(model)
+	if cmd == nil {
+		t.Fatalf("enter command = nil, want get secret command")
+	}
+	updated, cmd = m.Update(cmd())
+	m = updated.(model)
+	if m.screen != screenDetail || m.current == nil || m.current.ID != first.ID {
+		t.Fatalf("detail state = screen %v current %+v, want first secret", m.screen, m.current)
+	}
+	if cmd != nil {
+		updated, _ = m.Update(cmd())
+		m = updated.(model)
+	}
+
+	m.screen = screenList
+	updated, cmd = m.Update(keyRune('r'))
+	m = updated.(model)
+	if cmd == nil {
+		t.Fatalf("refresh command = nil")
+	}
+	updated, _ = m.Update(cmd())
+	m = updated.(model)
+	if len(m.secrets) != 2 {
+		t.Fatalf("secrets length = %d, want 2", len(m.secrets))
+	}
+}
+
+func TestSecretInputFromFormBuildsAllNonOTPTypes(t *testing.T) {
+	filePath := filepath.Join(t.TempDir(), "payload.txt")
+	if err := os.WriteFile(filePath, []byte("file payload"), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	tests := []struct {
+		name       string
+		kind       secretKind
+		fill       func([]textinput.Model)
+		secretType core.SecretType
+	}{
+		{
+			name: "text",
+			kind: secretKindText,
+			fill: func(inputs []textinput.Model) {
+				inputs[0].SetValue("Text")
+				inputs[1].SetValue("secret text")
+			},
+			secretType: core.SecretTypeText,
+		},
+		{
+			name: "login password",
+			kind: secretKindLoginPassword,
+			fill: func(inputs []textinput.Model) {
+				inputs[0].SetValue("GitHub")
+				inputs[1].SetValue("user@example.com")
+				inputs[2].SetValue("password")
+				inputs[3].SetValue("https://github.com")
+				inputs[4].SetValue("work")
+			},
+			secretType: core.SecretTypeLoginPassword,
+		},
+		{
+			name: "bank card",
+			kind: secretKindBankCard,
+			fill: func(inputs []textinput.Model) {
+				inputs[0].SetValue("Card")
+				inputs[1].SetValue("4111111111111111")
+				inputs[2].SetValue("IVAN IVANOV")
+				inputs[3].SetValue("05")
+				inputs[4].SetValue("2030")
+				inputs[5].SetValue("123")
+				inputs[6].SetValue("salary")
+			},
+			secretType: core.SecretTypeBankCard,
+		},
+		{
+			name: "binary",
+			kind: secretKindBinary,
+			fill: func(inputs []textinput.Model) {
+				inputs[0].SetValue("File")
+				inputs[1].SetValue(filePath)
+				inputs[2].SetValue("text/plain")
+			},
+			secretType: core.SecretTypeBinary,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := newModel(context.Background(), appDeps{})
+			updated, _ := m.startCreateForm(tt.kind)
+			m = updated.(model)
+			tt.fill(m.inputs)
+
+			input, err := m.secretInputFromForm()
+			if err != nil {
+				t.Fatalf("secretInputFromForm() error = %v", err)
+			}
+			if input.Type != tt.secretType {
+				t.Fatalf("Type = %v, want %v", input.Type, tt.secretType)
+			}
+			if len(input.Metadata) == 0 || len(input.Payload) == 0 {
+				t.Fatalf("encoded input has empty metadata or payload")
+			}
+		})
+	}
+}
+
+func TestViewsRenderExpectedScreensAndStatuses(t *testing.T) {
+	otpSecret := testOTPSecret(t)
+	m := newModel(context.Background(), appDeps{})
+	m.screen = screenList
+	m.secrets = []core.Secret{otpSecret}
+	if view := m.View(); !strings.Contains(view, "Vault") || !strings.Contains(view, "otp") || !strings.Contains(view, "стартовый экран") {
+		t.Fatalf("list view = %q, want vault otp row and hints", view)
+	}
+
+	m.screen = screenTypeSelect
+	if view := m.View(); !strings.Contains(view, "Новый секрет") || !strings.Contains(view, "O OTP") {
+		t.Fatalf("type select view = %q, want type choices", view)
+	}
+
+	updated, _ := m.startCreateForm(secretKindLoginPassword)
+	m = updated.(model)
+	if view := m.View(); !strings.Contains(view, "Обновление:") && !strings.Contains(view, "Создание: логин и пароль") {
+		t.Fatalf("form view = %q, want login password form", view)
+	}
+
+	m.screen = screenDelete
+	m.current = nil
+	if view := m.View(); !strings.Contains(view, "Удалить: <unknown>") {
+		t.Fatalf("delete view = %q, want unknown title", view)
+	}
+
+	m.screen = screenSaveBinary
+	m.inputs = makeInputs([]string{"Путь для сохранения файла"}, nil)
+	if view := m.View(); !strings.Contains(view, "Сохранение binary") {
+		t.Fatalf("save binary view = %q, want save title", view)
+	}
+
+	m.busy = true
+	if view := m.View(); !strings.Contains(view, "выполняется операция") {
+		t.Fatalf("busy view = %q, want busy status", view)
+	}
+	m.busy = false
+	m.setError(os.ErrNotExist)
+	if view := m.View(); !strings.Contains(view, "file does not exist") {
+		t.Fatalf("error view = %q, want user facing error", view)
+	}
+}
+
+func TestInputsFromSecretPrepopulateAllTypes(t *testing.T) {
+	for _, secret := range []core.Secret{
+		testTextSecret(t),
+		testLoginPasswordSecret(t),
+		testBankCardSecret(t),
+		testBinarySecret(t),
+		testOTPSecret(t),
+	} {
+		inputs, err := inputsFromSecret(secret)
+		if err != nil {
+			t.Fatalf("inputsFromSecret(%v) error = %v", secret.Type, err)
+		}
+		if len(inputs) == 0 || inputs[0].Value() == "" {
+			t.Fatalf("inputsFromSecret(%v) did not prepopulate title", secret.Type)
+		}
+	}
+
+	_, err := inputsFromSecret(core.Secret{
+		Type:                 core.SecretTypeText,
+		Metadata:             []byte(`{"title":"broken"}`),
+		Payload:              []byte(`{`),
+		PayloadSchemaVersion: 1,
+	})
+	if err == nil {
+		t.Fatalf("inputsFromSecret() error = nil, want decode error")
+	}
+}
+
+func TestSaveBinaryCommandValidationErrors(t *testing.T) {
+	secret := testBinarySecret(t)
+	m := newModel(context.Background(), appDeps{})
+
+	if msg := m.saveBinaryCmd(secret, " ")().(saveDoneMsg); msg.err == nil || !strings.Contains(msg.err.Error(), "output path is required") {
+		t.Fatalf("empty output path err = %v, want required error", msg.err)
+	}
+
+	existingPath := filepath.Join(t.TempDir(), "secret.bin")
+	if err := os.WriteFile(existingPath, []byte("exists"), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	if msg := m.saveBinaryCmd(secret, existingPath)().(saveDoneMsg); msg.err == nil || !strings.Contains(msg.err.Error(), "output file already exists") {
+		t.Fatalf("existing path err = %v, want exists error", msg.err)
+	}
+
+	broken := secret
+	broken.Payload = []byte(`{`)
+	if msg := m.saveBinaryCmd(broken, filepath.Join(t.TempDir(), "broken.bin"))().(saveDoneMsg); msg.err == nil || !strings.Contains(msg.err.Error(), "decode binary payload") {
+		t.Fatalf("broken payload err = %v, want decode error", msg.err)
+	}
+}
+
 func testSession() core.Session {
 	return core.Session{
 		AccessToken:          "access-token",
@@ -596,6 +943,110 @@ func testTextSecret(t *testing.T) core.Secret {
 		Payload:              payload,
 		PayloadSchemaVersion: version,
 		Version:              1,
+	}
+}
+
+func testLoginPasswordSecret(t *testing.T) core.Secret {
+	t.Helper()
+	metadata, err := encodeTextSecretMetadata("Login secret")
+	if err != nil {
+		t.Fatalf("encodeTextSecretMetadata() error = %v", err)
+	}
+	payload, version, err := core.EncodeLoginPasswordPayload(core.LoginPasswordPayload{
+		Login:    "user@example.com",
+		Password: "password",
+		URL:      "https://example.com",
+		Notes:    "work",
+	})
+	if err != nil {
+		t.Fatalf("EncodeLoginPasswordPayload() error = %v", err)
+	}
+	return core.Secret{
+		ID:                   "login-id",
+		Type:                 core.SecretTypeLoginPassword,
+		Metadata:             metadata,
+		Payload:              payload,
+		PayloadSchemaVersion: version,
+		Version:              2,
+	}
+}
+
+func testBankCardSecret(t *testing.T) core.Secret {
+	t.Helper()
+	metadata, err := encodeTextSecretMetadata("Card secret")
+	if err != nil {
+		t.Fatalf("encodeTextSecretMetadata() error = %v", err)
+	}
+	payload, version, err := core.EncodeBankCardPayload(core.BankCardPayload{
+		Number:          "4111111111111111",
+		CardholderName:  "IVAN IVANOV",
+		ExpirationMonth: "05",
+		ExpirationYear:  "2030",
+		CVV:             "123",
+		Notes:           "salary",
+	})
+	if err != nil {
+		t.Fatalf("EncodeBankCardPayload() error = %v", err)
+	}
+	return core.Secret{
+		ID:                   "card-id",
+		Type:                 core.SecretTypeBankCard,
+		Metadata:             metadata,
+		Payload:              payload,
+		PayloadSchemaVersion: version,
+		Version:              3,
+	}
+}
+
+func testBinarySecret(t *testing.T) core.Secret {
+	t.Helper()
+	metadata, err := encodeTextSecretMetadata("Binary secret")
+	if err != nil {
+		t.Fatalf("encodeTextSecretMetadata() error = %v", err)
+	}
+	payload, version, err := core.EncodeBinaryPayload(core.BinaryPayload{
+		FileName:    "secret.bin",
+		ContentType: "application/octet-stream",
+		Data:        []byte("binary payload"),
+	})
+	if err != nil {
+		t.Fatalf("EncodeBinaryPayload() error = %v", err)
+	}
+	return core.Secret{
+		ID:                   "binary-id",
+		Type:                 core.SecretTypeBinary,
+		Metadata:             metadata,
+		Payload:              payload,
+		PayloadSchemaVersion: version,
+		Version:              4,
+	}
+}
+
+func testOTPSecret(t *testing.T) core.Secret {
+	t.Helper()
+	metadata, err := encodeTextSecretMetadata("OTP secret")
+	if err != nil {
+		t.Fatalf("encodeTextSecretMetadata() error = %v", err)
+	}
+	payload, version, err := core.EncodeOTPPayload(core.OTPPayload{
+		Issuer:        "Example",
+		AccountName:   "user@example.com",
+		Secret:        "JBSWY3DPEHPK3PXP",
+		Algorithm:     "SHA1",
+		Digits:        6,
+		PeriodSeconds: 30,
+		Notes:         "work",
+	})
+	if err != nil {
+		t.Fatalf("EncodeOTPPayload() error = %v", err)
+	}
+	return core.Secret{
+		ID:                   "otp-id",
+		Type:                 core.SecretTypeOTP,
+		Metadata:             metadata,
+		Payload:              payload,
+		PayloadSchemaVersion: version,
+		Version:              5,
 	}
 }
 
