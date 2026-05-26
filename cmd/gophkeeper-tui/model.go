@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -429,7 +430,7 @@ func (m model) updateDetail(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "s":
 		if m.current != nil && m.current.Type == core.SecretTypeBinary {
-			m.inputs = makeInputs([]string{"Путь для сохранения файла"}, nil)
+			m.inputs = makeInputs([]string{"Папка для сохранения"}, nil)
 			m.focus = 0
 			m.inputs[0].Focus()
 			m.screen = screenSaveBinary
@@ -623,16 +624,13 @@ func (m model) submitFormCmd() tea.Cmd {
 
 func (m model) saveBinaryCmd(secret core.Secret, outputPath string) tea.Cmd {
 	return func() tea.Msg {
-		path := strings.TrimSpace(outputPath)
-		if path == "" {
-			return saveDoneMsg{err: fmt.Errorf("output path is required")}
-		}
 		binaryPayload, err := core.DecodeBinaryPayload(secret.Payload, secret.PayloadSchemaVersion)
 		if err != nil {
 			return saveDoneMsg{err: fmt.Errorf("decode binary payload: %w", err)}
 		}
-		if _, err = os.Stat(path); err == nil {
-			return saveDoneMsg{err: fmt.Errorf("output file already exists: %s", path)}
+		path, err := resolveBinaryOutputPath(outputPath, binaryPayload.FileName)
+		if err != nil {
+			return saveDoneMsg{err: err}
 		}
 		if err = os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 			return saveDoneMsg{err: fmt.Errorf("create output dir: %w", err)}
@@ -642,6 +640,75 @@ func (m model) saveBinaryCmd(secret core.Secret, outputPath string) tea.Cmd {
 		}
 		return saveDoneMsg{path: path}
 	}
+}
+
+func resolveBinaryOutputPath(outputDir string, fileName string) (string, error) {
+	dir, err := normalizeBinaryOutputPath(outputDir)
+	if err != nil {
+		return "", err
+	}
+
+	if info, err := os.Stat(dir); err == nil {
+		if !info.IsDir() {
+			return "", fmt.Errorf("output directory is not a directory: %s", dir)
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return "", fmt.Errorf("check output file: %w", err)
+	}
+
+	path := filepath.Join(dir, safeBinaryFileName(fileName))
+	if _, err := os.Stat(path); err == nil {
+		return "", fmt.Errorf("output file already exists: %s", path)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return "", fmt.Errorf("check output file: %w", err)
+	}
+
+	return path, nil
+}
+
+func normalizeBinaryOutputPath(outputPath string) (string, error) {
+	path := strings.TrimSpace(outputPath)
+	if path == "" {
+		return "", fmt.Errorf("output directory is required")
+	}
+
+	if path == "~" || strings.HasPrefix(path, "~/") {
+		home, err := os.UserHomeDir()
+		if err != nil || home == "" {
+			return "", fmt.Errorf("resolve home dir: %w", err)
+		}
+		if path == "~" {
+			return filepath.Clean(home), nil
+		}
+		return filepath.Clean(filepath.Join(home, strings.TrimPrefix(path, "~/"))), nil
+	}
+
+	home, err := os.UserHomeDir()
+	if err == nil && home != "" {
+		cleanHome := filepath.Clean(home)
+		homeWithoutRoot := strings.TrimPrefix(cleanHome, string(os.PathSeparator))
+		if !filepath.IsAbs(path) {
+			if path == homeWithoutRoot || strings.HasPrefix(path, homeWithoutRoot+string(os.PathSeparator)) {
+				path = string(os.PathSeparator) + path
+			}
+		}
+
+		duplicateHome := cleanHome + string(os.PathSeparator) + homeWithoutRoot
+		if path == duplicateHome || strings.HasPrefix(path, duplicateHome+string(os.PathSeparator)) {
+			path = filepath.Clean(cleanHome + strings.TrimPrefix(path, duplicateHome))
+		}
+	}
+
+	return filepath.Clean(path), nil
+}
+
+func safeBinaryFileName(fileName string) string {
+	name := filepath.Base(strings.TrimSpace(fileName))
+	if name == "." || name == string(os.PathSeparator) {
+		return "binary"
+	}
+
+	return name
 }
 
 func otpTickCmd() tea.Cmd {
@@ -798,7 +865,7 @@ func (m model) viewList() string {
 
 func (m model) viewDetail() string {
 	lines := []string{titleStyle.Render("Secret"), m.detail.View()}
-	lines = append(lines, mutedStyle.Render("Esc назад  U обновить  D удалить  S сохранить binary. Для OTP текущий код показан в detail"))
+	lines = append(lines, mutedStyle.Render("Esc назад  U обновить  D удалить  S сохранить binary"))
 	return lipgloss.NewStyle().Padding(1, 2).Render(strings.Join(lines, "\n"))
 }
 
@@ -1027,8 +1094,8 @@ func inputPlaceholder(label string) string {
 		return "123"
 	case "Путь к файлу":
 		return "/path/to/file"
-	case "Путь для сохранения файла":
-		return "/path/to/output-file"
+	case "Папка для сохранения":
+		return "~/Downloads"
 	case "Content type":
 		return "text/plain или application/octet-stream"
 	case "Сервис":

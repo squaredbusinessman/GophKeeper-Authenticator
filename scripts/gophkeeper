@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+COMMAND="${1:-tui}"
+
+case "$COMMAND" in
+	tui)
+		shift || true
+		cd "$PROJECT_DIR"
+		exec go run ./cmd/gophkeeper-tui "$@"
+		;;
+	shell)
+		cd "$PROJECT_DIR"
+		exec "${SHELL:-/bin/sh}"
+		;;
+	path)
+		printf '%s\n' "$PROJECT_DIR"
+		;;
+	*)
+		cat <<USAGE
+Usage:
+  scripts/gophkeeper tui
+  scripts/gophkeeper shell
+  scripts/gophkeeper path
+USAGE
+		exit 2
+		;;
+esac

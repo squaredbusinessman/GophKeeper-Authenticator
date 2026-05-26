@@ -576,7 +576,8 @@ func TestGetTextSecretCommandLogsInPromptsIDAndPrintsSecret(t *testing.T) {
 
 func TestGetBinarySecretCommandWritesFileAndPrintsMetadata(t *testing.T) {
 	authService := &fakeCLIAuthService{}
-	outputFile := filepath.Join(t.TempDir(), "restored.bin")
+	outputDir := t.TempDir()
+	outputFile := filepath.Join(outputDir, "private-key.bin")
 	binaryData := []byte{0x05, 0x06, 0x07, 0x08}
 	vaultService := &fakeCLIVaultService{
 		getSecretFunc: func(context.Context, core.Session, core.GetSecretInput) (core.Secret, error) {
@@ -596,7 +597,7 @@ func TestGetBinarySecretCommandWritesFileAndPrintsMetadata(t *testing.T) {
 			"login-password",
 			"master-password",
 			"binary-secret-id",
-			outputFile,
+			outputDir,
 		},
 	}
 	var stdout bytes.Buffer
@@ -629,7 +630,8 @@ func TestGetBinarySecretCommandWritesFileAndPrintsMetadata(t *testing.T) {
 
 func TestGetBinarySecretCommandDoesNotOverwriteExistingOutputFile(t *testing.T) {
 	authService := &fakeCLIAuthService{}
-	outputFile := filepath.Join(t.TempDir(), "restored.bin")
+	outputDir := t.TempDir()
+	outputFile := filepath.Join(outputDir, "private-key.bin")
 	originalData := []byte("already exists")
 	if err := os.WriteFile(outputFile, originalData, 0o600); err != nil {
 		t.Fatalf("write existing output file: %v", err)
@@ -653,7 +655,7 @@ func TestGetBinarySecretCommandDoesNotOverwriteExistingOutputFile(t *testing.T) 
 			"login-password",
 			"master-password",
 			"binary-secret-id",
-			outputFile,
+			outputDir,
 		},
 	}
 

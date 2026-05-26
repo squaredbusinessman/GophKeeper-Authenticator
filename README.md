@@ -737,7 +737,7 @@ go run ./cmd/gophkeeper-cli sync
 
 Команда `create` без указания типа создает текстовый секрет. Для остальных обязательных типов используются команды `create login-password`, `create bank-card` и `create binary`. Title сохраняется как encrypted metadata, а содержимое кодируется в одну из client payload schemas: `TextPayload`, `LoginPasswordPayload`, `BankCardPayload` или `BinaryPayload`. После кодирования metadata и payload шифруются на клиенте через vault key.
 
-Команда `get` запрашивает ID секрета, получает encrypted item с сервера и расшифровывает metadata и payload на клиенте. В выводе всегда есть `ID`, `Type` и `Version`, чтобы пользователь мог сразу использовать актуальную версию для update/delete. Для `binary` команда дополнительно запрашивает `Output path` и записывает расшифрованный файл на диск с правами `0600`. Если файл по этому пути уже существует, CLI не перезаписывает его без явного выбора нового пути. Для открытия vault команды заново запрашивают login, пароль входа и мастер-пароль. Это нужно потому, что текущий CLI сохраняет только access token, но не хранит открытый vault key между запусками.
+Команда `get` запрашивает ID секрета, получает encrypted item с сервера и расшифровывает metadata и payload на клиенте. В выводе всегда есть `ID`, `Type` и `Version`, чтобы пользователь мог сразу использовать актуальную версию для update/delete. Для `binary` команда дополнительно запрашивает `Output directory` и записывает расшифрованный файл на диск с исходным именем и правами `0600`. Если файл с таким именем уже существует в выбранной директории, CLI не перезаписывает его без явного выбора другой директории. Для открытия vault команды заново запрашивают login, пароль входа и мастер-пароль. Это нужно потому, что текущий CLI сохраняет только access token, но не хранит открытый vault key между запусками.
 
 Команда `update` без указания типа обновляет текстовый секрет. Для остальных обязательных типов используются команды `update login-password`, `update bank-card` и `update binary`. Перед create/update CLI показывает подсказку по полям выбранного типа секрета. Команда `delete` не зависит от типа секрета: она удаляет любой item по `Secret ID` и `Expected version`. Команды `update` и `delete` требуют `Expected version`. Версию нужно брать из `list`, `get` или результата предыдущей команды. Если версия устарела, сервер возвращает version conflict.
 
@@ -1283,10 +1283,10 @@ CVV: 123
 Notes: main bank card
 ```
 
-Для `<binary-secret-id>` команда дополнительно спросит `Output path`:
+Для `<binary-secret-id>` команда дополнительно спросит `Output directory`:
 
 ```text
-Output path: /tmp/gophkeeper-restored-binary-secret.txt
+Output directory: /tmp/gophkeeper-restored-binary
 ```
 
 Ожидаемый результат содержит:
@@ -1300,13 +1300,13 @@ File name: gophkeeper-binary-secret.txt
 Content type: text/plain
 Size bytes: <size>
 Checksum SHA256: <checksum>
-Written to: /tmp/gophkeeper-restored-binary-secret.txt
+Written to: /tmp/gophkeeper-restored-binary/gophkeeper-binary-secret.txt
 ```
 
 Проверить восстановленный файл:
 
 ```bash
-cat /tmp/gophkeeper-restored-binary-secret.txt
+cat /tmp/gophkeeper-restored-binary/gophkeeper-binary-secret.txt
 ```
 
 Проверяется:
@@ -1462,14 +1462,14 @@ Type: text
 Secret text: updated secret text
 ```
 
-Повторить `get` для `<login-password-secret-id>`, `<bank-card-secret-id>` и `<binary-secret-id>`. Для binary указать новый output path и проверить содержимое файла:
+Повторить `get` для `<login-password-secret-id>`, `<bank-card-secret-id>` и `<binary-secret-id>`. Для binary указать output directory и проверить содержимое файла:
 
 ```text
-Output path: /tmp/gophkeeper-restored-binary-secret-updated.txt
+Output directory: /tmp/gophkeeper-restored-binary-updated
 ```
 
 ```bash
-cat /tmp/gophkeeper-restored-binary-secret-updated.txt
+cat /tmp/gophkeeper-restored-binary-updated/gophkeeper-binary-secret-updated.txt
 ```
 
 ### 15. Удалить секреты основных CLI типов

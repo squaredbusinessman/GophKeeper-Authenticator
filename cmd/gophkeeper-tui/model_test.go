@@ -506,16 +506,58 @@ func TestSaveBinaryCommandWritesFile(t *testing.T) {
 	}
 
 	m := newModel(context.Background(), appDeps{})
-	outputPath := filepath.Join(t.TempDir(), "secret.bin")
+	outputDir := filepath.Join(t.TempDir(), "output")
 	cmd := m.saveBinaryCmd(core.Secret{
 		Type:                 core.SecretTypeBinary,
 		Payload:              payload,
 		PayloadSchemaVersion: version,
-	}, outputPath)
+	}, outputDir)
 
 	msg := cmd().(saveDoneMsg)
 	if msg.err != nil {
 		t.Fatalf("saveBinaryCmd() error = %v", msg.err)
+	}
+
+	outputPath := filepath.Join(outputDir, "secret.bin")
+	if msg.path != outputPath {
+		t.Fatalf("saved path = %q, want %q", msg.path, outputPath)
+	}
+
+	data, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+
+	if !bytes.Equal(data, []byte("binary payload")) {
+		t.Fatalf("saved data = %q, want binary payload", data)
+	}
+}
+
+func TestSaveBinaryCommandWritesFileInsideExistingDirectory(t *testing.T) {
+	payload, version, err := core.EncodeBinaryPayload(core.BinaryPayload{
+		FileName: "secret.bin",
+		Data:     []byte("binary payload"),
+	})
+	if err != nil {
+		t.Fatalf("EncodeBinaryPayload() error = %v", err)
+	}
+
+	m := newModel(context.Background(), appDeps{})
+	outputDir := t.TempDir()
+	cmd := m.saveBinaryCmd(core.Secret{
+		Type:                 core.SecretTypeBinary,
+		Payload:              payload,
+		PayloadSchemaVersion: version,
+	}, outputDir)
+
+	msg := cmd().(saveDoneMsg)
+	if msg.err != nil {
+		t.Fatalf("saveBinaryCmd() error = %v", msg.err)
+	}
+
+	outputPath := filepath.Join(outputDir, "secret.bin")
+	if msg.path != outputPath {
+		t.Fatalf("saved path = %q, want %q", msg.path, outputPath)
 	}
 
 	data, err := os.ReadFile(outputPath)
@@ -583,7 +625,7 @@ func TestDetailActionsUpdateDeleteSaveBinaryAndBack(t *testing.T) {
 	if m.screen != screenSaveBinary {
 		t.Fatalf("screen = %v, want screenSaveBinary", m.screen)
 	}
-	if len(m.inputs) != 1 || !strings.Contains(m.inputs[0].Prompt, "Путь для сохранения файла") {
+	if len(m.inputs) != 1 || !strings.Contains(m.inputs[0].Prompt, "Папка для сохранения") {
 		t.Fatalf("save inputs = %+v, want output path input", m.inputs)
 	}
 
@@ -851,7 +893,7 @@ func TestViewsRenderExpectedScreensAndStatuses(t *testing.T) {
 	}
 
 	m.screen = screenSaveBinary
-	m.inputs = makeInputs([]string{"Путь для сохранения файла"}, nil)
+	m.inputs = makeInputs([]string{"Папка для сохранения"}, nil)
 	if view := m.View(); !strings.Contains(view, "Сохранение binary") {
 		t.Fatalf("save binary view = %q, want save title", view)
 	}
@@ -899,7 +941,7 @@ func TestSaveBinaryCommandValidationErrors(t *testing.T) {
 	secret := testBinarySecret(t)
 	m := newModel(context.Background(), appDeps{})
 
-	if msg := m.saveBinaryCmd(secret, " ")().(saveDoneMsg); msg.err == nil || !strings.Contains(msg.err.Error(), "output path is required") {
+	if msg := m.saveBinaryCmd(secret, " ")().(saveDoneMsg); msg.err == nil || !strings.Contains(msg.err.Error(), "output directory is required") {
 		t.Fatalf("empty output path err = %v, want required error", msg.err)
 	}
 
@@ -907,14 +949,63 @@ func TestSaveBinaryCommandValidationErrors(t *testing.T) {
 	if err := os.WriteFile(existingPath, []byte("exists"), 0o600); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
-	if msg := m.saveBinaryCmd(secret, existingPath)().(saveDoneMsg); msg.err == nil || !strings.Contains(msg.err.Error(), "output file already exists") {
-		t.Fatalf("existing path err = %v, want exists error", msg.err)
+	if msg := m.saveBinaryCmd(secret, existingPath)().(saveDoneMsg); msg.err == nil || !strings.Contains(msg.err.Error(), "output directory is not a directory") {
+		t.Fatalf("existing path err = %v, want directory error", msg.err)
+	}
+
+	existingDir := t.TempDir()
+	existingFileInDir := filepath.Join(existingDir, "secret.bin")
+	if err := os.WriteFile(existingFileInDir, []byte("exists"), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	if msg := m.saveBinaryCmd(secret, existingDir)().(saveDoneMsg); msg.err == nil || !strings.Contains(msg.err.Error(), "output file already exists") {
+		t.Fatalf("existing file in directory err = %v, want exists error", msg.err)
 	}
 
 	broken := secret
 	broken.Payload = []byte(`{`)
 	if msg := m.saveBinaryCmd(broken, filepath.Join(t.TempDir(), "broken.bin"))().(saveDoneMsg); msg.err == nil || !strings.Contains(msg.err.Error(), "decode binary payload") {
 		t.Fatalf("broken payload err = %v, want decode error", msg.err)
+	}
+}
+
+func TestNormalizeBinaryOutputPath(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		t.Skipf("UserHomeDir() = %q, %v", home, err)
+	}
+
+	got, err := normalizeBinaryOutputPath("~/secret.bin")
+	if err != nil {
+		t.Fatalf("normalizeBinaryOutputPath() error = %v", err)
+	}
+	if want := filepath.Join(home, "secret.bin"); got != want {
+		t.Fatalf("tilde path = %q, want %q", got, want)
+	}
+
+	got, err = normalizeBinaryOutputPath("~")
+	if err != nil {
+		t.Fatalf("normalizeBinaryOutputPath() error = %v", err)
+	}
+	if want := filepath.Clean(home); got != want {
+		t.Fatalf("home shorthand path = %q, want %q", got, want)
+	}
+
+	homeWithoutRoot := strings.TrimPrefix(filepath.Clean(home), string(os.PathSeparator))
+	got, err = normalizeBinaryOutputPath(filepath.Join(homeWithoutRoot, "secret.bin"))
+	if err != nil {
+		t.Fatalf("normalizeBinaryOutputPath() error = %v", err)
+	}
+	if want := filepath.Join(home, "secret.bin"); got != want {
+		t.Fatalf("home path without leading slash = %q, want %q", got, want)
+	}
+
+	got, err = normalizeBinaryOutputPath(filepath.Join(home, homeWithoutRoot, "secret.bin"))
+	if err != nil {
+		t.Fatalf("normalizeBinaryOutputPath() error = %v", err)
+	}
+	if want := filepath.Join(home, "secret.bin"); got != want {
+		t.Fatalf("duplicated home path = %q, want %q", got, want)
 	}
 }
 

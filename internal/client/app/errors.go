@@ -24,7 +24,7 @@ func UserFacingError(err error) string {
 	case strings.Contains(lowerMessage, "string field contains invalid utf-8"):
 		return "введенные данные содержат недопустимые символы. Используйте UTF-8 символы для login и пароля входа"
 	case strings.Contains(lowerMessage, "output file already exists"):
-		return "файл для сохранения binary-секрета уже существует. Укажите другой Output path, чтобы не перезаписать существующий файл"
+		return "файл для сохранения binary-секрета уже существует. Укажите другую папку для сохранения, чтобы не перезаписать существующий файл"
 	case strings.Contains(lowerMessage, "invalid credentials"):
 		return "неверный login или пароль входа"
 	case strings.Contains(lowerMessage, "login already exists"):

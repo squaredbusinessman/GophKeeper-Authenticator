@@ -1021,13 +1021,18 @@ func printSecret(stdout io.Writer, prompter Prompter, secret core.Secret) error 
 			return fmt.Errorf("decode binary payload: %w", err)
 		}
 
-		outputPath, err := promptRequired(prompter, "Output path")
+		outputDir, err := promptRequired(prompter, "Output directory")
 		if err != nil {
-			return fmt.Errorf("read output path: %w", err)
+			return fmt.Errorf("read output directory: %w", err)
 		}
 
+		outputPath := filepath.Join(strings.TrimSpace(outputDir), filepath.Base(binaryPayload.FileName))
 		if err = ensureOutputFileDoesNotExist(outputPath); err != nil {
 			return err
+		}
+
+		if err = os.MkdirAll(filepath.Dir(outputPath), 0o700); err != nil {
+			return fmt.Errorf("create output dir: %w", err)
 		}
 
 		if err = os.WriteFile(outputPath, binaryPayload.Data, 0o600); err != nil {
