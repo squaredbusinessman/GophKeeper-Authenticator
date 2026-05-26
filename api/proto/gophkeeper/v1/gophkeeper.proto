@@ -4,36 +4,74 @@ package gophkeeper.v1;
 
 option go_package = "github.com/squaredbusinessman/gophkeeper-authenticator/internal/gen/proto/gophkeeper/v1;gophkeeperv1";
 
+import "google/api/annotations.proto";
 import "google/protobuf/timestamp.proto";
 
 // AuthService описывает регистрацию и аутентификацию пользователей
 service AuthService {
   // Register создает нового пользователя и возвращает данные авторизованной сессии
-  rpc Register(RegisterRequest) returns (RegisterResponse);
+  rpc Register(RegisterRequest) returns (RegisterResponse) {
+    option (google.api.http) = {
+      post: "/v1/auth/register"
+      body: "*"
+    };
+  }
 
   // Login аутентифицирует существующего пользователя и возвращает данные авторизованной сессии
-  rpc Login(LoginRequest) returns (LoginResponse);
+  rpc Login(LoginRequest) returns (LoginResponse) {
+    option (google.api.http) = {
+      post: "/v1/auth/login"
+      body: "*"
+    };
+  }
 }
 
 // VaultService описывает операции с зашифрованным хранилищем пользователя
 service VaultService {
   // CreateItem создает новую запись в хранилище пользователя
-  rpc CreateItem(CreateItemRequest) returns (CreateItemResponse);
+  rpc CreateItem(CreateItemRequest) returns (CreateItemResponse) {
+    option (google.api.http) = {
+      post: "/v1/vault/items"
+      body: "*"
+    };
+  }
 
   // GetItem возвращает одну запись хранилища по идентификатору
-  rpc GetItem(GetItemRequest) returns (GetItemResponse);
+  rpc GetItem(GetItemRequest) returns (GetItemResponse) {
+    option (google.api.http) = {
+      get: "/v1/vault/items/{id}"
+    };
+  }
 
   // ListItems возвращает страницу записей хранилища пользователя
-  rpc ListItems(ListItemsRequest) returns (ListItemsResponse);
+  rpc ListItems(ListItemsRequest) returns (ListItemsResponse) {
+    option (google.api.http) = {
+      get: "/v1/vault/items"
+    };
+  }
 
   // UpdateItem обновляет существующую запись с проверкой ожидаемой версии
-  rpc UpdateItem(UpdateItemRequest) returns (UpdateItemResponse);
+  rpc UpdateItem(UpdateItemRequest) returns (UpdateItemResponse) {
+    option (google.api.http) = {
+      put: "/v1/vault/items/{id}"
+      body: "*"
+    };
+  }
 
   // DeleteItem помечает запись как удаленную с проверкой ожидаемой версии
-  rpc DeleteItem(DeleteItemRequest) returns (DeleteItemResponse);
+  rpc DeleteItem(DeleteItemRequest) returns (DeleteItemResponse) {
+    option (google.api.http) = {
+      delete: "/v1/vault/items/{id}"
+    };
+  }
 
   // Sync возвращает изменения хранилища для синхронизации клиента
-  rpc Sync(SyncRequest) returns (SyncResponse);
+  rpc Sync(SyncRequest) returns (SyncResponse) {
+    option (google.api.http) = {
+      post: "/v1/vault/sync"
+      body: "*"
+    };
+  }
 }
 
 // ItemType задает тип приватных данных в хранилище

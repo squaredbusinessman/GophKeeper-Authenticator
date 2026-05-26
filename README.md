@@ -32,8 +32,11 @@ GophKeeper - клиент-серверный менеджер секретов �
 - gRPC Vault API для create, get, list, update, delete и sync;
 - client core для auth flow, vault flow и sync flow;
 - CLI-команды `register`, `login`, `create`, `get`, `list`, `update`, `delete`, `sync`;
-- typed client payload schemas для `login_password`, `text`, `bank_card` и `binary`;
+- typed client payload schemas для `login_password`, `text`, `bank_card`, `binary` и `otp`;
+- TOTP генерация по RFC 6238 на стороне клиента;
+- TUI-клиент для auth flow и операций с vault;
 - inline binary metadata, checksum и size limit;
+- Swagger/OpenAPI описание gRPC HTTP projection;
 - coverage gate в CI с порогом не ниже 70%;
 - кроссплатформенная сборка CLI под Linux, macOS и Windows.
 
@@ -47,6 +50,7 @@ GophKeeper должен поддерживать хранение:
 - произвольных текстовых секретов;
 - произвольных бинарных данных;
 - данных банковских карт;
+- OTP-секретов для одноразовых паролей;
 - произвольной текстовой метаинформации для любого элемента.
 
 Обязательное ядро MVP:
@@ -60,6 +64,8 @@ GophKeeper должен поддерживать хранение:
 - CRUD секретов;
 - version-based sync;
 - CLI;
+- TUI;
+- Swagger/OpenAPI описание протокола;
 - unit-тесты с покрытием не менее 70%;
 - README с инструкциями запуска и проверки;
 - отображение версии и даты сборки CLI.
@@ -67,11 +73,8 @@ GophKeeper должен поддерживать хранение:
 Расширения после надежного MVP:
 
 - refresh token flow;
-- OTP/TOTP;
-- TUI;
 - MinIO или S3-compatible blob storage;
 - gRPC streaming для больших бинарных файлов;
-- Swagger/OpenAPI через gRPC-Gateway;
 - offline/cache режим через SQLite;
 - GUI через Wails.
 
@@ -83,17 +86,18 @@ GophKeeper должен поддерживать хранение:
 - `cmd/gophkeeper-server` - серверное приложение;
 - `api/proto` - gRPC proto-контракты;
 - `internal/gen/proto` - сгенерированный Go-код protobuf и gRPC;
+- `api/openapi` - Swagger/OpenAPI описание HTTP projection gRPC-контракта;
 - `internal/client` - клиентская бизнес-логика и client-side crypto;
 - `internal/server` - серверная логика и инфраструктура;
 - `internal/shared` - общие пакеты;
 - `deploy` - локальная инфраструктура для разработки и проверки;
 - `migrations` - SQL-миграции базы данных.
 
-Основной протокол взаимодействия клиента и сервера - gRPC.
+Основной runtime-протокол взаимодействия клиента и сервера - gRPC.
 
-Для MVP `.proto` файлы являются главным описанием API. Swagger/OpenAPI через gRPC-Gateway можно добавить позже, если основной сценарий будет реализован надежно.
+Swagger/OpenAPI файл описывает HTTP projection того же protobuf-контракта для выполнения требования ТЗ по документированию протокола. Сервер проекта не переключается на REST и не использует OpenAPI как runtime transport.
 
-Серверная база данных - PostgreSQL. SQLite не используется на сервере. SQLite может появиться только на стороне клиента для будущего offline/cache режима.
+Серверная база данных - PostgreSQL. SQLite не используется на сервере и не входит в текущую реализацию клиента.
 
 ## Client core и интерфейсы
 
@@ -114,9 +118,9 @@ presentation layers
 - потенциальный GUI через Wails
 ```
 
-CLI, TUI и будущий GUI не должны содержать бизнес-логику, напрямую шифровать данные, напрямую работать с token storage или ходить в gRPC API в обход client core.
+CLI и TUI не содержат бизнес-логику, напрямую не шифруют данные, напрямую не работают с token storage и не ходят в gRPC API в обход client core.
 
-Такой подход нужен, чтобы позже добавить TUI или GUI без переписывания клиентской бизнес-логики.
+Такой подход отделяет presentation layer от client core и фиксирует единый путь работы с auth, vault, sync и client-side encryption.
 
 ## Модель безопасности
 
@@ -368,7 +372,7 @@ Dev-режим без TLS предназначен только для запу�
 - удаление выполняется как soft delete через `deleted_at`;
 - tombstones должны участвовать в синхронизации между клиентами.
 
-Полноценный offline-режим в MVP не входит. Локальное шифрованное хранилище, очередь изменений, retry и replay изменений можно добавить позже.
+Полноценный offline-режим в MVP не входит. Текущая реализация синхронизации работает через online gRPC API.
 
 ## Бинарные данные
 
@@ -745,6 +749,12 @@ Proto-контракты находятся в:
 api/proto/gophkeeper/v1/gophkeeper.proto
 ```
 
+Swagger/OpenAPI файл находится в:
+
+```text
+api/openapi/gophkeeper.v1.swagger.json
+```
+
 Сгенерированный Go-код находится в:
 
 ```text
@@ -757,17 +767,19 @@ internal/gen/proto/gophkeeper/v1
 easyp validate-config
 ```
 
-Lint proto-контрактов:
-
-```bash
-easyp lint --root api/proto --path .
-```
-
 Генерация Go-кода:
 
 ```bash
 easyp generate
 ```
+
+Генерация Swagger/OpenAPI:
+
+```bash
+make generate-openapi
+```
+
+OpenAPI генерируется из protobuf HTTP mappings `google.api.http`. Описаны методы `Register`, `Login`, `CreateItem`, `GetItem`, `ListItems`, `UpdateItem`, `DeleteItem`, `Sync`, тип `ITEM_TYPE_OTP` и основные ошибки `400`, `401`, `403`, `404`, `409`, `500`.
 
 Сгенерированный код коммитится в репозиторий, чтобы проверяющему не нужно было обязательно устанавливать EasyP для обычной сборки проекта.
 
@@ -809,8 +821,9 @@ make smoke
 - vault use cases;
 - обработка version conflicts;
 - преобразование доменных ошибок в gRPC status codes;
-- поведение CLI-команд через fake client core.
-- smoke flow для всех обязательных типов секретов: `text`, `login_password`, `bank_card`, `binary`.
+- поведение CLI-команд через fake client core;
+- поведение TUI model без интерактивного терминала;
+- smoke flow для всех обязательных типов секретов: `text`, `login_password`, `bank_card`, `binary`, `otp`.
 
 Generated protobuf code напрямую тестировать не планируется.
 

@@ -6,7 +6,7 @@ SMOKE_DATABASE_DSN ?= postgres://gophkeeper:gophkeeper@localhost:5432/gophkeeper
 VERSION_PACKAGE := github.com/squaredbusinessman/gophkeeper-authenticator/internal/shared/version
 LDFLAGS := -s -w -X $(VERSION_PACKAGE).Version=$(VERSION) -X $(VERSION_PACKAGE).BuildDate=$(BUILD_DATE) -X $(VERSION_PACKAGE).Commit=$(COMMIT)
 
-.PHONY: build-cli build-tui build-cli-all test vet coverage smoke
+.PHONY: build-cli build-tui build-cli-all generate-openapi test vet coverage smoke
 
 build-cli:
 	@mkdir -p $(OUTPUT_DIR)
@@ -18,6 +18,9 @@ build-tui:
 
 build-cli-all:
 	VERSION="$(VERSION)" BUILD_DATE="$(BUILD_DATE)" COMMIT="$(COMMIT)" OUTPUT_DIR="$(OUTPUT_DIR)" ./scripts/build_cli.sh
+
+generate-openapi:
+	bash ./scripts/generate_openapi.sh
 
 test:
 	go test ./...

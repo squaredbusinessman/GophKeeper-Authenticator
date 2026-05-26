@@ -7,6 +7,7 @@
 package gophkeeperv1
 
 import (
+	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
@@ -1416,7 +1417,7 @@ var File_api_proto_gophkeeper_v1_gophkeeper_proto protoreflect.FileDescriptor
 
 const file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDesc = "" +
 	"\n" +
-	"(api/proto/gophkeeper/v1/gophkeeper.proto\x12\rgophkeeper.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xba\x01\n" +
+	"(api/proto/gophkeeper/v1/gophkeeper.proto\x12\rgophkeeper.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xba\x01\n" +
 	"\tKDFParams\x12\x1c\n" +
 	"\talgorithm\x18\x01 \x01(\tR\talgorithm\x12\x12\n" +
 	"\x04salt\x18\x02 \x01(\fR\x04salt\x12\x1b\n" +
@@ -1520,20 +1521,20 @@ const file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDesc = "" +
 	"\x0eITEM_TYPE_TEXT\x10\x02\x12\x14\n" +
 	"\x10ITEM_TYPE_BINARY\x10\x03\x12\x17\n" +
 	"\x13ITEM_TYPE_BANK_CARD\x10\x04\x12\x11\n" +
-	"\rITEM_TYPE_OTP\x10\x052\x9e\x01\n" +
-	"\vAuthService\x12K\n" +
-	"\bRegister\x12\x1e.gophkeeper.v1.RegisterRequest\x1a\x1f.gophkeeper.v1.RegisterResponse\x12B\n" +
-	"\x05Login\x12\x1b.gophkeeper.v1.LoginRequest\x1a\x1c.gophkeeper.v1.LoginResponse2\xe2\x03\n" +
-	"\fVaultService\x12Q\n" +
+	"\rITEM_TYPE_OTP\x10\x052\xd7\x01\n" +
+	"\vAuthService\x12i\n" +
+	"\bRegister\x12\x1e.gophkeeper.v1.RegisterRequest\x1a\x1f.gophkeeper.v1.RegisterResponse\"\x1c\x82\xd3\xe4\x93\x02\x16:\x01*\"\x11/v1/auth/register\x12]\n" +
+	"\x05Login\x12\x1b.gophkeeper.v1.LoginRequest\x1a\x1c.gophkeeper.v1.LoginResponse\"\x19\x82\xd3\xe4\x93\x02\x13:\x01*\"\x0e/v1/auth/login2\x8f\x05\n" +
+	"\fVaultService\x12m\n" +
 	"\n" +
-	"CreateItem\x12 .gophkeeper.v1.CreateItemRequest\x1a!.gophkeeper.v1.CreateItemResponse\x12H\n" +
-	"\aGetItem\x12\x1d.gophkeeper.v1.GetItemRequest\x1a\x1e.gophkeeper.v1.GetItemResponse\x12N\n" +
-	"\tListItems\x12\x1f.gophkeeper.v1.ListItemsRequest\x1a .gophkeeper.v1.ListItemsResponse\x12Q\n" +
+	"CreateItem\x12 .gophkeeper.v1.CreateItemRequest\x1a!.gophkeeper.v1.CreateItemResponse\"\x1a\x82\xd3\xe4\x93\x02\x14:\x01*\"\x0f/v1/vault/items\x12f\n" +
+	"\aGetItem\x12\x1d.gophkeeper.v1.GetItemRequest\x1a\x1e.gophkeeper.v1.GetItemResponse\"\x1c\x82\xd3\xe4\x93\x02\x16\x12\x14/v1/vault/items/{id}\x12g\n" +
+	"\tListItems\x12\x1f.gophkeeper.v1.ListItemsRequest\x1a .gophkeeper.v1.ListItemsResponse\"\x17\x82\xd3\xe4\x93\x02\x11\x12\x0f/v1/vault/items\x12r\n" +
 	"\n" +
-	"UpdateItem\x12 .gophkeeper.v1.UpdateItemRequest\x1a!.gophkeeper.v1.UpdateItemResponse\x12Q\n" +
+	"UpdateItem\x12 .gophkeeper.v1.UpdateItemRequest\x1a!.gophkeeper.v1.UpdateItemResponse\"\x1f\x82\xd3\xe4\x93\x02\x19:\x01*\x1a\x14/v1/vault/items/{id}\x12o\n" +
 	"\n" +
-	"DeleteItem\x12 .gophkeeper.v1.DeleteItemRequest\x1a!.gophkeeper.v1.DeleteItemResponse\x12?\n" +
-	"\x04Sync\x12\x1a.gophkeeper.v1.SyncRequest\x1a\x1b.gophkeeper.v1.SyncResponseBfZdgithub.com/squaredbusinessman/gophkeeper-authenticator/internal/gen/proto/gophkeeper/v1;gophkeeperv1b\x06proto3"
+	"DeleteItem\x12 .gophkeeper.v1.DeleteItemRequest\x1a!.gophkeeper.v1.DeleteItemResponse\"\x1c\x82\xd3\xe4\x93\x02\x16*\x14/v1/vault/items/{id}\x12Z\n" +
+	"\x04Sync\x12\x1a.gophkeeper.v1.SyncRequest\x1a\x1b.gophkeeper.v1.SyncResponse\"\x19\x82\xd3\xe4\x93\x02\x13:\x01*\"\x0e/v1/vault/syncBfZdgithub.com/squaredbusinessman/gophkeeper-authenticator/internal/gen/proto/gophkeeper/v1;gophkeeperv1b\x06proto3"
 
 var (
 	file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescOnce sync.Once
