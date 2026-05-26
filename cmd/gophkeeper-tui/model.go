@@ -47,7 +47,8 @@ type appDeps struct {
 type screen int
 
 const (
-	screenAuth screen = iota
+	screenWelcome screen = iota
+	screenAuth
 	screenList
 	screenDetail
 	screenTypeSelect
@@ -79,6 +80,20 @@ const (
 	secretKindBinary        secretKind = "binary"
 	secretKindOTP           secretKind = "otp"
 )
+
+const banner = `
+  ____  ___  ____  _   _ _  _______ _____ ____  _____ ____  
+ / ___|/ _ \|  _ \| | | | |/ / ____| ____|  _ \| ____|  _ \ 
+| |  _| | | | |_) | |_| | ' /|  _| |  _| | |_) |  _| | |_) |
+| |_| | |_| |  __/|  _  | . \| |___| |___|  __/| |___|  _ < 
+ \____|\___/|_|   |_| |_|_|\_\_____|_____|_|   |_____|_| \_\
+
+ ____  _____ ____ ____  _____ _____ 
+/ ___|| ____/ ___|  _ \| ____|_   _|
+\___ \|  _|| |   | |_) |  _|   | |  
+ ___) | |__| |___|  _ <| |___  | |  
+|____/|_____\____|_| \_\_____| |_|  
+`
 
 var (
 	titleStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("212"))
@@ -142,11 +157,13 @@ type saveDoneMsg struct {
 	err  error
 }
 
+type otpTickMsg time.Time
+
 func newModel(ctx context.Context, deps appDeps) model {
 	m := model{
 		ctx:    ctx,
 		deps:   deps,
-		screen: screenAuth,
+		screen: screenWelcome,
 		detail: viewport.New(80, 20),
 	}
 	m.setAuthInputs()
@@ -203,7 +220,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.statusOK("секрет загружен")
 		if m.formMode == formModeCreate || m.formMode == formModeUpdate {
 			m.busy = true
+			if msg.secret.Type == core.SecretTypeOTP {
+				return m, tea.Batch(m.loadSecretsCmd(false), otpTickCmd())
+			}
 			return m, m.loadSecretsCmd(false)
+		}
+		if msg.secret.Type == core.SecretTypeOTP {
+			return m, otpTickCmd()
 		}
 		return m, nil
 	case deleteDoneMsg:
@@ -235,6 +258,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.statusOK("binary сохранен: " + msg.path)
 		m.screen = screenDetail
 		return m, nil
+	case otpTickMsg:
+		if m.screen == screenDetail && m.current != nil && m.current.Type == core.SecretTypeOTP {
+			m.detail.SetContent(m.renderSecretDetail(*m.current))
+			return m, otpTickCmd()
+		}
+		return m, nil
 	}
 
 	key, ok := msg.(tea.KeyMsg)
@@ -250,6 +279,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	switch m.screen {
+	case screenWelcome:
+		return m.updateWelcome(key)
 	case screenAuth:
 		return m.updateAuth(key)
 	case screenList:
@@ -272,6 +303,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() string {
 	body := ""
 	switch m.screen {
+	case screenWelcome:
+		body = m.viewWelcome()
 	case screenAuth:
 		body = m.viewAuth()
 	case screenList:
@@ -292,13 +325,23 @@ func (m model) View() string {
 }
 
 func (m *model) setAuthInputs() {
-	labels := []string{"Login", "Login password", "Master password"}
+	labels := []string{"Логин", "Пароль входа", "Мастер-пароль"}
 	if m.authMode == authModeRegister {
-		labels = append(labels, "Repeat master password")
+		labels = append(labels, "Повтор мастер-пароля")
 	}
 	m.inputs = makeInputs(labels, map[int]bool{1: true, 2: true, 3: true})
 	m.focus = 0
 	m.inputs[0].Focus()
+}
+
+func (m model) updateWelcome(key tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch key.String() {
+	case "enter":
+		m.screen = screenAuth
+	case "q":
+		return m, tea.Quit
+	}
+	return m, nil
 }
 
 func (m model) updateAuth(key tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -331,7 +374,8 @@ func (m model) updateAuth(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m model) updateList(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch key.String() {
 	case "q":
-		return m, tea.Quit
+		m.resetToWelcome()
+		return m, nil
 	case "up", "k":
 		if m.selected > 0 {
 			m.selected--
@@ -385,7 +429,7 @@ func (m model) updateDetail(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "s":
 		if m.current != nil && m.current.Type == core.SecretTypeBinary {
-			m.inputs = makeInputs([]string{"Output path"}, nil)
+			m.inputs = makeInputs([]string{"Путь для сохранения файла"}, nil)
 			m.focus = 0
 			m.inputs[0].Focus()
 			m.screen = screenSaveBinary
@@ -600,6 +644,12 @@ func (m model) saveBinaryCmd(secret core.Secret, outputPath string) tea.Cmd {
 	}
 }
 
+func otpTickCmd() tea.Cmd {
+	return tea.Tick(time.Second, func(t time.Time) tea.Msg {
+		return otpTickMsg(t)
+	})
+}
+
 func (m model) startCreateForm(kind secretKind) (tea.Model, tea.Cmd) {
 	m.formMode = formModeCreate
 	m.formKind = kind
@@ -693,16 +743,38 @@ func (m model) secretInputFromForm() (core.CreateSecretInput, error) {
 	}
 }
 
+func (m model) viewWelcome() string {
+	lines := []string{
+		activeStyle.Render(strings.TrimRight(banner, "\n")),
+		titleStyle.Render("Команды"),
+		"Enter  перейти к входу",
+		"Ctrl+R  режим регистрации",
+		"Ctrl+L  режим входа",
+		"N  создать секрет",
+		"T/P/C/B/O  text, login/password, bank card, binary, OTP",
+		"Enter  открыть или отправить форму",
+		"U  обновить выбранный секрет",
+		"D  удалить выбранный секрет",
+		"R  обновить список",
+		"S  синхронизировать vault",
+		"Esc  назад",
+		"Q  выйти из TUI",
+	}
+	return lipgloss.NewStyle().Padding(1, 2).Render(strings.Join(lines, "\n"))
+}
+
 func (m model) viewAuth() string {
 	mode := "Login"
 	if m.authMode == authModeRegister {
-		mode = "Register"
+		mode = "Регистрация"
+	} else {
+		mode = "Вход"
 	}
 	lines := []string{titleStyle.Render("GophKeeper TUI"), mutedStyle.Render(mode)}
 	for _, input := range m.inputs {
 		lines = append(lines, input.View())
 	}
-	lines = append(lines, mutedStyle.Render("Ctrl+L Login  Ctrl+R Register  Enter Submit"))
+	lines = append(lines, mutedStyle.Render("Ctrl+L вход  Ctrl+R регистрация  Enter далее или отправить"))
 	return lipgloss.NewStyle().Padding(1, 2).Render(strings.Join(lines, "\n\n"))
 }
 
@@ -720,38 +792,40 @@ func (m model) viewList() string {
 		}
 		lines = append(lines, style.Render(prefix+m.secretRow(secret)))
 	}
-	lines = append(lines, mutedStyle.Render("Enter Open  N New  U Update  D Delete  R Refresh  S Sync  Q Quit"))
+	lines = append(lines, mutedStyle.Render("Enter открыть секрет, для OTP показать код  N создать  U обновить  D удалить  R обновить  S синхронизировать  Q стартовый экран"))
 	return lipgloss.NewStyle().Padding(1, 2).Render(strings.Join(lines, "\n"))
 }
 
 func (m model) viewDetail() string {
 	lines := []string{titleStyle.Render("Secret"), m.detail.View()}
-	lines = append(lines, mutedStyle.Render("Esc Back  U Update  D Delete  S Save binary"))
+	lines = append(lines, mutedStyle.Render("Esc назад  U обновить  D удалить  S сохранить binary. Для OTP текущий код показан в detail"))
 	return lipgloss.NewStyle().Padding(1, 2).Render(strings.Join(lines, "\n"))
 }
 
 func (m model) viewTypeSelect() string {
 	lines := []string{
-		titleStyle.Render("New secret"),
-		"T Text",
-		"P Login/password",
-		"C Bank card",
-		"B Binary",
-		"O OTP",
+		titleStyle.Render("Новый секрет"),
+		"T Текст",
+		"P Логин и пароль",
+		"C Банковская карта",
+		"B Файл или binary данные",
+		"O OTP одноразовый пароль",
+		mutedStyle.Render("Esc назад"),
 	}
 	return lipgloss.NewStyle().Padding(1, 2).Render(strings.Join(lines, "\n"))
 }
 
 func (m model) viewForm() string {
-	title := "Create " + string(m.formKind)
+	title := "Создание: " + formKindLabel(m.formKind)
 	if m.formMode == formModeUpdate {
-		title = "Update " + string(m.formKind)
+		title = "Обновление: " + formKindLabel(m.formKind)
 	}
 	lines := []string{titleStyle.Render(title)}
+	lines = append(lines, mutedStyle.Render(formHelp(m.formKind)))
 	for _, input := range m.inputs {
 		lines = append(lines, input.View())
 	}
-	lines = append(lines, mutedStyle.Render("Enter Submit  Esc Cancel"))
+	lines = append(lines, mutedStyle.Render("Enter далее или сохранить  Esc отмена"))
 	return lipgloss.NewStyle().Padding(1, 2).Render(strings.Join(lines, "\n\n"))
 }
 
@@ -761,15 +835,15 @@ func (m model) viewDelete() string {
 		title = secretTitle(*m.current)
 	}
 	lines := []string{
-		titleStyle.Render("Delete secret"),
+		titleStyle.Render("Удаление секрета"),
 		"Удалить: " + title,
-		mutedStyle.Render("Y Delete  N Cancel"),
+		mutedStyle.Render("Y удалить  N отмена"),
 	}
 	return lipgloss.NewStyle().Padding(1, 2).Render(strings.Join(lines, "\n\n"))
 }
 
 func (m model) viewSaveBinary() string {
-	lines := []string{titleStyle.Render("Save binary"), m.inputs[0].View(), mutedStyle.Render("Enter Save  Esc Cancel")}
+	lines := []string{titleStyle.Render("Сохранение binary"), m.inputs[0].View(), mutedStyle.Render("Enter сохранить  Esc отмена")}
 	return lipgloss.NewStyle().Padding(1, 2).Render(strings.Join(lines, "\n\n"))
 }
 
@@ -820,12 +894,12 @@ func (m model) renderSecretDetail(secret core.Secret) string {
 	case core.SecretTypeOTP:
 		if value, err := core.DecodeOTPPayload(secret.Payload, secret.PayloadSchemaVersion); err == nil {
 			code, codeErr := core.CurrentOTPCode(value, time.Now())
-			lines = append(lines, "Issuer: "+value.Issuer, "Account: "+value.AccountName, "Secret: "+core.MaskOTPSecret(value.Secret))
+			lines = append(lines, "Сервис: "+value.Issuer, "Аккаунт: "+value.AccountName, "OTP secret: "+core.MaskOTPSecret(value.Secret))
 			if codeErr == nil {
 				progress := otpProgress(code.RemainingSeconds, code.PeriodSeconds)
-				lines = append(lines, "Code: "+code.Value, fmt.Sprintf("Remaining: %ds %s", code.RemainingSeconds, progress))
+				lines = append(lines, "Текущий OTP-код: "+code.Value, fmt.Sprintf("До смены кода: %d секунд %s", code.RemainingSeconds, progress))
 			} else {
-				lines = append(lines, "Code: "+clientapp.UserFacingError(codeErr))
+				lines = append(lines, "OTP-код: "+clientapp.UserFacingError(codeErr))
 			}
 		}
 	}
@@ -856,6 +930,23 @@ func (m *model) setError(err error) {
 func (m *model) statusOK(value string) {
 	m.status = value
 	m.isError = false
+}
+
+func (m *model) resetToWelcome() {
+	m.deps.sessionState.Clear()
+	m.screen = screenWelcome
+	m.busy = false
+	m.status = ""
+	m.isError = false
+	m.authMode = authModeLogin
+	m.secrets = nil
+	m.selected = 0
+	m.current = nil
+	m.formMode = formModeCreate
+	m.formKind = ""
+	m.editID = ""
+	m.editVer = 0
+	m.setAuthInputs()
 }
 
 func (m *model) focusNext() {
@@ -889,7 +980,7 @@ func makeInputs(labels []string, hidden map[int]bool) []textinput.Model {
 	inputs := make([]textinput.Model, 0, len(labels))
 	for i, label := range labels {
 		input := textinput.New()
-		input.Placeholder = label
+		input.Placeholder = inputPlaceholder(label)
 		input.Prompt = label + ": "
 		input.CharLimit = 2048
 		input.Width = 64
@@ -902,24 +993,79 @@ func makeInputs(labels []string, hidden map[int]bool) []textinput.Model {
 	return inputs
 }
 
+func inputPlaceholder(label string) string {
+	switch label {
+	case "Логин":
+		return "user@example.com"
+	case "Пароль входа":
+		return "пароль для входа на сервер"
+	case "Мастер-пароль":
+		return "пароль для расшифровки vault"
+	case "Повтор мастер-пароля":
+		return "повторите мастер-пароль"
+	case "Название":
+		return "понятное имя секрета"
+	case "Текст секрета":
+		return "любой текст, который нужно хранить"
+	case "Логин секрета":
+		return "логин от сайта или сервиса"
+	case "Пароль секрета":
+		return "пароль от сайта или сервиса"
+	case "URL":
+		return "https://example.com"
+	case "Заметки":
+		return "необязательное описание"
+	case "Номер карты":
+		return "4111111111111111"
+	case "Имя владельца":
+		return "IVAN IVANOV"
+	case "Месяц окончания":
+		return "05"
+	case "Год окончания":
+		return "2030"
+	case "CVV":
+		return "123"
+	case "Путь к файлу":
+		return "/path/to/file"
+	case "Путь для сохранения файла":
+		return "/path/to/output-file"
+	case "Content type":
+		return "text/plain или application/octet-stream"
+	case "Сервис":
+		return "GitHub, Google, Почта"
+	case "Аккаунт":
+		return "user@example.com"
+	case "OTP secret":
+		return "ключ ручного ввода или secret из otpauth URI"
+	case "Длина OTP-кода":
+		return "6 или 8 цифр"
+	case "Период секунд":
+		return "по умолчанию 30"
+	case "Алгоритм":
+		return "SHA1, SHA256 или SHA512"
+	default:
+		return label
+	}
+}
+
 func inputsForKind(kind secretKind) []textinput.Model {
 	switch kind {
 	case secretKindText:
-		return makeInputs([]string{"Title", "Text"}, nil)
+		return makeInputs([]string{"Название", "Текст секрета"}, nil)
 	case secretKindLoginPassword:
-		return makeInputs([]string{"Title", "Secret login", "Secret password", "URL", "Notes"}, map[int]bool{2: true})
+		return makeInputs([]string{"Название", "Логин секрета", "Пароль секрета", "URL", "Заметки"}, map[int]bool{2: true})
 	case secretKindBankCard:
-		return makeInputs([]string{"Title", "Card number", "Cardholder name", "Expiration month", "Expiration year", "CVV", "Notes"}, map[int]bool{5: true})
+		return makeInputs([]string{"Название", "Номер карты", "Имя владельца", "Месяц окончания", "Год окончания", "CVV", "Заметки"}, map[int]bool{5: true})
 	case secretKindBinary:
-		return makeInputs([]string{"Title", "File path", "Content type"}, nil)
+		return makeInputs([]string{"Название", "Путь к файлу", "Content type"}, nil)
 	case secretKindOTP:
-		inputs := makeInputs([]string{"Title", "Issuer", "Account", "Secret", "Digits", "Period seconds", "Algorithm", "Notes"}, map[int]bool{3: true})
+		inputs := makeInputs([]string{"Название", "Сервис", "Аккаунт", "OTP secret", "Длина OTP-кода", "Период секунд", "Алгоритм", "Заметки"}, map[int]bool{3: true})
 		inputs[4].SetValue("6")
 		inputs[5].SetValue(strconv.Itoa(core.DefaultOTPPeriodSeconds))
 		inputs[6].SetValue("SHA1")
 		return inputs
 	default:
-		return makeInputs([]string{"Title"}, nil)
+		return makeInputs([]string{"Название"}, nil)
 	}
 }
 
@@ -977,6 +1123,73 @@ func inputsFromSecret(secret core.Secret) ([]textinput.Model, error) {
 	}
 
 	return inputs, nil
+}
+
+func formKindLabel(kind secretKind) string {
+	switch kind {
+	case secretKindText:
+		return "текст"
+	case secretKindLoginPassword:
+		return "логин и пароль"
+	case secretKindBankCard:
+		return "банковская карта"
+	case secretKindBinary:
+		return "файл или binary данные"
+	case secretKindOTP:
+		return "OTP одноразовый пароль"
+	default:
+		return string(kind)
+	}
+}
+
+func formHelp(kind secretKind) string {
+	switch kind {
+	case secretKindText:
+		return strings.Join([]string{
+			"Название: короткое имя секрета для списка, например Рабочая заметка",
+			"Текст секрета: любой текст, который нужно хранить приватно",
+			"Текст шифруется на клиенте и не отправляется на сервер в открытом виде",
+		}, "\n")
+	case secretKindLoginPassword:
+		return strings.Join([]string{
+			"Название: имя записи для списка, например GitHub account",
+			"Логин секрета: login или email от сайта или сервиса",
+			"Пароль секрета: пароль от этого сайта или сервиса, не пароль входа в GophKeeper",
+			"URL: адрес сайта, можно оставить пустым",
+			"Заметки: любое дополнительное описание, можно оставить пустым",
+		}, "\n")
+	case secretKindBankCard:
+		return strings.Join([]string{
+			"Название: имя карты для списка, например Зарплатная карта",
+			"Номер карты: номер без пробелов или с пробелами, как удобно вводить",
+			"Имя владельца: имя на карте",
+			"Месяц окончания: две цифры, например 05",
+			"Год окончания: четыре цифры, например 2030",
+			"CVV: код с обратной стороны карты, поле скрыто при вводе",
+			"Заметки: банк или назначение карты, можно оставить пустым",
+		}, "\n")
+	case secretKindBinary:
+		return strings.Join([]string{
+			"Название: имя файла или понятное имя записи для списка",
+			"Путь к файлу: локальный путь к файлу, который нужно сохранить",
+			"Content type: тип содержимого, например text/plain или application/octet-stream",
+			"TUI прочитает файл, зашифрует содержимое и сохранит metadata",
+		}, "\n")
+	case secretKindOTP:
+		return strings.Join([]string{
+			"Название: имя OTP записи для списка, например Почта OTP",
+			"Сервис: кто выдал код, например Google, GitHub, Почта",
+			"Аккаунт: login или email, для которого создан OTP",
+			"OTP secret: ключ ручного ввода из 2FA или значение secret из otpauth URI",
+			"Длина OTP-кода: по умолчанию 6",
+			"Период секунд: время жизни кода, значение по умолчанию 30",
+			"Алгоритм: значение по умолчанию SHA1",
+			"Заметки: дополнительное описание, можно оставить пустым",
+			"После сохранения откроется detail, где будет строка Текущий OTP-код",
+		}, "\n")
+	default:
+		return ""
+	}
 }
 
 func createInput(secretType core.SecretType, metadata []byte, payload []byte, version uint32) core.CreateSecretInput {

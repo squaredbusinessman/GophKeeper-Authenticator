@@ -70,14 +70,6 @@ GophKeeper должен поддерживать хранение:
 - README с инструкциями запуска и проверки;
 - отображение версии и даты сборки CLI.
 
-Расширения после надежного MVP:
-
-- refresh token flow;
-- MinIO или S3-compatible blob storage;
-- gRPC streaming для больших бинарных файлов;
-- offline/cache режим через SQLite;
-- GUI через Wails.
-
 ## Архитектура
 
 Проект состоит из следующих частей:
@@ -115,7 +107,6 @@ client core
 presentation layers
 - CLI
 - TUI
-- потенциальный GUI через Wails
 ```
 
 CLI и TUI не содержат бизнес-логику, напрямую не шифруют данные, напрямую не работают с token storage и не ходят в gRPC API в обход client core.
@@ -185,7 +176,7 @@ $argon2id$v=19$m=65536,t=3,p=4$base64salt$base64hash
 - соль;
 - итоговый hash.
 
-Это позволяет менять параметры в будущем и при этом проверять старые хеши с теми параметрами, с которыми они были созданы.
+Это позволяет менять параметры и при этом проверять старые хеши с теми параметрами, с которыми они были созданы.
 
 ### Регистрация и вход
 
@@ -256,7 +247,7 @@ JWT содержит стандартные claims:
 - JWT удобно передавать в gRPC metadata;
 - подпись защищает claims от незаметной подмены.
 
-В MVP используется только access token. Refresh token flow остается расширением после надежного MVP.
+В текущей реализации используется только access token.
 
 ### Vault key
 
@@ -345,6 +336,28 @@ Payload в этом контексте это содержимое конкре�
 
 Сервер не получает пользовательский payload в открытом виде. Он хранит только ciphertext, nonce, тип секрета и техническую metadata.
 
+### OTP модель
+
+OTP-секрет хранится как обычный encrypted vault item с типом `ITEM_TYPE_OTP`.
+
+Plaintext payload существует только на клиенте до шифрования и после расшифрования:
+
+```json
+{
+  "issuer": "Example",
+  "account_name": "user@example.com",
+  "secret": "BASE32SECRET",
+  "algorithm": "SHA1",
+  "digits": 6,
+  "period_seconds": 30,
+  "notes": "optional"
+}
+```
+
+Клиент валидирует OTP payload, кодирует его в JSON и шифрует через vault key. Сервер хранит encrypted payload, encrypted metadata, тип `ITEM_TYPE_OTP`, версию схемы и технические timestamps. Сервер не получает plaintext OTP secret и не может рассчитать одноразовый код.
+
+TOTP-код рассчитывается на клиенте по RFC 6238. Поддерживаются алгоритмы `SHA1`, `SHA256`, `SHA512`, длина кода `6` или `8` цифр и период ротации больше нуля. Значение периода по умолчанию - 30 секунд.
+
 ### Восстановление доступа
 
 Если пользователь потерял мастер-пароль, восстановить секреты невозможно.
@@ -427,10 +440,43 @@ GOPHKEEPER_LOG_MODE=dev
 
 Файл `deploy/.env` предназначен для локальной машины и не должен содержать production secrets.
 
+### Server env
+
+Сервер читает следующие переменные окружения:
+
+```env
+GOPHKEEPER_GRPC_ADDRESS=:9090
+GOPHKEEPER_GRPC_TLS_ENABLED=false
+GOPHKEEPER_GRPC_TLS_CERT_FILE=
+GOPHKEEPER_GRPC_TLS_KEY_FILE=
+GOPHKEEPER_DATABASE_DSN=postgres://gophkeeper:gophkeeper@localhost:5432/gophkeeper?sslmode=disable
+GOPHKEEPER_ACCESS_TOKEN_SECRET=local-dev-access-token-secret-32-bytes
+GOPHKEEPER_ACCESS_TOKEN_TTL=5m
+GOPHKEEPER_MIGRATIONS_ENABLED=true
+GOPHKEEPER_MIGRATIONS_DIR=migrations
+GOPHKEEPER_DATABASE_PING_TTL=5s
+GOPHKEEPER_LOG_MODE=dev
+```
+
+TLS включается через `GOPHKEEPER_GRPC_TLS_ENABLED=true`. В этом режиме обязательны `GOPHKEEPER_GRPC_TLS_CERT_FILE` и `GOPHKEEPER_GRPC_TLS_KEY_FILE`.
+
 `GOPHKEEPER_LOG_MODE` управляет форматом логов сервера:
 
 - `dev` - цветной console output для локальной разработки;
 - `prod` - JSON output для CI и production-like запуска.
+
+### Client env для CLI и TUI
+
+CLI и TUI используют общий client app layer и читают одинаковые переменные окружения:
+
+```env
+GOPHKEEPER_SERVER_ADDRESS=localhost:9090
+GOPHKEEPER_SERVER_TLS_ENABLED=false
+GOPHKEEPER_SERVER_TLS_CERT_FILE=
+GOPHKEEPER_TOKEN_FILE=$HOME/.gophkeeper/token.json
+```
+
+TLS-клиент включается через `GOPHKEEPER_SERVER_TLS_ENABLED=true`. В этом режиме обязательна переменная `GOPHKEEPER_SERVER_TLS_CERT_FILE` с путем к server certificate.
 
 ## Локальный PostgreSQL через Docker Compose
 
@@ -526,9 +572,69 @@ grpc request completed
 
 Остановить сервер можно через `Ctrl+C`.
 
+## TUI
+
+TUI запускается поверх того же client core, что и CLI. В TUI нет прямой gRPC-логики и client-side crypto логики.
+
+Перед запуском TUI должен быть запущен PostgreSQL и gRPC-сервер.
+
+Запуск через Makefile:
+
+```bash
+make tui
+```
+
+Запуск через Go:
+
+```bash
+go run ./cmd/gophkeeper-tui
+```
+
+Сборка TUI:
+
+```bash
+make build-tui
+./bin/gophkeeper-tui
+```
+
+Основные действия в TUI:
+
+- `Ctrl+R` - режим регистрации;
+- `Ctrl+L` - режим входа;
+- `Enter` - перейти к следующему полю или выполнить действие;
+- `N` - создать новый секрет;
+- `T` - выбрать text secret;
+- `P` - выбрать login/password secret;
+- `C` - выбрать bank card secret;
+- `B` - выбрать binary secret;
+- `O` - выбрать OTP secret;
+- `U` - обновить выбранный секрет;
+- `D` - удалить выбранный секрет;
+- `S` - синхронизировать vault на экране списка;
+- `R` - обновить список;
+- `Q` - выйти из TUI.
+
+Для OTP list показывает title, issuer/account и время до ротации. Detail показывает текущий код и progress до следующей ротации. OTP secret value не пишется в logs и не отображается в detail в открытом виде.
+
+Пример запуска TUI с нестандартным адресом сервера:
+
+```bash
+GOPHKEEPER_SERVER_ADDRESS='localhost:9091' \
+make tui
+```
+
+Пример запуска TUI с TLS:
+
+```bash
+GOPHKEEPER_SERVER_ADDRESS='localhost:9090' \
+GOPHKEEPER_SERVER_TLS_ENABLED='true' \
+GOPHKEEPER_SERVER_TLS_CERT_FILE='/path/to/server.crt' \
+make tui
+```
+
 ## CLI
 
-Сейчас CLI умеет показывать версию, регистрировать пользователя, выполнять вход, создавать и обновлять секреты типов `text`, `login_password`, `bank_card` и `binary`, получать секрет по ID, выводить список активных секретов, мягко удалять секрет и запускать server-side sync.
+Сейчас CLI умеет показывать версию, регистрировать пользователя, выполнять вход, создавать и обновлять секреты типов `text`, `login_password`, `bank_card` и `binary`, получать секрет по ID, выводить список активных секретов, мягко удалять секрет и запускать server-side sync. OTP доступен через TUI и client core.
 
 Запуск через Go:
 
@@ -783,6 +889,34 @@ OpenAPI генерируется из protobuf HTTP mappings `google.api.http`. 
 
 Сгенерированный код коммитится в репозиторий, чтобы проверяющему не нужно было обязательно устанавливать EasyP для обычной сборки проекта.
 
+## Makefile команды
+
+Основные команды проекта:
+
+```bash
+make proto
+make test
+make smoke
+make tui
+make build-cli
+make build-tui
+make build-cli-all
+make coverage
+make vet
+```
+
+Назначение команд:
+
+- `make proto` - генерирует Go protobuf/gRPC код и Swagger/OpenAPI;
+- `make test` - запускает `go test ./...`;
+- `make smoke` - запускает smoke-тесты с живым PostgreSQL и gRPC-сервером;
+- `make tui` - запускает TUI-клиент через `go run ./cmd/gophkeeper-tui`;
+- `make build-cli` - собирает CLI для текущей платформы;
+- `make build-tui` - собирает TUI для текущей платформы;
+- `make build-cli-all` - собирает CLI под Linux, macOS и Windows;
+- `make coverage` - проверяет порог покрытия;
+- `make vet` - запускает `go vet ./...`.
+
 ## Тестирование
 
 Запуск всех тестов:
@@ -795,6 +929,14 @@ go test ./...
 
 ```bash
 ./scripts/check_coverage.sh
+```
+
+То же самое через Makefile:
+
+```bash
+make test
+make coverage
+make vet
 ```
 
 Интеграционный smoke-сценарий с живым PostgreSQL и gRPC-сервером:
@@ -875,8 +1017,8 @@ make smoke
 - все тесты проходят;
 - `go vet` завершается без ошибок;
 - coverage не ниже 70%;
-- generated protobuf code не учитывается в coverage threshold.
-- smoke-сценарий проходит register, login, create/list/get/update/delete для `text`, `login_password`, `bank_card` и `binary`, а также sync tombstones через реальный gRPC-сервер и PostgreSQL.
+- generated protobuf code не учитывается в coverage threshold;
+- smoke-сценарий проходит register, login, create/list/get/update/delete/sync для `text`, `login_password`, `bank_card`, `binary` и `otp` через реальный gRPC-сервер и PostgreSQL.
 
 ### 4. Собрать CLI
 
@@ -926,7 +1068,24 @@ go run ./cmd/gophkeeper-server
 ./scripts/dev.sh server
 ```
 
-### 6. Проверить CLI version
+### 6. Запустить TUI
+
+В другом терминале:
+
+```bash
+make tui
+```
+
+Ожидаемый результат: открывается TUI-экран входа. Через `Ctrl+R` можно перейти к регистрации, ввести login, пароль входа, мастер-пароль и открыть vault. После регистрации или входа можно нажать `N`, затем `O`, создать OTP-секрет и увидеть текущий OTP-код в detail.
+
+Сборка TUI:
+
+```bash
+make build-tui
+./bin/gophkeeper-tui
+```
+
+### 7. Проверить CLI version
 
 В другом терминале:
 
@@ -936,7 +1095,7 @@ go run ./cmd/gophkeeper-server
 
 Ожидаемый результат: команда завершается сразу и печатает версию. Это нормальное поведение CLI: процесс выполняет одну команду и завершается.
 
-### 7. Зарегистрировать пользователя
+### 8. Зарегистрировать пользователя
 
 ```bash
 ./bin/gophkeeper-cli register
@@ -966,7 +1125,7 @@ Repeat master password: master-password-123
 - сохранение encrypted vault key metadata;
 - запрет совпадения пароля входа и мастер-пароля.
 
-### 8. Проверить вход
+### 9. Проверить вход
 
 ```bash
 ./bin/gophkeeper-cli login
@@ -987,7 +1146,7 @@ Repeat master password: master-password-123
 - сохранение token state в `$HOME/.gophkeeper/token.json`;
 - расшифровка vault key на клиенте.
 
-### 9. Создать секреты всех обязательных типов
+### 10. Создать секреты основных CLI типов
 
 Текстовый секрет:
 
@@ -1085,7 +1244,7 @@ Content type: text/plain
 - inline binary metadata, checksum и size limit;
 - сохранение encrypted item на сервере.
 
-### 10. Получить секреты по ID
+### 11. Получить секреты по ID
 
 ```bash
 ./bin/gophkeeper-cli get
@@ -1156,7 +1315,7 @@ cat /tmp/gophkeeper-restored-binary-secret.txt
 - получение encrypted item;
 - расшифровка metadata и payload на клиенте.
 
-### 11. Проверить список активных секретов
+### 12. Проверить список активных секретов
 
 ```bash
 ./bin/gophkeeper-cli list
@@ -1183,7 +1342,7 @@ cat /tmp/gophkeeper-restored-binary-secret.txt
 - фильтрация deleted items;
 - отображение ID, версии и title.
 
-### 12. Обновить секреты всех обязательных типов
+### 13. Обновить секреты основных CLI типов
 
 Текстовый секрет:
 
@@ -1287,7 +1446,7 @@ Content type: text/plain
 Секрет обновлен: <binary-secret-id>, version: 2
 ```
 
-### 13. Проверить обновленные значения
+### 14. Проверить обновленные значения
 
 ```bash
 ./bin/gophkeeper-cli get
@@ -1313,7 +1472,7 @@ Output path: /tmp/gophkeeper-restored-binary-secret-updated.txt
 cat /tmp/gophkeeper-restored-binary-secret-updated.txt
 ```
 
-### 14. Удалить секреты всех обязательных типов
+### 15. Удалить секреты основных CLI типов
 
 ```bash
 ./bin/gophkeeper-cli delete
@@ -1341,7 +1500,7 @@ Expected version: 2
 - deleted_at на сервере;
 - deleted item не показывается как активный.
 
-### 15. Проверить, что удаленный секрет не виден в active list
+### 16. Проверить, что удаленный секрет не виден в active list
 
 ```bash
 ./bin/gophkeeper-cli list
@@ -1349,7 +1508,7 @@ Expected version: 2
 
 Ожидаемый результат: удаленные `<text-secret-id>`, `<login-password-secret-id>`, `<bank-card-secret-id>` и `<binary-secret-id>` отсутствуют в списке активных секретов.
 
-### 16. Проверить sync и tombstones
+### 17. Проверить sync и tombstones
 
 ```bash
 ./bin/gophkeeper-cli sync
@@ -1365,7 +1524,7 @@ Expected version: 2
 - фильтрация по текущему пользователю;
 - расшифровка synced payload на клиенте.
 
-### 17. Проверить ошибку version conflict
+### 18. Проверить ошибку version conflict
 
 Создать новый секрет:
 
@@ -1378,7 +1537,7 @@ Expected version: 2
 
 Ожидаемый результат второго update: CLI возвращает ошибку с контекстом `version conflict`.
 
-### 18. Проверить ошибку неверного мастер-пароля
+### 19. Проверить ошибку неверного мастер-пароля
 
 ```bash
 ./bin/gophkeeper-cli get
@@ -1388,7 +1547,7 @@ Expected version: 2
 
 Ожидаемый результат: команда завершается ошибкой расшифровки vault key. Это корректно: мастер-пароль не хранится и не восстанавливается.
 
-### 19. Остановить локальную инфраструктуру
+### 20. Остановить локальную инфраструктуру
 
 Остановить сервер через `Ctrl+C`.
 
@@ -1428,5 +1587,3 @@ GophKeeper не защищает от:
 - потери мастер-пароля;
 - чтения данных, уже расшифрованных в памяти процесса;
 - утечки секретов через shell history.
-
-Практическое следствие: пользовательские секреты не нужно передавать как аргументы командной строки.

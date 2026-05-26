@@ -98,6 +98,30 @@ func (s *fakeVaultService) SyncSecrets(context.Context, core.Session, core.SyncS
 	return core.SyncSecretsResult{Secrets: s.listSecrets, NextChangedAfter: time.Now()}, nil
 }
 
+func TestWelcomeScreenShowsBannerAndCommands(t *testing.T) {
+	m := newModel(context.Background(), appDeps{})
+
+	if m.screen != screenWelcome {
+		t.Fatalf("screen = %v, want screenWelcome", m.screen)
+	}
+
+	view := m.View()
+	for _, want := range []string{"____  ___", "Команды", "Enter  перейти к входу", "T/P/C/B/O"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("view = %q, want %q", view, want)
+		}
+	}
+
+	updated, cmd := m.Update(keyEnter())
+	m = updated.(model)
+	if cmd != nil {
+		t.Fatalf("welcome enter command = %v, want nil", cmd)
+	}
+	if m.screen != screenAuth {
+		t.Fatalf("screen = %v, want screenAuth", m.screen)
+	}
+}
+
 func TestAuthDoneOpensVaultAndLoadsList(t *testing.T) {
 	session := testSession()
 	vaultService := &fakeVaultService{
@@ -175,6 +199,7 @@ func TestTUIAuthFlowThroughModelUpdate(t *testing.T) {
 		vaultService: vaultService,
 		sessionState: state,
 	})
+	m.screen = screenAuth
 
 	m.inputs[0].SetValue(" user@example.com ")
 	m.inputs[1].SetValue("login-password")
@@ -268,11 +293,52 @@ func TestTUIFunctionalCreateOTPAndRenderCurrentCode(t *testing.T) {
 	}
 
 	view := m.View()
-	if !strings.Contains(view, "Code:") {
+	if !strings.Contains(view, "Текущий OTP-код:") {
 		t.Fatalf("view does not contain OTP code: %q", view)
 	}
 	if strings.Contains(view, "JBSWY3DPEHPK3PXP") {
 		t.Fatalf("view contains raw OTP secret")
+	}
+}
+
+func TestOTPTickRefreshesDetailAndSchedulesNextTick(t *testing.T) {
+	payload, version, err := core.EncodeOTPPayload(core.OTPPayload{
+		Issuer:        "Example",
+		AccountName:   "user@example.com",
+		Secret:        "JBSWY3DPEHPK3PXP",
+		Algorithm:     "SHA1",
+		Digits:        6,
+		PeriodSeconds: 30,
+	})
+	if err != nil {
+		t.Fatalf("EncodeOTPPayload() error = %v", err)
+	}
+
+	metadata, err := encodeTextSecretMetadata("Example OTP")
+	if err != nil {
+		t.Fatalf("encodeTextSecretMetadata() error = %v", err)
+	}
+
+	secret := core.Secret{
+		ID:                   "otp-id",
+		Type:                 core.SecretTypeOTP,
+		Metadata:             metadata,
+		Payload:              payload,
+		PayloadSchemaVersion: version,
+		Version:              1,
+	}
+	m := newModel(context.Background(), appDeps{})
+	m.screen = screenDetail
+	m.current = &secret
+
+	updated, cmd := m.Update(otpTickMsg(time.Now()))
+	m = updated.(model)
+	if cmd == nil {
+		t.Fatalf("otp tick command = nil, want next tick")
+	}
+
+	if !strings.Contains(m.detail.View(), "Текущий OTP-код:") {
+		t.Fatalf("detail = %q, want current otp code", m.detail.View())
 	}
 }
 
@@ -330,6 +396,36 @@ func TestTUISyncAfterDeleteFlow(t *testing.T) {
 	}
 	if len(vaultService.syncCalls) != 1 {
 		t.Fatalf("sync calls = %d, want 1", len(vaultService.syncCalls))
+	}
+}
+
+func TestListQuitReturnsToWelcomeAndClearsSession(t *testing.T) {
+	state := clientapp.NewSessionState()
+	if err := state.SetSession(testSession()); err != nil {
+		t.Fatalf("SetSession() error = %v", err)
+	}
+	m := newModel(context.Background(), appDeps{sessionState: state})
+	m.screen = screenList
+	m.secrets = []core.Secret{testTextSecret(t)}
+	m.current = &m.secrets[0]
+	m.statusOK("vault открыт")
+
+	updated, cmd := m.Update(keyRune('q'))
+	m = updated.(model)
+	if cmd != nil {
+		t.Fatalf("quit command = %v, want nil", cmd)
+	}
+	if m.screen != screenWelcome {
+		t.Fatalf("screen = %v, want screenWelcome", m.screen)
+	}
+	if _, ok := state.Session(); ok {
+		t.Fatalf("session is still open")
+	}
+	if len(m.secrets) != 0 {
+		t.Fatalf("secrets length = %d, want 0", len(m.secrets))
+	}
+	if m.current != nil {
+		t.Fatalf("current = %+v, want nil", m.current)
 	}
 }
 

@@ -16,3 +16,4 @@ go.work.sum
 
 # Local planning notes for development and mentoring
 .local-docs/
+.gocache/
