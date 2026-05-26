@@ -831,11 +831,9 @@ func (m model) viewWelcome() string {
 }
 
 func (m model) viewAuth() string {
-	mode := "Login"
+	mode := "Вход"
 	if m.authMode == authModeRegister {
 		mode = "Регистрация"
-	} else {
-		mode = "Вход"
 	}
 	lines := []string{titleStyle.Render("GophKeeper TUI"), mutedStyle.Render(mode)}
 	for _, input := range m.inputs {

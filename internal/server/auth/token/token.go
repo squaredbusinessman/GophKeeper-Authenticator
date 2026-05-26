@@ -147,7 +147,7 @@ func (i *Issuer) Validate(rawToken string) (Claims, error) {
 
 	return Claims{
 		UserID:    claims.Subject,
-		ExpiresAt: claims.ExpiresAt.Time.UTC(),
+		ExpiresAt: claims.ExpiresAt.UTC(),
 	}, nil
 }
 

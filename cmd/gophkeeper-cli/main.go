@@ -17,10 +17,6 @@ func main() {
 	}
 }
 
-func printVersion() {
-	printVersionTo(os.Stdout)
-}
-
 func printVersionTo(stdout io.Writer) {
 	info := version.Get()
 
@@ -28,10 +24,6 @@ func printVersionTo(stdout io.Writer) {
 	fmt.Fprintf(stdout, "Version: %s\n", info.Version)
 	fmt.Fprintf(stdout, "Build date: %s\n", info.BuildDate)
 	fmt.Fprintf(stdout, "Commit: %s\n", info.Commit)
-}
-
-func printUsage() {
-	printUsageTo(os.Stdout)
 }
 
 func printUsageTo(stdout io.Writer) {
