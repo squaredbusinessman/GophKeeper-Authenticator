@@ -35,7 +35,8 @@ GophKeeper - клиент-серверный менеджер секретов �
 - typed client payload schemas для `login_password`, `text`, `bank_card`, `binary` и `otp`;
 - TOTP генерация по RFC 6238 на стороне клиента;
 - TUI-клиент для auth flow и операций с vault;
-- inline binary metadata, checksum и size limit;
+- BlobService для encrypted binary chunks через MinIO;
+- CLI и TUI binary flow через BlobService без хранения файла внутри vault item;
 - Swagger/OpenAPI описание gRPC HTTP projection;
 - coverage gate в CI с порогом не ниже 70%;
 - публикация покрытия в Codecov;
@@ -83,6 +84,7 @@ GophKeeper должен поддерживать хранение:
 - `api/openapi` - Swagger/OpenAPI описание HTTP projection gRPC-контракта;
 - `internal/client` - клиентская бизнес-логика и client-side crypto;
 - `internal/server` - серверная логика и инфраструктура;
+- `internal/server/blob` - metadata и use cases для encrypted binary chunks;
 - `internal/shared` - общие пакеты;
 - `deploy` - локальная инфраструктура для разработки и проверки;
 - `migrations` - SQL-миграции базы данных.
@@ -325,7 +327,7 @@ Argon2id используется здесь не для хранения пар
 internal/client/crypto/payload
 ```
 
-Payload в этом контексте это содержимое конкретной записи хранилища: текстовый секрет, логин и пароль, банковская карта или бинарные данные. Перед отправкой на сервер клиент должен превратить эти данные в bytes и зашифровать их через `vault key`.
+Payload в этом контексте это содержимое конкретной записи хранилища: текстовый секрет, логин и пароль, банковская карта или metadata бинарного файла. Перед отправкой на сервер клиент должен превратить эти данные в bytes и зашифровать их через `vault key`.
 
 Для payload используется AES-256-GCM из стандартной библиотеки Go. Ключом выступает `vault key` длиной 32 байта. Для каждой операции шифрования генерируется новый nonce через `crypto/rand`.
 
@@ -333,7 +335,7 @@ Payload в этом контексте это содержимое конкре�
 
 - это AEAD-режим, который одновременно дает шифрование и проверку целостности;
 - он доступен в стандартной библиотеке Go без дополнительных зависимостей;
-- он хорошо подходит для небольших payload, которые MVP хранит inline в PostgreSQL;
+- он используется одинаково для обычных payload и encrypted binary chunks;
 - при неверном ключе, поврежденном ciphertext или подмененном nonce расшифровка завершается ошибкой.
 
 Сервер не получает пользовательский payload в открытом виде. Он хранит только ciphertext, nonce, тип секрета и техническую metadata.
@@ -391,17 +393,33 @@ Dev-режим без TLS предназначен только для запу�
 
 ## Бинарные данные
 
-Для MVP небольшие бинарные данные могут храниться inline в PostgreSQL как encrypted payload.
+Binary-секреты полностью работают через `BlobService`. Старое поведение, где весь файл сохранялся внутри payload обычного `VaultService` item, больше не используется.
 
-Текущие ограничения MVP:
+`BlobService` использует PostgreSQL для metadata и MinIO для encrypted chunks:
 
-- явный лимит размера payload;
-- file metadata хранится в зашифрованном виде;
-- checksum хранится в зашифрованном payload и проверяется на клиенте;
-- слишком большие файлы отклоняются понятной ошибкой;
-- поиск по пользовательским file metadata выполняется на клиенте после расшифрования.
+```text
+client core
+    -> CreateBlobUpload
+    -> UploadBlob stream encrypted chunks
+    -> DownloadBlob stream encrypted chunks
+    -> AbortBlobUpload
 
-MinIO, chunking и gRPC streaming остаются расширениями после MVP.
+server
+    -> blob_uploads, blob_upload_parts, blobs в PostgreSQL
+    -> encrypted chunk objects в MinIO bucket
+```
+
+Полный поток для CLI и TUI:
+
+- пользователь выбирает файл в CLI или TUI;
+- клиент читает файл локально и считает checksum plaintext;
+- клиент режет файл на chunks и шифрует каждый chunk через vault key;
+- encrypted chunks отправляются в `BlobService` через gRPC streaming;
+- сервер сохраняет encrypted objects в MinIO и техническую metadata в PostgreSQL;
+- `VaultService` item хранит encrypted metadata `BinaryPayload` с `file_name`, `content_type`, `size_bytes`, `checksum_sha256` и `blob_id`;
+- при скачивании CLI или TUI получает encrypted chunks через `BlobService`, расшифровывает их на клиенте и проверяет plaintext checksum.
+
+`BlobService` не получает plaintext file content. Сервер хранит object keys, размеры, checksum encrypted upload и состояние upload session. Plaintext checksum находится внутри encrypted vault item и нужен только клиенту для проверки результата после расшифрования.
 
 ## Требования для локального запуска
 
@@ -428,7 +446,7 @@ deploy/.env.example
 cp deploy/.env.example deploy/.env
 ```
 
-Текущие значения для PostgreSQL:
+Текущие значения для локальной инфраструктуры и сервера:
 
 ```env
 POSTGRES_DB=gophkeeper
@@ -437,6 +455,13 @@ POSTGRES_PASSWORD=gophkeeper
 POSTGRES_PORT=5432
 
 GOPHKEEPER_DATABASE_DSN=postgres://gophkeeper:gophkeeper@localhost:5432/gophkeeper?sslmode=disable
+GOPHKEEPER_ACCESS_TOKEN_SECRET=local-dev-access-token-secret-32-bytes
+GOPHKEEPER_BLOB_STORAGE_ENABLED=true
+GOPHKEEPER_MINIO_ENDPOINT=localhost:9000
+GOPHKEEPER_MINIO_ACCESS_KEY=gophkeeper
+GOPHKEEPER_MINIO_SECRET_KEY=gophkeeper-minio-password
+GOPHKEEPER_MINIO_BUCKET=gophkeeper-blobs
+GOPHKEEPER_MINIO_USE_SSL=false
 GOPHKEEPER_LOG_MODE=dev
 ```
 
@@ -454,6 +479,15 @@ GOPHKEEPER_GRPC_TLS_KEY_FILE=
 GOPHKEEPER_DATABASE_DSN=postgres://gophkeeper:gophkeeper@localhost:5432/gophkeeper?sslmode=disable
 GOPHKEEPER_ACCESS_TOKEN_SECRET=local-dev-access-token-secret-32-bytes
 GOPHKEEPER_ACCESS_TOKEN_TTL=5m
+GOPHKEEPER_BLOB_STORAGE_ENABLED=true
+GOPHKEEPER_MINIO_ENDPOINT=localhost:9000
+GOPHKEEPER_MINIO_ACCESS_KEY=gophkeeper
+GOPHKEEPER_MINIO_SECRET_KEY=gophkeeper-minio-password
+GOPHKEEPER_MINIO_BUCKET=gophkeeper-blobs
+GOPHKEEPER_MINIO_USE_SSL=false
+GOPHKEEPER_BLOB_UPLOAD_TTL=24h
+GOPHKEEPER_BLOB_CHUNK_SIZE=4194304
+GOPHKEEPER_BLOB_MAX_SIZE=1073741824
 GOPHKEEPER_MIGRATIONS_ENABLED=true
 GOPHKEEPER_MIGRATIONS_DIR=migrations
 GOPHKEEPER_DATABASE_PING_TTL=5s
@@ -461,6 +495,8 @@ GOPHKEEPER_LOG_MODE=dev
 ```
 
 TLS включается через `GOPHKEEPER_GRPC_TLS_ENABLED=true`. В этом режиме обязательны `GOPHKEEPER_GRPC_TLS_CERT_FILE` и `GOPHKEEPER_GRPC_TLS_KEY_FILE`.
+
+`GOPHKEEPER_BLOB_STORAGE_ENABLED=true` включает регистрацию server-side `BlobService`. В этом режиме сервер обязан подключиться к MinIO, проверить bucket и подготовить object storage. Если MinIO недоступен, сервер завершит старт с ошибкой.
 
 `GOPHKEEPER_LOG_MODE` управляет форматом логов сервера:
 
@@ -480,9 +516,9 @@ GOPHKEEPER_TOKEN_FILE=$HOME/.gophkeeper/token.json
 
 TLS-клиент включается через `GOPHKEEPER_SERVER_TLS_ENABLED=true`. В этом режиме обязательна переменная `GOPHKEEPER_SERVER_TLS_CERT_FILE` с путем к server certificate.
 
-## Локальный PostgreSQL через Docker Compose
+## Локальные PostgreSQL и MinIO через Docker Compose
 
-Запуск PostgreSQL:
+Запуск локальной инфраструктуры:
 
 ```bash
 docker compose -f deploy/docker-compose.yml up -d
@@ -500,10 +536,37 @@ docker compose -f deploy/docker-compose.yml ps
 docker compose -f deploy/docker-compose.yml exec postgres pg_isready -U gophkeeper -d gophkeeper
 ```
 
+MinIO API доступен на:
+
+```text
+localhost:9000
+```
+
+MinIO Console доступна в браузере:
+
+```text
+http://localhost:9001
+```
+
+Логин и пароль MinIO для локального запуска:
+
+```text
+gophkeeper
+gophkeeper-minio-password
+```
+
+Bucket `gophkeeper-blobs` создается автоматически контейнером `minio-init`.
+
 Просмотр логов PostgreSQL:
 
 ```bash
 docker compose -f deploy/docker-compose.yml logs -f postgres
+```
+
+Просмотр логов MinIO:
+
+```bash
+docker compose -f deploy/docker-compose.yml logs -f minio
 ```
 
 Остановка контейнера без удаления данных:
@@ -518,7 +581,7 @@ docker compose -f deploy/docker-compose.yml stop
 docker compose -f deploy/docker-compose.yml down
 ```
 
-Полная очистка локальных данных PostgreSQL:
+Полная очистка локальных данных PostgreSQL и MinIO:
 
 ```bash
 docker compose -f deploy/docker-compose.yml down -v
@@ -526,16 +589,31 @@ docker compose -f deploy/docker-compose.yml down -v
 
 ## Запуск gRPC-сервера
 
-Сейчас сервер умеет стартовать, подключаться к PostgreSQL, применять миграции, регистрировать gRPC-сервисы и корректно завершаться по `SIGINT` или `SIGTERM`.
+Сейчас сервер умеет стартовать, подключаться к PostgreSQL, применять миграции, подключаться к MinIO при включенном blob storage, регистрировать gRPC-сервисы и корректно завершаться по `SIGINT` или `SIGTERM`.
 
 В `AuthService` реализованы `Register` и `Login`. В `VaultService` реализованы protected методы `CreateItem`, `GetItem`, `ListItems`, `UpdateItem`, `DeleteItem` и `Sync`.
+В `BlobService` реализованы protected методы `CreateBlobUpload`, `UploadBlob`, `DownloadBlob` и `AbortBlobUpload`.
 
 Перед запуском сервера нужно передать обязательные переменные окружения:
 
 ```bash
 GOPHKEEPER_DATABASE_DSN='postgres://gophkeeper:gophkeeper@localhost:5432/gophkeeper?sslmode=disable' \
 GOPHKEEPER_ACCESS_TOKEN_SECRET='local-dev-access-token-secret-32-bytes' \
+GOPHKEEPER_BLOB_STORAGE_ENABLED='true' \
+GOPHKEEPER_MINIO_ENDPOINT='localhost:9000' \
+GOPHKEEPER_MINIO_ACCESS_KEY='gophkeeper' \
+GOPHKEEPER_MINIO_SECRET_KEY='gophkeeper-minio-password' \
+GOPHKEEPER_MINIO_BUCKET='gophkeeper-blobs' \
 GOPHKEEPER_LOG_MODE='dev' \
+go run ./cmd/gophkeeper-server
+```
+
+Если локальный `.env` уже создан из `.env.example`, можно загрузить его в текущий shell и запустить сервер короче:
+
+```bash
+set -a
+source deploy/.env
+set +a
 go run ./cmd/gophkeeper-server
 ```
 
@@ -551,6 +629,11 @@ go run ./cmd/gophkeeper-server
 GOPHKEEPER_GRPC_ADDRESS=':9091' \
 GOPHKEEPER_DATABASE_DSN='postgres://gophkeeper:gophkeeper@localhost:5432/gophkeeper?sslmode=disable' \
 GOPHKEEPER_ACCESS_TOKEN_SECRET='local-dev-access-token-secret-32-bytes' \
+GOPHKEEPER_BLOB_STORAGE_ENABLED='true' \
+GOPHKEEPER_MINIO_ENDPOINT='localhost:9000' \
+GOPHKEEPER_MINIO_ACCESS_KEY='gophkeeper' \
+GOPHKEEPER_MINIO_SECRET_KEY='gophkeeper-minio-password' \
+GOPHKEEPER_MINIO_BUCKET='gophkeeper-blobs' \
 GOPHKEEPER_LOG_MODE='dev' \
 go run ./cmd/gophkeeper-server
 ```
@@ -579,6 +662,8 @@ grpc request completed
 TUI запускается поверх того же client core, что и CLI. В TUI нет прямой gRPC-логики и client-side crypto логики.
 
 Перед запуском TUI должен быть запущен PostgreSQL и gRPC-сервер.
+Если включен `GOPHKEEPER_BLOB_STORAGE_ENABLED`, перед запуском сервера также должен быть запущен MinIO.
+Для binary-секретов TUI использует тот же `BlobService`, что и CLI: файл шифруется chunks на клиенте, хранится в MinIO, а vault item содержит только encrypted metadata с `blob_id`.
 
 Запуск через Makefile:
 
@@ -590,6 +675,18 @@ make tui
 
 ```bash
 go run ./cmd/gophkeeper-tui
+```
+
+Запуск через локальную программу запуска из любой рабочей директории:
+
+```bash
+/path/to/GophKeeper-Authenticator/scripts/gophkeeper tui
+```
+
+Переход в shell внутри корня проекта:
+
+```bash
+/path/to/GophKeeper-Authenticator/scripts/gophkeeper shell
 ```
 
 Сборка TUI:
@@ -737,13 +834,15 @@ go run ./cmd/gophkeeper-cli sync
 - пароль входа и мастер-пароль не должны совпадать;
 - при регистрации CLI предупреждает, что мастер-пароль невозможно восстановить.
 
-Команда `create` без указания типа создает текстовый секрет. Для остальных обязательных типов используются команды `create login-password`, `create bank-card` и `create binary`. Title сохраняется как encrypted metadata, а содержимое кодируется в одну из client payload schemas: `TextPayload`, `LoginPasswordPayload`, `BankCardPayload` или `BinaryPayload`. После кодирования metadata и payload шифруются на клиенте через vault key.
+Команда `create` без указания типа создает текстовый секрет. Для остальных обязательных типов используются команды `create login-password`, `create bank-card` и `create binary`. Title сохраняется как encrypted metadata, а содержимое кодируется в одну из client payload schemas: `TextPayload`, `LoginPasswordPayload`, `BankCardPayload` или `BinaryPayload`. Для binary файл шифруется chunks на клиенте и сохраняется через `BlobService`, а в `BinaryPayload` остается только encrypted metadata с `blob_id`.
 
-Команда `get` запрашивает ID секрета, получает encrypted item с сервера и расшифровывает metadata и payload на клиенте. В выводе всегда есть `ID`, `Type` и `Version`, чтобы пользователь мог сразу использовать актуальную версию для update/delete. Для `binary` команда дополнительно запрашивает `Output directory` и записывает расшифрованный файл на диск с исходным именем и правами `0600`. Если файл с таким именем уже существует в выбранной директории, CLI не перезаписывает его без явного выбора другой директории. Для открытия vault команды заново запрашивают login, пароль входа и мастер-пароль. Это нужно потому, что текущий CLI сохраняет только access token, но не хранит открытый vault key между запусками.
+Команда `get` запрашивает ID секрета, получает encrypted item с сервера и расшифровывает metadata и payload на клиенте. В выводе всегда есть `ID`, `Type` и `Version`, чтобы пользователь мог сразу использовать актуальную версию для update/delete. Для `binary` команда дополнительно запрашивает `Output directory`, скачивает encrypted chunks через `BlobService`, расшифровывает файл на клиенте и записывает его на диск с исходным именем и правами `0600`. Если файл с таким именем уже существует в выбранной директории, CLI не перезаписывает его без явного выбора другой директории. Для открытия vault команды заново запрашивают login, пароль входа и мастер-пароль. Это нужно потому, что текущий CLI сохраняет только access token, но не хранит открытый vault key между запусками.
 
 Команда `update` без указания типа обновляет текстовый секрет. Для остальных обязательных типов используются команды `update login-password`, `update bank-card` и `update binary`. Перед create/update CLI показывает подсказку по полям выбранного типа секрета. Команда `delete` не зависит от типа секрета: она удаляет любой item по `Secret ID` и `Expected version`. Команды `update` и `delete` требуют `Expected version`. Версию нужно брать из `list`, `get` или результата предыдущей команды. Если версия устарела, сервер возвращает version conflict.
 
 Команда `sync` получает изменения с сервера, включая tombstones для удаленных записей. На текущем этапе offline cache еще нет, поэтому CLI не сохраняет sync cursor локально и отправляет пустой `changed_after`.
+
+Команды `create binary`, `update binary`, `get` для binary и TUI-сохранение binary требуют включенный `BlobService` на сервере. Для локального запуска это означает `GOPHKEEPER_BLOB_STORAGE_ENABLED=true` и доступный MinIO.
 
 Перед запуском `register`, `login`, `create`, `get`, `list`, `update`, `delete` и `sync` должен быть запущен gRPC-сервер. По умолчанию клиент подключается к:
 
@@ -1271,10 +1370,10 @@ Content type: text/plain
 Проверяется:
 
 - protected gRPC method;
-- client-side encryption metadata и payload;
+- client-side encryption metadata, payload и binary chunks;
 - payload schemas `TextPayload`, `LoginPasswordPayload`, `BankCardPayload` и `BinaryPayload`;
-- inline binary metadata, checksum и size limit;
-- сохранение encrypted item на сервере.
+- binary metadata с `blob_id` внутри encrypted vault item;
+- сохранение encrypted chunks в MinIO через `BlobService`.
 
 ### 11. Получить секреты по ID
 

@@ -20,6 +20,7 @@ func main() {
 	deps := appDeps{
 		authService:  runtime.AuthService,
 		vaultService: runtime.VaultService,
+		blobService:  runtime.BlobService,
 		sessionState: clientapp.NewSessionState(),
 	}
 

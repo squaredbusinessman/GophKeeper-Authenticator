@@ -98,6 +98,35 @@ func (s *fakeVaultService) SyncSecrets(context.Context, core.Session, core.SyncS
 	return core.SyncSecretsResult{Secrets: s.listSecrets, NextChangedAfter: time.Now()}, nil
 }
 
+type fakeBlobService struct {
+	uploadBinaryFunc   func(context.Context, core.Session, core.UploadBinaryInput) (core.BinaryPayload, error)
+	downloadBinaryFunc func(context.Context, core.Session, core.DownloadBinaryInput) ([]byte, error)
+	uploadBinaryCalls  []core.UploadBinaryInput
+	downloadCalls      []core.DownloadBinaryInput
+}
+
+func (s *fakeBlobService) UploadBinary(ctx context.Context, session core.Session, input core.UploadBinaryInput) (core.BinaryPayload, error) {
+	s.uploadBinaryCalls = append(s.uploadBinaryCalls, input)
+	if s.uploadBinaryFunc != nil {
+		return s.uploadBinaryFunc(ctx, session, input)
+	}
+	return core.BinaryPayload{
+		FileName:       input.FileName,
+		ContentType:    input.ContentType,
+		SizeBytes:      int64(len(input.Data)),
+		ChecksumSHA256: "checksum",
+		BlobID:         "blob-id",
+	}, nil
+}
+
+func (s *fakeBlobService) DownloadBinary(ctx context.Context, session core.Session, input core.DownloadBinaryInput) ([]byte, error) {
+	s.downloadCalls = append(s.downloadCalls, input)
+	if s.downloadBinaryFunc != nil {
+		return s.downloadBinaryFunc(ctx, session, input)
+	}
+	return []byte("binary payload"), nil
+}
+
 func TestWelcomeScreenShowsBannerAndCommands(t *testing.T) {
 	m := newModel(context.Background(), appDeps{})
 
@@ -480,7 +509,16 @@ func TestTUIFormValidationReturnsErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := newModel(context.Background(), appDeps{})
+			deps := appDeps{}
+			if tt.kind == secretKindBinary {
+				state := clientapp.NewSessionState()
+				if err := state.SetSession(testSession()); err != nil {
+					t.Fatalf("SetSession() error = %v", err)
+				}
+				deps.blobService = &fakeBlobService{}
+				deps.sessionState = state
+			}
+			m := newModel(context.Background(), deps)
 			updated, _ := m.startCreateForm(tt.kind)
 			m = updated.(model)
 			tt.fill(m.inputs)
@@ -498,14 +536,24 @@ func TestTUIFormValidationReturnsErrors(t *testing.T) {
 
 func TestSaveBinaryCommandWritesFile(t *testing.T) {
 	payload, version, err := core.EncodeBinaryPayload(core.BinaryPayload{
-		FileName: "secret.bin",
-		Data:     []byte("binary payload"),
+		FileName:       "secret.bin",
+		SizeBytes:      int64(len("binary payload")),
+		ChecksumSHA256: "checksum",
+		BlobID:         "blob-id",
 	})
 	if err != nil {
 		t.Fatalf("EncodeBinaryPayload() error = %v", err)
 	}
 
-	m := newModel(context.Background(), appDeps{})
+	state := clientapp.NewSessionState()
+	if err := state.SetSession(testSession()); err != nil {
+		t.Fatalf("SetSession() error = %v", err)
+	}
+	blobService := &fakeBlobService{}
+	m := newModel(context.Background(), appDeps{
+		blobService:  blobService,
+		sessionState: state,
+	})
 	outputDir := filepath.Join(t.TempDir(), "output")
 	cmd := m.saveBinaryCmd(core.Secret{
 		Type:                 core.SecretTypeBinary,
@@ -531,18 +579,30 @@ func TestSaveBinaryCommandWritesFile(t *testing.T) {
 	if !bytes.Equal(data, []byte("binary payload")) {
 		t.Fatalf("saved data = %q, want binary payload", data)
 	}
+	if len(blobService.downloadCalls) != 1 {
+		t.Fatalf("DownloadBinary() calls = %d, want 1", len(blobService.downloadCalls))
+	}
 }
 
 func TestSaveBinaryCommandWritesFileInsideExistingDirectory(t *testing.T) {
 	payload, version, err := core.EncodeBinaryPayload(core.BinaryPayload{
-		FileName: "secret.bin",
-		Data:     []byte("binary payload"),
+		FileName:       "secret.bin",
+		SizeBytes:      int64(len("binary payload")),
+		ChecksumSHA256: "checksum",
+		BlobID:         "blob-id",
 	})
 	if err != nil {
 		t.Fatalf("EncodeBinaryPayload() error = %v", err)
 	}
 
-	m := newModel(context.Background(), appDeps{})
+	state := clientapp.NewSessionState()
+	if err := state.SetSession(testSession()); err != nil {
+		t.Fatalf("SetSession() error = %v", err)
+	}
+	m := newModel(context.Background(), appDeps{
+		blobService:  &fakeBlobService{},
+		sessionState: state,
+	})
 	outputDir := t.TempDir()
 	cmd := m.saveBinaryCmd(core.Secret{
 		Type:                 core.SecretTypeBinary,
@@ -615,7 +675,14 @@ func TestStartUpdateOTPFormPrepopulatesFields(t *testing.T) {
 
 func TestDetailActionsUpdateDeleteSaveBinaryAndBack(t *testing.T) {
 	secret := testBinarySecret(t)
-	m := newModel(context.Background(), appDeps{})
+	state := clientapp.NewSessionState()
+	if err := state.SetSession(testSession()); err != nil {
+		t.Fatalf("SetSession() error = %v", err)
+	}
+	m := newModel(context.Background(), appDeps{
+		blobService:  &fakeBlobService{},
+		sessionState: state,
+	})
 	m.screen = screenDetail
 	m.current = &secret
 	m.detail.SetContent(m.renderSecretDetail(secret))
@@ -847,7 +914,16 @@ func TestSecretInputFromFormBuildsAllNonOTPTypes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := newModel(context.Background(), appDeps{})
+			deps := appDeps{}
+			if tt.kind == secretKindBinary {
+				state := clientapp.NewSessionState()
+				if err := state.SetSession(testSession()); err != nil {
+					t.Fatalf("SetSession() error = %v", err)
+				}
+				deps.blobService = &fakeBlobService{}
+				deps.sessionState = state
+			}
+			m := newModel(context.Background(), deps)
 			updated, _ := m.startCreateForm(tt.kind)
 			m = updated.(model)
 			tt.fill(m.inputs)
@@ -939,7 +1015,14 @@ func TestInputsFromSecretPrepopulateAllTypes(t *testing.T) {
 
 func TestSaveBinaryCommandValidationErrors(t *testing.T) {
 	secret := testBinarySecret(t)
-	m := newModel(context.Background(), appDeps{})
+	state := clientapp.NewSessionState()
+	if err := state.SetSession(testSession()); err != nil {
+		t.Fatalf("SetSession() error = %v", err)
+	}
+	m := newModel(context.Background(), appDeps{
+		blobService:  &fakeBlobService{},
+		sessionState: state,
+	})
 
 	if msg := m.saveBinaryCmd(secret, " ")().(saveDoneMsg); msg.err == nil || !strings.Contains(msg.err.Error(), "output directory is required") {
 		t.Fatalf("empty output path err = %v, want required error", msg.err)
@@ -1096,9 +1179,11 @@ func testBinarySecret(t *testing.T) core.Secret {
 		t.Fatalf("encodeTextSecretMetadata() error = %v", err)
 	}
 	payload, version, err := core.EncodeBinaryPayload(core.BinaryPayload{
-		FileName:    "secret.bin",
-		ContentType: "application/octet-stream",
-		Data:        []byte("binary payload"),
+		FileName:       "secret.bin",
+		ContentType:    "application/octet-stream",
+		SizeBytes:      int64(len("binary payload")),
+		ChecksumSHA256: "checksum",
+		BlobID:         "blob-id",
 	})
 	if err != nil {
 		t.Fatalf("EncodeBinaryPayload() error = %v", err)

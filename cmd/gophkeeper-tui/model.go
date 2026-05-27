@@ -33,6 +33,11 @@ type vaultService interface {
 	SyncSecrets(context.Context, core.Session, core.SyncSecretsInput) (core.SyncSecretsResult, error)
 }
 
+type blobService interface {
+	UploadBinary(context.Context, core.Session, core.UploadBinaryInput) (core.BinaryPayload, error)
+	DownloadBinary(context.Context, core.Session, core.DownloadBinaryInput) ([]byte, error)
+}
+
 type sessionState interface {
 	SetSession(core.Session) error
 	Session() (core.Session, bool)
@@ -42,6 +47,7 @@ type sessionState interface {
 type appDeps struct {
 	authService  authService
 	vaultService vaultService
+	blobService  blobService
 	sessionState sessionState
 }
 
@@ -632,10 +638,27 @@ func (m model) saveBinaryCmd(secret core.Secret, outputPath string) tea.Cmd {
 		if err != nil {
 			return saveDoneMsg{err: err}
 		}
+
+		if m.deps.blobService == nil {
+			return saveDoneMsg{err: fmt.Errorf("blob service is required")}
+		}
+		session, ok := m.deps.sessionState.Session()
+		if !ok {
+			return saveDoneMsg{err: fmt.Errorf("vault session is not open")}
+		}
+
 		if err = os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 			return saveDoneMsg{err: fmt.Errorf("create output dir: %w", err)}
 		}
-		if err = os.WriteFile(path, binaryPayload.Data, 0o600); err != nil {
+
+		data, err := m.deps.blobService.DownloadBinary(m.ctx, session, core.DownloadBinaryInput{
+			Payload: binaryPayload,
+		})
+		if err != nil {
+			return saveDoneMsg{err: fmt.Errorf("download binary blob: %w", err)}
+		}
+
+		if err = os.WriteFile(path, data, 0o600); err != nil {
 			return saveDoneMsg{err: fmt.Errorf("write binary file: %w", err)}
 		}
 		return saveDoneMsg{path: path}
@@ -776,15 +799,29 @@ func (m model) secretInputFromForm() (core.CreateSecretInput, error) {
 		})
 		return createInput(core.SecretTypeBankCard, metadata, payload, version), err
 	case secretKindBinary:
+		if m.deps.blobService == nil {
+			return core.CreateSecretInput{}, fmt.Errorf("blob service is required")
+		}
+		session, ok := m.deps.sessionState.Session()
+		if !ok {
+			return core.CreateSecretInput{}, fmt.Errorf("vault session is not open")
+		}
+
 		data, err := os.ReadFile(m.inputs[1].Value())
 		if err != nil {
 			return core.CreateSecretInput{}, fmt.Errorf("read binary file: %w", err)
 		}
-		payload, version, err := core.EncodeBinaryPayload(core.BinaryPayload{
+
+		binaryPayload, err := m.deps.blobService.UploadBinary(m.ctx, session, core.UploadBinaryInput{
 			FileName:    filepath.Base(m.inputs[1].Value()),
 			ContentType: strings.TrimSpace(m.inputs[2].Value()),
 			Data:        data,
 		})
+		if err != nil {
+			return core.CreateSecretInput{}, fmt.Errorf("upload binary blob: %w", err)
+		}
+
+		payload, version, err := core.EncodeBinaryPayload(binaryPayload)
 		return createInput(core.SecretTypeBinary, metadata, payload, version), err
 	case secretKindOTP:
 		digits, err := parseOptionalUint32(m.inputs[4].Value(), 6)

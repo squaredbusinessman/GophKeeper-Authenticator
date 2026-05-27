@@ -67,5 +67,5 @@ func run(ctx context.Context, args []string, stdout io.Writer, stderr io.Writer)
 
 	prompter := newTerminalPrompter(os.Stdin, stdout, int(os.Stdin.Fd()))
 
-	return runCLI(ctx, args, runtime.AuthService, runtime.VaultService, prompter, stdout, stderr)
+	return runCLIWithBlob(ctx, args, runtime.AuthService, runtime.VaultService, runtime.BlobService, prompter, stdout, stderr)
 }

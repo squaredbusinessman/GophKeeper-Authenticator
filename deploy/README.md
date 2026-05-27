@@ -4,6 +4,12 @@
 
 Для MVP основной сценарий приемки - запуск сервера, PostgreSQL и MinIO через Docker Compose.
 
+Создать локальный env-файл:
+
+```bash
+cp deploy/.env.example deploy/.env
+```
+
 Запуск локального окружения:
 
 ```bash
@@ -27,4 +33,13 @@ Bucket для encrypted blobs создается автоматически:
 
 ```text
 gophkeeper-blobs
+```
+
+Сервер запускается из корня проекта с переменными из `deploy/.env`:
+
+```bash
+set -a
+source deploy/.env
+set +a
+go run ./cmd/gophkeeper-server
 ```
