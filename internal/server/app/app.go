@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	miniostore "github.com/squaredbusinessman/gophkeeper-authenticator/internal/server/blob/minio"
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/server/database"
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/server/migrations"
 	"go.uber.org/zap"
@@ -54,6 +55,27 @@ func Run(parent context.Context) error {
 		}
 
 		log.Info("database migrations applied", zap.String("dir", cfg.MigrationsDir))
+	}
+
+	if cfg.BlobStorageEnabled {
+		blobStore, err := miniostore.NewStore(miniostore.Config{
+			Endpoint:  cfg.MinIOEndpoint,
+			AccessKey: cfg.MinIOAccessKey,
+			SecretKey: cfg.MinIOSecretKey,
+			Bucket:    cfg.MinIOBucket,
+			UseSSL:    cfg.MinIOUseSSL,
+		})
+		if err != nil {
+			log.Error("failed to create blob storage", zap.Error(err))
+			return fmt.Errorf("create blob storage: %w", err)
+		}
+
+		if err = blobStore.EnsureBucket(parent); err != nil {
+			log.Error("failed to prepare blob storage", zap.Error(err))
+			return fmt.Errorf("prepare blob storage: %w", err)
+		}
+
+		log.Info("blob storage ready", zap.String("bucket", cfg.MinIOBucket))
 	}
 
 	server, err := grpcserver.New(cfg, log, db)

@@ -50,6 +50,14 @@ func TestLoadReturnsServerConfigFromEnv(t *testing.T) {
 	t.Setenv("GOPHKEEPER_DATABASE_DSN", "postgres://custom")
 	t.Setenv("GOPHKEEPER_ACCESS_TOKEN_SECRET", testAccessTokenSecret)
 	t.Setenv("GOPHKEEPER_ACCESS_TOKEN_TTL", "30m")
+	t.Setenv("GOPHKEEPER_BLOB_STORAGE_ENABLED", "true")
+	t.Setenv("GOPHKEEPER_MINIO_ENDPOINT", "localhost:9000")
+	t.Setenv("GOPHKEEPER_MINIO_ACCESS_KEY", "gophkeeper")
+	t.Setenv("GOPHKEEPER_MINIO_SECRET_KEY", "gophkeeper-minio-password")
+	t.Setenv("GOPHKEEPER_MINIO_BUCKET", "gophkeeper-blobs")
+	t.Setenv("GOPHKEEPER_BLOB_UPLOAD_TTL", "12h")
+	t.Setenv("GOPHKEEPER_BLOB_CHUNK_SIZE", "8388608")
+	t.Setenv("GOPHKEEPER_BLOB_MAX_SIZE", "2147483648")
 	t.Setenv("GOPHKEEPER_LOG_MODE", "prod")
 
 	cfg, err := Load()
@@ -83,6 +91,26 @@ func TestLoadReturnsServerConfigFromEnv(t *testing.T) {
 
 	if cfg.AccessTokenTTL != 30*time.Minute {
 		t.Fatalf("AccessTokenTTL = %s, want %s", cfg.AccessTokenTTL, 30*time.Minute)
+	}
+
+	if !cfg.BlobStorageEnabled {
+		t.Fatalf("BlobStorageEnabled = false, want true")
+	}
+
+	if cfg.MinIOEndpoint != "localhost:9000" {
+		t.Fatalf("MinIOEndpoint = %q, want localhost:9000", cfg.MinIOEndpoint)
+	}
+
+	if cfg.BlobUploadTTL != 12*time.Hour {
+		t.Fatalf("BlobUploadTTL = %s, want %s", cfg.BlobUploadTTL, 12*time.Hour)
+	}
+
+	if cfg.BlobChunkSize != 8388608 {
+		t.Fatalf("BlobChunkSize = %d, want 8388608", cfg.BlobChunkSize)
+	}
+
+	if cfg.BlobMaxSize != 2147483648 {
+		t.Fatalf("BlobMaxSize = %d, want 2147483648", cfg.BlobMaxSize)
 	}
 
 	if cfg.LogMode != "prod" {
@@ -204,6 +232,50 @@ func TestLoadReturnsErrorWhenLogModeInvalid(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "log mode") {
 		t.Fatalf("Load() error = %q, want mention log mode", err.Error())
+	}
+}
+
+func TestLoadReturnsErrorWhenBlobStorageEnabledWithoutMinIOEndpoint(t *testing.T) {
+	t.Setenv("GOPHKEEPER_DATABASE_DSN", "postgres://custom")
+	t.Setenv("GOPHKEEPER_ACCESS_TOKEN_SECRET", testAccessTokenSecret)
+	t.Setenv("GOPHKEEPER_BLOB_STORAGE_ENABLED", "true")
+	t.Setenv("GOPHKEEPER_MINIO_ACCESS_KEY", "gophkeeper")
+	t.Setenv("GOPHKEEPER_MINIO_SECRET_KEY", "gophkeeper-minio-password")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatalf("Load() error = nil, want error")
+	}
+
+	if !strings.Contains(err.Error(), "minio endpoint") {
+		t.Fatalf("Load() error = %q, want mention minio endpoint", err.Error())
+	}
+}
+
+func TestValidateReturnsErrorWhenBlobMaxSizeBelowChunkSize(t *testing.T) {
+	cfg := Config{
+		GRPCAddress:        ":9090",
+		DatabaseDSN:        "postgres://custom",
+		AccessTokenSecret:  testAccessTokenSecret,
+		AccessTokenTTL:     5 * time.Minute,
+		BlobStorageEnabled: true,
+		MinIOEndpoint:      "localhost:9000",
+		MinIOAccessKey:     "gophkeeper",
+		MinIOSecretKey:     "gophkeeper-minio-password",
+		MinIOBucket:        "gophkeeper-blobs",
+		BlobUploadTTL:      24 * time.Hour,
+		BlobChunkSize:      1024,
+		BlobMaxSize:        512,
+		LogMode:            "dev",
+	}
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatalf("Validate() error = nil, want error")
+	}
+
+	if !strings.Contains(err.Error(), "blob max size") {
+		t.Fatalf("Validate() error = %q, want mention blob max size", err.Error())
 	}
 }
 
