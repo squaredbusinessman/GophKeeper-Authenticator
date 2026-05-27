@@ -1,16 +1,16 @@
 # GophKeeper Authenticator
 
-GophKeeper Authenticator is a Go client/server password manager. Clients encrypt vault metadata and payloads locally before sending data to the server.
+GophKeeper Authenticator - клиент-серверный менеджер секретов на Go. Клиенты шифруют metadata и payload локально до отправки данных на сервер, поэтому сервер хранит только зашифрованные данные vault.
 
-## Capabilities
+## Возможности
 
-- Registration and login with a separate master password.
-- Encrypted vault items for text, login/password, bank cards, binary files, and OTP.
-- Optimistic version checks for update and delete operations.
-- gRPC API with generated OpenAPI documentation.
-- CLI and TUI clients.
+- Регистрация и вход с отдельным мастер-паролем.
+- Зашифрованные vault items для текста, логина и пароля, банковских карт, binary-файлов и OTP.
+- Проверка expected version при обновлении и удалении секретов.
+- gRPC API и сгенерированное OpenAPI-описание.
+- CLI и TUI клиенты.
 
-## Local Quality Gates
+## Локальные проверки качества
 
 ```bash
 make fmt-check
@@ -20,3 +20,8 @@ make coverage
 make security
 make docs-build
 ```
+
+## Внешние сервисы
+
+- Документация Read the Docs: <https://gophkeeper-authenticator.readthedocs.io/>
+- Покрытие Codecov: <https://app.codecov.io/gh/squaredbusinessman/GophKeeper-Authenticator>

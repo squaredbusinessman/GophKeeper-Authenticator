@@ -38,6 +38,8 @@ GophKeeper - клиент-серверный менеджер секретов �
 - inline binary metadata, checksum и size limit;
 - Swagger/OpenAPI описание gRPC HTTP projection;
 - coverage gate в CI с порогом не ниже 70%;
+- публикация покрытия в Codecov;
+- статическая документация на русском языке через Read the Docs;
 - кроссплатформенная сборка CLI под Linux, macOS и Windows.
 
 Команды ниже описывают рабочий сценарий текущего состояния проекта.
@@ -902,6 +904,11 @@ make build-cli
 make build-tui
 make build-cli-all
 make coverage
+make fmt-check
+make lint
+make security
+make docs-build
+make ci
 make vet
 ```
 
@@ -915,7 +922,32 @@ make vet
 - `make build-tui` - собирает TUI для текущей платформы;
 - `make build-cli-all` - собирает CLI под Linux, macOS и Windows;
 - `make coverage` - проверяет порог покрытия;
+- `make fmt-check` - проверяет форматирование Go-файлов через `gofmt`;
+- `make lint` - запускает `golangci-lint run ./...`;
+- `make security` - запускает `govulncheck ./...`;
+- `make docs-build` - собирает статическую документацию MkDocs;
+- `make ci` - запускает локальный набор quality gates и сборку;
 - `make vet` - запускает `go vet ./...`.
+
+## Внешние сервисы качества и документации
+
+Для проекта подготовлены конфиги внешних сервисов:
+
+- Read the Docs: <https://gophkeeper-authenticator.readthedocs.io/>
+- Codecov: <https://app.codecov.io/gh/squaredbusinessman/GophKeeper-Authenticator>
+
+Read the Docs использует `.readthedocs.yaml`, `mkdocs.yml` и `docs/requirements.txt`. Документация хранится в `docs/` и написана на русском языке. После импорта репозитория в Read the Docs сервис будет автоматически собирать MkDocs-сайт из ветки репозитория.
+
+Codecov использует `codecov.yml` и coverage profile `artifacts/coverage/coverage.out`, который CircleCI отправляет через orb `codecov/codecov`. В Codecov настроен project target `70%` и patch target `60%`.
+
+CircleCI pipeline находится в `.circleci/config.yml` и выполняет:
+
+- проверку форматирования;
+- запуск `golangci-lint`;
+- тесты с coverage gate и отправкой покрытия в Codecov;
+- проверку зависимостей через `govulncheck`;
+- сборку CLI/TUI артефактов;
+- сборку статической документации.
 
 ## Тестирование
 
@@ -948,7 +980,7 @@ make smoke
 
 `make smoke` запускает тесты с build tag `smoke`. Обычный `go test ./...` эти тесты не запускает, чтобы локальная быстрая проверка не требовала PostgreSQL.
 
-В GitHub Actions этот же сценарий запускается отдельной job `postgres-smoke`. Эта job является CI-проверкой основных требований ТЗ: она поднимает PostgreSQL, стартует реальный gRPC-сервер внутри теста и проходит register, login, create, list, get, update, delete и sync для обязательных типов секретов.
+В CI быстрые проверки вынесены в CircleCI: форматирование, lint, unit-тесты с coverage, security check, сборка артефактов и сборка статической документации. Smoke-сценарий с живым PostgreSQL запускается локально командой `make smoke`, чтобы обычный CI pipeline не зависел от поднятия базы для быстрых проверок.
 
 Целевое покрытие проекта unit-тестами - не менее 70%.
 

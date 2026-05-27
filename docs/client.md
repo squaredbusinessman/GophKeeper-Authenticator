@@ -1,14 +1,14 @@
-# Client
+# Клиент
 
-The project provides two clients:
+В проекте есть два клиента:
 
-- `gophkeeper-cli` for command-line workflows.
-- `gophkeeper-tui` for interactive terminal workflows.
+- `gophkeeper-cli` - командный интерфейс для сценариев из терминала;
+- `gophkeeper-tui` - интерактивный терминальный интерфейс.
 
-Both clients keep the vault key on the client side and send only encrypted metadata and payloads to the server.
+Оба клиента держат vault key на стороне пользователя и отправляют на сервер только зашифрованные metadata и payload.
 
-## Binary Restore
+## Восстановление binary-файлов
 
-Binary secrets preserve the original uploaded file name in the encrypted payload. During restore, the user chooses an output directory and the client writes the file using that stored name.
+Binary secret сохраняет исходное имя загруженного файла внутри зашифрованного payload. При восстановлении пользователь выбирает директорию назначения, а клиент записывает файл с тем именем, которое было сохранено при загрузке на сервис.
 
-The client refuses to overwrite an existing file in the selected directory.
+Клиент не перезаписывает существующий файл в выбранной директории.

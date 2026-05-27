@@ -1,9 +1,9 @@
-# Deployment
+# Развертывание
 
-Local development services are defined under `deploy/`.
+Локальные сервисы для разработки описаны в директории `deploy/`.
 
 ```bash
 docker compose -f deploy/docker-compose.yml up -d
 ```
 
-CI builds and stores package artifacts for the CLI and TUI clients. Documentation is built as a static site and stored as a CircleCI artifact.
+CI собирает и сохраняет артефакты CLI и TUI клиентов. Документация собирается как статический MkDocs-сайт; постоянная публикация выполняется через Read the Docs.

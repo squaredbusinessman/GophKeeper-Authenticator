@@ -1,11 +1,11 @@
 site_name: GophKeeper Authenticator
-site_description: Client/server password manager with encrypted vault storage.
-repo_url: https://github.com/squaredbusinessman/gophkeeper-authenticator
+site_description: Клиент-серверный менеджер секретов с клиентским шифрованием vault.
+repo_url: https://github.com/squaredbusinessman/GophKeeper-Authenticator
 theme:
   name: mkdocs
 nav:
-  - Overview: index.md
-  - Client: client.md
-  - Server: server.md
+  - Обзор: index.md
+  - Клиент: client.md
+  - Сервер: server.md
   - API: api.md
-  - Deployment: deployment.md
+  - Развертывание: deployment.md
