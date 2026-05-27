@@ -152,7 +152,7 @@ func TestVaultServiceCreateSecretEncryptsPayloadAndSendsAccessToken(t *testing.T
 	}
 
 	call := vaultClient.createItemCalls[0]
-	assertOutgoingBearerToken(t, call.ctx, session.AccessToken)
+	assertOutgoingBearerToken(call.ctx, t, session.AccessToken)
 
 	request := call.req
 	if request.GetType() != gophkeeperv1.ItemType_ITEM_TYPE_LOGIN_PASSWORD {
@@ -241,7 +241,7 @@ func TestVaultServiceGetSecretDecryptsPayloadAndSendsAccessToken(t *testing.T) {
 		t.Fatalf("GetItem() calls = %d, want 1", len(vaultClient.getItemCalls))
 	}
 
-	assertOutgoingBearerToken(t, vaultClient.getItemCalls[0].ctx, session.AccessToken)
+	assertOutgoingBearerToken(vaultClient.getItemCalls[0].ctx, t, session.AccessToken)
 
 	if secret.ID != "item-id-1" {
 		t.Fatalf("secret id = %q, want item-id-1", secret.ID)
@@ -294,7 +294,7 @@ func TestVaultServiceListSecretsDecryptsActiveItemsAndSendsAccessToken(t *testin
 		t.Fatalf("ListItems() calls = %d, want 1", len(vaultClient.listItemsCalls))
 	}
 
-	assertOutgoingBearerToken(t, vaultClient.listItemsCalls[0].ctx, session.AccessToken)
+	assertOutgoingBearerToken(vaultClient.listItemsCalls[0].ctx, t, session.AccessToken)
 
 	if len(secrets) != 1 {
 		t.Fatalf("secrets length = %d, want 1 active secret", len(secrets))
@@ -395,7 +395,7 @@ func TestVaultServiceUpdateSecretEncryptsPayloadAndSendsExpectedVersion(t *testi
 		t.Fatalf("UpdateItem() calls = %d, want 1", len(vaultClient.updateItemCalls))
 	}
 
-	assertOutgoingBearerToken(t, vaultClient.updateItemCalls[0].ctx, session.AccessToken)
+	assertOutgoingBearerToken(vaultClient.updateItemCalls[0].ctx, t, session.AccessToken)
 
 	if secret.Version != 4 {
 		t.Fatalf("secret version = %d, want 4", secret.Version)
@@ -441,7 +441,7 @@ func TestVaultServiceDeleteSecretSendsExpectedVersion(t *testing.T) {
 		t.Fatalf("DeleteItem() calls = %d, want 1", len(vaultClient.deleteItemCalls))
 	}
 
-	assertOutgoingBearerToken(t, vaultClient.deleteItemCalls[0].ctx, session.AccessToken)
+	assertOutgoingBearerToken(vaultClient.deleteItemCalls[0].ctx, t, session.AccessToken)
 
 	if result.ID != "item-id-1" {
 		t.Fatalf("result id = %q, want item-id-1", result.ID)
@@ -500,7 +500,7 @@ func TestVaultServiceSyncSecretsDecryptsChangedItemsAndSendsAccessToken(t *testi
 		t.Fatalf("Sync() calls = %d, want 1", len(vaultClient.syncCalls))
 	}
 
-	assertOutgoingBearerToken(t, vaultClient.syncCalls[0].ctx, session.AccessToken)
+	assertOutgoingBearerToken(vaultClient.syncCalls[0].ctx, t, session.AccessToken)
 
 	if len(result.Secrets) != 2 {
 		t.Fatalf("secrets length = %d, want 2", len(result.Secrets))
@@ -792,7 +792,7 @@ func testSession() Session {
 	}
 }
 
-func assertOutgoingBearerToken(t *testing.T, ctx context.Context, token string) {
+func assertOutgoingBearerToken(ctx context.Context, t *testing.T, token string) {
 	t.Helper()
 
 	md, ok := metadata.FromOutgoingContext(ctx)

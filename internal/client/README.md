@@ -72,8 +72,7 @@ type TokenStore interface {
 
 - создавать директорию под token file;
 - атомарно заменять файл через временный файл;
-- читать сохраненный token state через `Load`;
-- возвращать `ErrTokenStateNotFound`, если token еще не сохранен.
+- сохранять token state в JSON-файл с приватными правами.
 
 Путь к token file задается клиентским config через `GOPHKEEPER_TOKEN_FILE`. Если переменная не задана, используется путь по умолчанию:
 

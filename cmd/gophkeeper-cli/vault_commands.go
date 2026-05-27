@@ -3,12 +3,16 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/client/core"
 )
 
@@ -21,6 +25,15 @@ type CLIVaultService interface {
 	DeleteSecret(context.Context, core.Session, core.DeleteSecretInput) (core.DeleteSecretResult, error)
 	SyncSecrets(context.Context, core.Session, core.SyncSecretsInput) (core.SyncSecretsResult, error)
 }
+
+type secretKind string
+
+const (
+	secretKindText          secretKind = "text"
+	secretKindLoginPassword secretKind = "login-password"
+	secretKindBankCard      secretKind = "bank-card"
+	secretKindBinary        secretKind = "binary"
+)
 
 type textSecretMetadata struct {
 	Title string `json:"title"`
@@ -36,6 +49,8 @@ func runCreateTextSecret(
 	if vaultService == nil {
 		return fmt.Errorf("vault service is required")
 	}
+
+	printCreateHint(stdout, secretKindText)
 
 	session, err := openVaultSession(ctx, authService, prompter)
 	if err != nil {
@@ -83,11 +98,262 @@ func runCreateTextSecret(
 		return fmt.Errorf("create text secret: %w", err)
 	}
 
-	fmt.Fprintf(stdout, "Секрет создан: %s\n", secret.ID)
+	fmt.Fprintf(stdout, "Секрет создан: %s, version: %d\n", secret.ID, secret.Version)
 	return nil
 }
 
-func runGetTextSecret(
+func runCreateSecret(
+	ctx context.Context,
+	args []string,
+	authService CLIAuthService,
+	vaultService CLIVaultService,
+	prompter Prompter,
+	stdout io.Writer,
+) error {
+	kind := parseSecretKind(args)
+
+	switch kind {
+	case secretKindText:
+		return runCreateTextSecret(ctx, authService, vaultService, prompter, stdout)
+	case secretKindLoginPassword:
+		return runCreateLoginPasswordSecret(ctx, authService, vaultService, prompter, stdout)
+	case secretKindBankCard:
+		return runCreateBankCardSecret(ctx, authService, vaultService, prompter, stdout)
+	case secretKindBinary:
+		return runCreateBinarySecret(ctx, authService, vaultService, prompter, stdout)
+
+	default:
+		return fmt.Errorf("unsupported secret type: %s", kind)
+	}
+}
+
+func runCreateLoginPasswordSecret(
+	ctx context.Context,
+	authService CLIAuthService,
+	vaultService CLIVaultService,
+	prompter Prompter,
+	stdout io.Writer,
+) error {
+	if vaultService == nil {
+		return fmt.Errorf("vault service is required")
+	}
+
+	printCreateHint(stdout, secretKindLoginPassword)
+
+	session, err := openVaultSession(ctx, authService, prompter)
+	if err != nil {
+		return fmt.Errorf("open vault: %w", err)
+	}
+
+	title, err := promptRequired(prompter, "Title")
+	if err != nil {
+		return fmt.Errorf("read title: %w", err)
+	}
+
+	login, err := promptRequired(prompter, "Secret login")
+	if err != nil {
+		return fmt.Errorf("read secret login: %w", err)
+	}
+
+	password, err := prompter.PromptHidden("Secret password")
+	if err != nil {
+		return fmt.Errorf("read secret password: %w", err)
+	}
+
+	if password == "" {
+		return fmt.Errorf("secret password is required")
+	}
+
+	url, err := prompter.Prompt("URL")
+	if err != nil {
+		return fmt.Errorf("read url: %w", err)
+	}
+
+	notes, err := prompter.Prompt("Notes")
+	if err != nil {
+		return fmt.Errorf("read notes: %w", err)
+	}
+
+	metadata, err := encodeTextSecretMetadata(title)
+	if err != nil {
+		return fmt.Errorf("encode login/password secret metadata: %w", err)
+	}
+
+	payload, schemaVersion, err := core.EncodeLoginPasswordPayload(core.LoginPasswordPayload{
+		Login:    login,
+		Password: password,
+		URL:      strings.TrimSpace(url),
+		Notes:    strings.TrimSpace(notes),
+	})
+	if err != nil {
+		return fmt.Errorf("encode login/password payload: %w", err)
+	}
+
+	secret, err := vaultService.CreateSecret(ctx, session, core.CreateSecretInput{
+		Type:                 core.SecretTypeLoginPassword,
+		Metadata:             metadata,
+		Payload:              payload,
+		PayloadSchemaVersion: schemaVersion,
+	})
+	if err != nil {
+		return fmt.Errorf("create login/password secret: %w", err)
+	}
+
+	fmt.Fprintf(stdout, "Секрет создан: %s, version: %d\n", secret.ID, secret.Version)
+	return nil
+}
+
+func runCreateBankCardSecret(
+	ctx context.Context,
+	authService CLIAuthService,
+	vaultService CLIVaultService,
+	prompter Prompter,
+	stdout io.Writer,
+) error {
+	if vaultService == nil {
+		return fmt.Errorf("vault service is required")
+	}
+
+	printCreateHint(stdout, secretKindBankCard)
+
+	session, err := openVaultSession(ctx, authService, prompter)
+	if err != nil {
+		return fmt.Errorf("open vault: %w", err)
+	}
+
+	title, err := promptRequired(prompter, "Title")
+	if err != nil {
+		return fmt.Errorf("read title: %w", err)
+	}
+
+	cardNumber, err := promptRequired(prompter, "Card number")
+	if err != nil {
+		return fmt.Errorf("read card number: %w", err)
+	}
+
+	cardholderName, err := promptRequired(prompter, "Cardholder name")
+	if err != nil {
+		return fmt.Errorf("read cardholder name: %w", err)
+	}
+
+	expirationMonth, err := promptRequired(prompter, "Expiration month")
+	if err != nil {
+		return fmt.Errorf("read expiration month: %w", err)
+	}
+
+	expirationYear, err := promptRequired(prompter, "Expiration year")
+	if err != nil {
+		return fmt.Errorf("read expiration year: %w", err)
+	}
+
+	cvv, err := prompter.PromptHidden("CVV")
+	if err != nil {
+		return fmt.Errorf("read cvv: %w", err)
+	}
+
+	notes, err := prompter.Prompt("Notes")
+	if err != nil {
+		return fmt.Errorf("read notes: %w", err)
+	}
+
+	metadata, err := encodeTextSecretMetadata(title)
+	if err != nil {
+		return fmt.Errorf("encode bank card metadata: %w", err)
+	}
+
+	payload, schemaVersion, err := core.EncodeBankCardPayload(core.BankCardPayload{
+		Number:          cardNumber,
+		CardholderName:  cardholderName,
+		ExpirationMonth: expirationMonth,
+		ExpirationYear:  expirationYear,
+		CVV:             cvv,
+		Notes:           strings.TrimSpace(notes),
+	})
+	if err != nil {
+		return fmt.Errorf("encode bank card payload: %w", err)
+	}
+
+	secret, err := vaultService.CreateSecret(ctx, session, core.CreateSecretInput{
+		Type:                 core.SecretTypeBankCard,
+		Metadata:             metadata,
+		Payload:              payload,
+		PayloadSchemaVersion: schemaVersion,
+	})
+	if err != nil {
+		return fmt.Errorf("create bank card secret: %w", err)
+	}
+
+	fmt.Fprintf(stdout, "Секрет создан: %s, version: %d\n", secret.ID, secret.Version)
+	return nil
+}
+
+func runCreateBinarySecret(
+	ctx context.Context,
+	authService CLIAuthService,
+	vaultService CLIVaultService,
+	prompter Prompter,
+	stdout io.Writer,
+) error {
+	if vaultService == nil {
+		return fmt.Errorf("vault service is required")
+	}
+
+	printCreateHint(stdout, secretKindBinary)
+
+	session, err := openVaultSession(ctx, authService, prompter)
+	if err != nil {
+		return fmt.Errorf("open vault: %w", err)
+	}
+
+	title, err := promptRequired(prompter, "Title")
+	if err != nil {
+		return fmt.Errorf("read title: %w", err)
+	}
+
+	filePath, err := promptRequired(prompter, "File path")
+	if err != nil {
+		return fmt.Errorf("read file path: %w", err)
+	}
+
+	contentType, err := prompter.Prompt("Content type")
+	if err != nil {
+		return fmt.Errorf("read content type: %w", err)
+	}
+
+	fileData, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("read binary file: %w", err)
+	}
+
+	metadata, err := encodeTextSecretMetadata(title)
+	if err != nil {
+		return fmt.Errorf("encode binary metadata: %w", err)
+	}
+
+	payload, schemaVersion, err := core.EncodeBinaryPayload(core.BinaryPayload{
+		FileName:    filepath.Base(filePath),
+		ContentType: strings.TrimSpace(contentType),
+		Data:        fileData,
+	})
+	if err != nil {
+		return fmt.Errorf("encode binary payload: %w", err)
+	}
+
+	secret, err := vaultService.CreateSecret(ctx, session, core.CreateSecretInput{
+		Type:                 core.SecretTypeBinary,
+		Metadata:             metadata,
+		Payload:              payload,
+		PayloadSchemaVersion: schemaVersion,
+	})
+	if err != nil {
+		return fmt.Errorf("create binary secret: %w", err)
+	}
+
+	fmt.Fprintf(stdout, "Секрет создан: %s, version: %d\n", secret.ID, secret.Version)
+	return nil
+}
+
+func runGetSecret(
 	ctx context.Context,
 	authService CLIAuthService,
 	vaultService CLIVaultService,
@@ -103,41 +369,20 @@ func runGetTextSecret(
 		return fmt.Errorf("open vault: %w", err)
 	}
 
-	id, err := prompter.Prompt("Secret ID")
+	id, err := promptRequired(prompter, "Secret ID")
 	if err != nil {
 		return fmt.Errorf("read secret id: %w", err)
 	}
 
-	id = strings.TrimSpace(id)
-	if id == "" {
-		return fmt.Errorf("secret id is required")
-	}
-
 	secret, err := vaultService.GetSecret(ctx, session, core.GetSecretInput{ID: id})
 	if err != nil {
-		return fmt.Errorf("get text secret: %w", err)
+		return fmt.Errorf("get secret: %w", err)
 	}
 
-	if secret.Type != core.SecretTypeText {
-		return fmt.Errorf("secret type is not text")
-	}
-
-	title := decodeTextSecretTitle(secret.Metadata)
-
-	if title != "" {
-		fmt.Fprintf(stdout, "Title: %s\n", title)
-	}
-
-	textPayload, err := core.DecodeTextPayload(secret.Payload, secret.PayloadSchemaVersion)
-	if err != nil {
-		return fmt.Errorf("decode text payload: %w", err)
-	}
-
-	fmt.Fprintf(stdout, "Secret text: %s\n", textPayload.Text)
-	return nil
+	return printSecret(stdout, prompter, secret)
 }
 
-func runListTextSecrets(ctx context.Context, authService CLIAuthService, vaultService CLIVaultService, prompter Prompter, stdout io.Writer) error {
+func runListSecrets(ctx context.Context, authService CLIAuthService, vaultService CLIVaultService, prompter Prompter, stdout io.Writer) error {
 	if vaultService == nil {
 		return fmt.Errorf("vault service is required")
 	}
@@ -149,15 +394,15 @@ func runListTextSecrets(ctx context.Context, authService CLIAuthService, vaultSe
 
 	secrets, err := vaultService.ListSecrets(ctx, session, core.ListSecretsInput{})
 	if err != nil {
-		return fmt.Errorf("list text secrets: %w", err)
+		return fmt.Errorf("list secrets: %w", err)
 	}
 
+	tableWriter := table.NewWriter()
+	tableWriter.AppendHeader(table.Row{"ID", "VERSION", "TYPE", "TITLE"})
+
+	activeCount := 0
 	for _, secret := range secrets {
 		if secret.DeletedAt != nil {
-			continue
-		}
-
-		if secret.Type != core.SecretTypeText {
 			continue
 		}
 
@@ -166,9 +411,270 @@ func runListTextSecrets(ctx context.Context, authService CLIAuthService, vaultSe
 			title = "<без названия>"
 		}
 
-		fmt.Fprintf(stdout, "%s | version %d | %s\n", secret.ID, secret.Version, title)
+		tableWriter.AppendRow(table.Row{secret.ID, secret.Version, secretTypeLabel(secret.Type), title})
+		activeCount++
 	}
 
+	if activeCount == 0 {
+		fmt.Fprintln(stdout, "Активные секреты не найдены")
+		return nil
+	}
+
+	tableWriter.SetStyle(table.StyleDefault)
+	fmt.Fprintln(stdout, tableWriter.Render())
+	return nil
+}
+
+func runUpdateSecret(
+	ctx context.Context,
+	args []string,
+	authService CLIAuthService,
+	vaultService CLIVaultService,
+	prompter Prompter,
+	stdout io.Writer,
+) error {
+	kind := parseSecretKind(args)
+
+	switch kind {
+	case secretKindText:
+		return runUpdateTextSecret(ctx, authService, vaultService, prompter, stdout)
+	case secretKindLoginPassword:
+		return runUpdateLoginPasswordSecret(ctx, authService, vaultService, prompter, stdout)
+	case secretKindBankCard:
+		return runUpdateBankCardSecret(ctx, authService, vaultService, prompter, stdout)
+	case secretKindBinary:
+		return runUpdateBinarySecret(ctx, authService, vaultService, prompter, stdout)
+	default:
+		return fmt.Errorf("unsupported secret type: %s", kind)
+	}
+}
+
+func runUpdateLoginPasswordSecret(ctx context.Context, authService CLIAuthService, vaultService CLIVaultService, prompter Prompter, stdout io.Writer) error {
+	if vaultService == nil {
+		return fmt.Errorf("vault service is required")
+	}
+
+	printUpdateHint(stdout, secretKindLoginPassword)
+
+	session, err := openVaultSession(ctx, authService, prompter)
+	if err != nil {
+		return fmt.Errorf("open vault: %w", err)
+	}
+
+	id, expectedVersion, err := promptSecretIDAndVersion(prompter)
+	if err != nil {
+		return err
+	}
+
+	title, err := promptRequired(prompter, "Title")
+	if err != nil {
+		return fmt.Errorf("read title: %w", err)
+	}
+
+	login, err := promptRequired(prompter, "Secret login")
+	if err != nil {
+		return fmt.Errorf("read secret login: %w", err)
+	}
+
+	password, err := prompter.PromptHidden("Secret password")
+	if err != nil {
+		return fmt.Errorf("read secret password: %w", err)
+	}
+
+	if password == "" {
+		return fmt.Errorf("secret password is required")
+	}
+
+	url, err := prompter.Prompt("URL")
+	if err != nil {
+		return fmt.Errorf("read url: %w", err)
+	}
+
+	notes, err := prompter.Prompt("Notes")
+	if err != nil {
+		return fmt.Errorf("read notes: %w", err)
+	}
+
+	metadata, err := encodeTextSecretMetadata(title)
+	if err != nil {
+		return fmt.Errorf("encode login/password secret metadata: %w", err)
+	}
+
+	payload, schemaVersion, err := core.EncodeLoginPasswordPayload(core.LoginPasswordPayload{
+		Login:    login,
+		Password: password,
+		URL:      strings.TrimSpace(url),
+		Notes:    strings.TrimSpace(notes),
+	})
+	if err != nil {
+		return fmt.Errorf("encode login/password payload: %w", err)
+	}
+
+	secret, err := vaultService.UpdateSecret(ctx, session, core.UpdateSecretInput{
+		ID:                   id,
+		ExpectedVersion:      expectedVersion,
+		Type:                 core.SecretTypeLoginPassword,
+		Metadata:             metadata,
+		Payload:              payload,
+		PayloadSchemaVersion: schemaVersion,
+	})
+	if err != nil {
+		return fmt.Errorf("update login/password secret: %w", err)
+	}
+
+	fmt.Fprintf(stdout, "Секрет обновлен: %s, version: %d\n", secret.ID, secret.Version)
+	return nil
+}
+
+func runUpdateBankCardSecret(ctx context.Context, authService CLIAuthService, vaultService CLIVaultService, prompter Prompter, stdout io.Writer) error {
+	if vaultService == nil {
+		return fmt.Errorf("vault service is required")
+	}
+
+	printUpdateHint(stdout, secretKindBankCard)
+
+	session, err := openVaultSession(ctx, authService, prompter)
+	if err != nil {
+		return fmt.Errorf("open vault: %w", err)
+	}
+
+	id, expectedVersion, err := promptSecretIDAndVersion(prompter)
+	if err != nil {
+		return err
+	}
+
+	title, err := promptRequired(prompter, "Title")
+	if err != nil {
+		return fmt.Errorf("read title: %w", err)
+	}
+
+	cardNumber, err := promptRequired(prompter, "Card number")
+	if err != nil {
+		return fmt.Errorf("read card number: %w", err)
+	}
+
+	cardholderName, err := promptRequired(prompter, "Cardholder name")
+	if err != nil {
+		return fmt.Errorf("read cardholder name: %w", err)
+	}
+
+	expirationMonth, err := promptRequired(prompter, "Expiration month")
+	if err != nil {
+		return fmt.Errorf("read expiration month: %w", err)
+	}
+
+	expirationYear, err := promptRequired(prompter, "Expiration year")
+	if err != nil {
+		return fmt.Errorf("read expiration year: %w", err)
+	}
+
+	cvv, err := prompter.PromptHidden("CVV")
+	if err != nil {
+		return fmt.Errorf("read cvv: %w", err)
+	}
+
+	notes, err := prompter.Prompt("Notes")
+	if err != nil {
+		return fmt.Errorf("read notes: %w", err)
+	}
+
+	metadata, err := encodeTextSecretMetadata(title)
+	if err != nil {
+		return fmt.Errorf("encode bank card metadata: %w", err)
+	}
+
+	payload, schemaVersion, err := core.EncodeBankCardPayload(core.BankCardPayload{
+		Number:          cardNumber,
+		CardholderName:  cardholderName,
+		ExpirationMonth: expirationMonth,
+		ExpirationYear:  expirationYear,
+		CVV:             cvv,
+		Notes:           strings.TrimSpace(notes),
+	})
+	if err != nil {
+		return fmt.Errorf("encode bank card payload: %w", err)
+	}
+
+	secret, err := vaultService.UpdateSecret(ctx, session, core.UpdateSecretInput{
+		ID:                   id,
+		ExpectedVersion:      expectedVersion,
+		Type:                 core.SecretTypeBankCard,
+		Metadata:             metadata,
+		Payload:              payload,
+		PayloadSchemaVersion: schemaVersion,
+	})
+	if err != nil {
+		return fmt.Errorf("update bank card secret: %w", err)
+	}
+
+	fmt.Fprintf(stdout, "Секрет обновлен: %s, version: %d\n", secret.ID, secret.Version)
+	return nil
+}
+
+func runUpdateBinarySecret(ctx context.Context, authService CLIAuthService, vaultService CLIVaultService, prompter Prompter, stdout io.Writer) error {
+	if vaultService == nil {
+		return fmt.Errorf("vault service is required")
+	}
+
+	printUpdateHint(stdout, secretKindBinary)
+
+	session, err := openVaultSession(ctx, authService, prompter)
+	if err != nil {
+		return fmt.Errorf("open vault: %w", err)
+	}
+
+	id, expectedVersion, err := promptSecretIDAndVersion(prompter)
+	if err != nil {
+		return err
+	}
+
+	title, err := promptRequired(prompter, "Title")
+	if err != nil {
+		return fmt.Errorf("read title: %w", err)
+	}
+
+	filePath, err := promptRequired(prompter, "File path")
+	if err != nil {
+		return fmt.Errorf("read file path: %w", err)
+	}
+
+	contentType, err := prompter.Prompt("Content type")
+	if err != nil {
+		return fmt.Errorf("read content type: %w", err)
+	}
+
+	fileData, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("read binary file: %w", err)
+	}
+
+	metadata, err := encodeTextSecretMetadata(title)
+	if err != nil {
+		return fmt.Errorf("encode binary metadata: %w", err)
+	}
+
+	payload, schemaVersion, err := core.EncodeBinaryPayload(core.BinaryPayload{
+		FileName:    filepath.Base(filePath),
+		ContentType: strings.TrimSpace(contentType),
+		Data:        fileData,
+	})
+	if err != nil {
+		return fmt.Errorf("encode binary payload: %w", err)
+	}
+
+	secret, err := vaultService.UpdateSecret(ctx, session, core.UpdateSecretInput{
+		ID:                   id,
+		ExpectedVersion:      expectedVersion,
+		Type:                 core.SecretTypeBinary,
+		Metadata:             metadata,
+		Payload:              payload,
+		PayloadSchemaVersion: schemaVersion,
+	})
+	if err != nil {
+		return fmt.Errorf("update binary secret: %w", err)
+	}
+
+	fmt.Fprintf(stdout, "Секрет обновлен: %s, version: %d\n", secret.ID, secret.Version)
 	return nil
 }
 
@@ -201,7 +707,7 @@ func runSyncSecrets(ctx context.Context, authService CLIAuthService, vaultServic
 			status = "удален"
 		}
 
-		fmt.Fprintf(stdout, "%s | version %d | %s | %s\n", secret.ID, secret.Version, status, title)
+		fmt.Fprintf(stdout, "%s | version %d | %s | %s | %s\n", secret.ID, secret.Version, status, secretTypeLabel(secret.Type), title)
 	}
 
 	if !result.NextChangedAfter.IsZero() {
@@ -215,6 +721,8 @@ func runUpdateTextSecret(ctx context.Context, authService CLIAuthService, vaultS
 	if vaultService == nil {
 		return fmt.Errorf("vault service is required")
 	}
+
+	printUpdateHint(stdout, secretKindText)
 
 	session, err := openVaultSession(ctx, authService, prompter)
 	if err != nil {
@@ -266,14 +774,14 @@ func runUpdateTextSecret(ctx context.Context, authService CLIAuthService, vaultS
 		PayloadSchemaVersion: schemaVersion,
 	})
 	if err != nil {
-		return fmt.Errorf("version conflict: update text secret: %w", err)
+		return fmt.Errorf("update text secret: %w", err)
 	}
 
 	fmt.Fprintf(stdout, "Секрет обновлен: %s, version: %d\n", secret.ID, secret.Version)
 	return nil
 }
 
-func runDeleteTextSecret(ctx context.Context, authService CLIAuthService, vaultService CLIVaultService, prompter Prompter, stdout io.Writer) error {
+func runDeleteSecret(ctx context.Context, authService CLIAuthService, vaultService CLIVaultService, prompter Prompter, stdout io.Writer) error {
 	if vaultService == nil {
 		return fmt.Errorf("vault service is required")
 	}
@@ -293,7 +801,7 @@ func runDeleteTextSecret(ctx context.Context, authService CLIAuthService, vaultS
 		ExpectedVersion: expectedVersion,
 	})
 	if err != nil {
-		return fmt.Errorf("version conflict: delete text secret: %w", err)
+		return fmt.Errorf("delete secret: %w", err)
 	}
 
 	fmt.Fprintf(stdout, "Секрет удален: %s, version: %d\n", result.ID, result.Version)
@@ -383,4 +891,196 @@ func promptSecretIDAndVersion(prompter Prompter) (string, int64, error) {
 	}
 
 	return id, expectedVersion, nil
+}
+
+func parseSecretKind(args []string) secretKind {
+	if len(args) == 0 {
+		return secretKindText
+	}
+
+	switch strings.TrimSpace(args[0]) {
+	case "", "text":
+		return secretKindText
+	case "login-password", "login_password":
+		return secretKindLoginPassword
+	case "bank-card", "bank_card":
+		return secretKindBankCard
+	case "binary":
+		return secretKindBinary
+	default:
+		return secretKind(args[0])
+	}
+}
+
+func promptRequired(prompter Prompter, label string) (string, error) {
+	value, err := prompter.Prompt(label)
+	if err != nil {
+		return "", err
+	}
+
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", fmt.Errorf("%s is required", strings.ToLower(label))
+	}
+
+	return value, nil
+}
+
+func printCreateHint(stdout io.Writer, kind secretKind) {
+	fmt.Fprintf(stdout, "Создание секрета типа %s\n", secretKindLabel(kind))
+
+	switch kind {
+	case secretKindText:
+		fmt.Fprintln(stdout, "Введите название и текст секрета")
+	case secretKindLoginPassword:
+		fmt.Fprintln(stdout, "Введите название, логин, пароль, URL и заметки")
+	case secretKindBankCard:
+		fmt.Fprintln(stdout, "Введите название, номер карты, имя держателя, срок действия, CVV и заметки")
+	case secretKindBinary:
+		fmt.Fprintf(stdout, "Введите название и путь к файлу, размер файла должен быть не больше %d bytes\n", core.MaxInlineBinaryPayloadSize)
+	}
+}
+
+func printUpdateHint(stdout io.Writer, kind secretKind) {
+	fmt.Fprintf(stdout, "Обновление секрета типа %s\n", secretKindLabel(kind))
+	fmt.Fprintln(stdout, "Нужны Secret ID и Expected version из get, list или sync")
+
+	switch kind {
+	case secretKindText:
+		fmt.Fprintln(stdout, "Будут заменены название и текст секрета")
+	case secretKindLoginPassword:
+		fmt.Fprintln(stdout, "Будут заменены название, логин, пароль, URL и заметки")
+	case secretKindBankCard:
+		fmt.Fprintln(stdout, "Будут заменены название, данные карты, CVV и заметки")
+	case secretKindBinary:
+		fmt.Fprintf(stdout, "Будет заменен файл, новый размер должен быть не больше %d bytes\n", core.MaxInlineBinaryPayloadSize)
+	}
+}
+
+func printSecret(stdout io.Writer, prompter Prompter, secret core.Secret) error {
+	fmt.Fprintf(stdout, "ID: %s\n", secret.ID)
+	fmt.Fprintf(stdout, "Type: %s\n", secretTypeLabel(secret.Type))
+	fmt.Fprintf(stdout, "Version: %d\n", secret.Version)
+
+	title := decodeTextSecretTitle(secret.Metadata)
+	if title != "" {
+		fmt.Fprintf(stdout, "Title: %s\n", title)
+	}
+
+	switch secret.Type {
+	case core.SecretTypeText:
+		textPayload, err := core.DecodeTextPayload(secret.Payload, secret.PayloadSchemaVersion)
+		if err != nil {
+			return fmt.Errorf("decode text payload: %w", err)
+		}
+
+		fmt.Fprintf(stdout, "Secret text: %s\n", textPayload.Text)
+		return nil
+
+	case core.SecretTypeLoginPassword:
+		loginPasswordPayload, err := core.DecodeLoginPasswordPayload(secret.Payload, secret.PayloadSchemaVersion)
+		if err != nil {
+			return fmt.Errorf("decode login/password payload: %w", err)
+		}
+
+		fmt.Fprintf(stdout, "Login: %s\n", loginPasswordPayload.Login)
+		fmt.Fprintf(stdout, "Password: %s\n", loginPasswordPayload.Password)
+
+		if loginPasswordPayload.URL != "" {
+			fmt.Fprintf(stdout, "URL: %s\n", loginPasswordPayload.URL)
+		}
+
+		if loginPasswordPayload.Notes != "" {
+			fmt.Fprintf(stdout, "Notes: %s\n", loginPasswordPayload.Notes)
+		}
+
+		return nil
+
+	case core.SecretTypeBankCard:
+		bankCardPayload, err := core.DecodeBankCardPayload(secret.Payload, secret.PayloadSchemaVersion)
+		if err != nil {
+			return fmt.Errorf("decode bank card payload: %w", err)
+		}
+
+		fmt.Fprintf(stdout, "Card number: %s\n", bankCardPayload.Number)
+		fmt.Fprintf(stdout, "Cardholder name: %s\n", bankCardPayload.CardholderName)
+		fmt.Fprintf(stdout, "Expiration: %s/%s\n", bankCardPayload.ExpirationMonth, bankCardPayload.ExpirationYear)
+
+		if bankCardPayload.CVV != "" {
+			fmt.Fprintf(stdout, "CVV: %s\n", bankCardPayload.CVV)
+		}
+
+		if bankCardPayload.Notes != "" {
+			fmt.Fprintf(stdout, "Notes: %s\n", bankCardPayload.Notes)
+		}
+
+		return nil
+	case core.SecretTypeBinary:
+		binaryPayload, err := core.DecodeBinaryPayload(secret.Payload, secret.PayloadSchemaVersion)
+		if err != nil {
+			return fmt.Errorf("decode binary payload: %w", err)
+		}
+
+		outputPath, err := promptRequired(prompter, "Output path")
+		if err != nil {
+			return fmt.Errorf("read output path: %w", err)
+		}
+
+		if err = ensureOutputFileDoesNotExist(outputPath); err != nil {
+			return err
+		}
+
+		if err = os.WriteFile(outputPath, binaryPayload.Data, 0o600); err != nil {
+			return fmt.Errorf("write binary file: %w", err)
+		}
+
+		fmt.Fprintf(stdout, "File name: %s\n", binaryPayload.FileName)
+		fmt.Fprintf(stdout, "Content type: %s\n", binaryPayload.ContentType)
+		fmt.Fprintf(stdout, "Size bytes: %d\n", binaryPayload.SizeBytes)
+		fmt.Fprintf(stdout, "Checksum SHA256: %s\n", binaryPayload.ChecksumSHA256)
+		fmt.Fprintf(stdout, "Written to: %s\n", outputPath)
+		return nil
+	default:
+		return fmt.Errorf("unsupported secret type: %s", secretTypeLabel(secret.Type))
+	}
+}
+
+func ensureOutputFileDoesNotExist(outputPath string) error {
+	if _, err := os.Stat(outputPath); err == nil {
+		return fmt.Errorf("output file already exists: %s", outputPath)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("check output file: %w", err)
+	}
+
+	return nil
+}
+
+func secretKindLabel(kind secretKind) string {
+	switch kind {
+	case secretKindText:
+		return "text"
+	case secretKindLoginPassword:
+		return "login-password"
+	case secretKindBankCard:
+		return "bank-card"
+	case secretKindBinary:
+		return "binary"
+	default:
+		return string(kind)
+	}
+}
+
+func secretTypeLabel(secretType core.SecretType) string {
+	switch secretType {
+	case core.SecretTypeText:
+		return "text"
+	case core.SecretTypeLoginPassword:
+		return "login_password"
+	case core.SecretTypeBankCard:
+		return "bank_card"
+	case core.SecretTypeBinary:
+		return "binary"
+	default:
+		return "unknown"
+	}
 }

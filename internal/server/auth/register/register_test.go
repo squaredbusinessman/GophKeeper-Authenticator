@@ -133,6 +133,10 @@ func TestServiceRegisterCreatesUserWithPasswordHashVaultMetadataAndAccessToken(t
 		t.Fatalf("AccessTokenExpiresAt = %s, want fixed expires at", result.AccessTokenExpiresAt)
 	}
 
+	if string(result.VaultKey.EncryptedVaultKey) != "encrypted-vault-key" {
+		t.Fatalf("result EncryptedVaultKey = %q, want encrypted vault key", string(result.VaultKey.EncryptedVaultKey))
+	}
+
 	if len(tokenIssuer.calls) != 1 || tokenIssuer.calls[0] != "user-id-1" {
 		t.Fatalf("token issuer calls = %v, want user-id-1", tokenIssuer.calls)
 	}

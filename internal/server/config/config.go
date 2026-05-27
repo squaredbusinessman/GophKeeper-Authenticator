@@ -9,6 +9,8 @@ import (
 	"github.com/ilyakaznacheev/cleanenv"
 )
 
+const minAccessTokenSecretLength = 32
+
 // Config описывает настройки серверного приложения
 type Config struct {
 	GRPCAddress       string        `env:"GOPHKEEPER_GRPC_ADDRESS" env-default:":9090"`
@@ -47,6 +49,10 @@ func (c *Config) Validate() error {
 
 	if c.AccessTokenTTL <= 0 {
 		return fmt.Errorf("access token ttl must be greater than zero")
+	}
+
+	if len(strings.TrimSpace(c.AccessTokenSecret)) < minAccessTokenSecretLength {
+		return fmt.Errorf("access token secret must be at least %d characters", minAccessTokenSecretLength)
 	}
 
 	if c.GRPCTLSEnabled {

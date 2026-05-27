@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/client/core"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type fakeCLIAuthService struct {
@@ -125,6 +127,90 @@ func TestRegisterCommandPromptsPasswordsHiddenAndCallsAuthService(t *testing.T) 
 
 	if !strings.Contains(stdout.String(), "Регистрация выполнена") {
 		t.Fatalf("stdout = %q, want success message", stdout.String())
+	}
+}
+
+func TestUsageMentionsSecretTypesAndVersionSource(t *testing.T) {
+	var stdout bytes.Buffer
+
+	err := runCLI(context.Background(), nil, nil, nil, nil, &stdout, &bytes.Buffer{})
+	if err != nil {
+		t.Fatalf("runCLI() error = %v", err)
+	}
+
+	output := stdout.String()
+	for _, want := range []string{
+		"create [text|login-password|bank-card|binary]",
+		"update [text|login-password|bank-card|binary]",
+		"delete работает для любого типа секрета",
+		"version для update/delete",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("stdout = %q, want %q", output, want)
+		}
+	}
+}
+
+func TestUserFacingErrorMapsCommonCLIProblems(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{
+			name: "connection_refused",
+			err:  errors.New(`login: rpc error: code = Unavailable desc = connection error: dial tcp 127.0.0.1:9090: connect: connection refused`),
+			want: "не удалось подключиться к серверу",
+		},
+		{
+			name: "version_conflict",
+			err:  errors.New("update text secret: rpc error: code = FailedPrecondition desc = version conflict"),
+			want: "актуальной version",
+		},
+		{
+			name: "wrong_master_password",
+			err:  errors.New("open vault: login: could not decrypt vault key: cipher: message authentication failed"),
+			want: "неверный мастер-пароль",
+		},
+		{
+			name: "invalid_credentials",
+			err:  errors.New("open vault: login: could not login: rpc error: code = Unauthenticated desc = invalid credentials"),
+			want: "неверный login или пароль входа",
+		},
+		{
+			name: "login_already_exists",
+			err:  errors.New("register: could not register user: rpc error: code = AlreadyExists desc = login already exists"),
+			want: "пользователь с таким login уже существует",
+		},
+		{
+			name: "invalid_utf8",
+			err:  errors.New("register: could not register user: rpc error: code = Internal desc = grpc: error while marshaling: string field contains invalid UTF-8"),
+			want: "недопустимые символы",
+		},
+		{
+			name: "not_found_status",
+			err:  status.Error(codes.NotFound, "item not found"),
+			want: "секрет не найден",
+		},
+		{
+			name: "internal_status",
+			err:  status.Error(codes.Internal, "register failed"),
+			want: "внутренняя ошибка сервера",
+		},
+		{
+			name: "binary_output_exists",
+			err:  errors.New("output file already exists: /tmp/secret.bin"),
+			want: "файл для сохранения binary-секрета уже существует",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := userFacingError(tt.err)
+			if !strings.Contains(got, tt.want) {
+				t.Fatalf("userFacingError() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
 

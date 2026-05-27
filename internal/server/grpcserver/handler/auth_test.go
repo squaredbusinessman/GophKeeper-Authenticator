@@ -75,6 +75,19 @@ func validRegisterResult() register.Result {
 		UserID:               "user-id-1",
 		AccessToken:          "access-token",
 		AccessTokenExpiresAt: time.Date(2026, 5, 18, 12, 5, 0, 0, time.UTC),
+		VaultKey: register.VaultKeyEnvelope{
+			EncryptedVaultKey: []byte("encrypted-vault-key"),
+			Nonce:             []byte("vault-key-nonce"),
+			EncryptionAlg:     "xchacha20poly1305",
+			KDFParams: register.KDFParams{
+				Algorithm:   "argon2id",
+				Salt:        []byte("kdf-salt"),
+				TimeCost:    3,
+				MemoryKiB:   64 * 1024,
+				Parallelism: 4,
+				KeyLength:   32,
+			},
+		},
 	}
 }
 

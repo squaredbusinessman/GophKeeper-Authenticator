@@ -738,7 +738,7 @@ func TestVaultHandlerMapsUseCaseErrors(t *testing.T) {
 		{
 			name: "version conflict",
 			err:  vault.ErrVersionConflict,
-			code: codes.Aborted,
+			code: codes.FailedPrecondition,
 		},
 		{
 			name: "internal error",

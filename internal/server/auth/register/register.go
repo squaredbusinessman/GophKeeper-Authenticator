@@ -28,6 +28,7 @@ type Result struct {
 	UserID               string
 	AccessToken          string
 	AccessTokenExpiresAt time.Time
+	VaultKey             VaultKeyEnvelope
 }
 
 // KDFParams описывает параметры получения encryption key из мастер-пароля

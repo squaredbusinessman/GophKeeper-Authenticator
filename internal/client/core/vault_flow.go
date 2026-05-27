@@ -69,19 +69,23 @@ type Secret struct {
 	DeletedAt            *time.Time
 }
 
+// ListSecretsInput содержит параметры получения списка секретов
 type ListSecretsInput struct {
 	IncludeDeleted bool
 }
 
+// SyncSecretsInput содержит параметры синхронизации секретов
 type SyncSecretsInput struct {
 	ChangedAfter time.Time
 }
 
+// SyncSecretsResult содержит результат синхронизации секретов
 type SyncSecretsResult struct {
 	Secrets          []Secret
 	NextChangedAfter time.Time
 }
 
+// UpdateSecretInput содержит plaintext-данные и expected version для обновления секрета
 type UpdateSecretInput struct {
 	ID                   string
 	ExpectedVersion      int64
@@ -91,11 +95,13 @@ type UpdateSecretInput struct {
 	PayloadSchemaVersion uint32
 }
 
+// DeleteSecretInput содержит данные для soft delete секрета
 type DeleteSecretInput struct {
 	ID              string
 	ExpectedVersion int64
 }
 
+// DeleteSecretResult содержит результат soft delete секрета
 type DeleteSecretResult struct {
 	ID        string
 	Version   int64

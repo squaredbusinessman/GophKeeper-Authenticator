@@ -77,15 +77,10 @@ jobs:
       - name: Build server
         run: go build -o /tmp/gophkeeper-server ./cmd/gophkeeper-server
 
-      - name: Start server with migrations
-        env:
-          GOPHKEEPER_DATABASE_DSN: postgres://gophkeeper:gophkeeper@localhost:5432/gophkeeper?sslmode=disable
-          GOPHKEEPER_ACCESS_TOKEN_SECRET: ci-local-secret
-          GOPHKEEPER_LOG_MODE: prod
-        run: |
-          timeout 10s /tmp/gophkeeper-server || test $? -eq 124
+      - name: Build CLI
+        run: go build -o /tmp/gophkeeper-cli ./cmd/gophkeeper-cli
 
-      - name: Test auth repositories with PostgreSQL
+      - name: Run smoke flow
         env:
           GOPHKEEPER_TEST_DATABASE_DSN: postgres://gophkeeper:gophkeeper@localhost:5432/gophkeeper?sslmode=disable
-        run: go test ./internal/server/auth/register ./internal/server/auth/login
+        run: go test -tags=smoke ./internal/smoke

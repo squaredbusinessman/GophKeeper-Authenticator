@@ -3,6 +3,7 @@ package grpcserver
 
 import (
 	"database/sql"
+	"fmt"
 	"net"
 
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/server/auth/login"
@@ -11,6 +12,7 @@ import (
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/server/vault"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 
 	gophkeeperv1 "github.com/squaredbusinessman/gophkeeper-authenticator/internal/gen/proto/gophkeeper/v1"
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/server/config"
@@ -28,16 +30,35 @@ type Server struct {
 
 // New создает и настраивает gRPC-сервер
 func New(cfg *config.Config, logger *zap.Logger, db *sql.DB) (*Server, error) {
+	tokenIssuer := token.NewIssuer(cfg.AccessTokenSecret, cfg.AccessTokenTTL)
+	serverOptions := []grpc.ServerOption{
+		grpc.ChainUnaryInterceptor(
+			AuthUnaryInterceptor(tokenIssuer),
+			LoggingUnaryInterceptor(logger),
+		),
+	}
+
+	if cfg.GRPCTLSEnabled {
+		creds, err := credentials.NewServerTLSFromFile(cfg.GRPCTLSCertFile, cfg.GRPCTLSKeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("load grpc TLS credentials: %w", err)
+		}
+
+		serverOptions = append(serverOptions, grpc.Creds(creds))
+	}
+
 	listener, err := net.Listen("tcp", cfg.GRPCAddress)
 	if err != nil {
 		return nil, err
 	}
+	listenerOwned := true
+	defer func() {
+		if listenerOwned {
+			_ = listener.Close()
+		}
+	}()
 
-	tokenIssuer := token.NewIssuer(cfg.AccessTokenSecret, cfg.AccessTokenTTL)
-
-	grpcServer := grpc.NewServer(
-		grpc.UnaryInterceptor(AuthUnaryInterceptor(tokenIssuer)),
-	)
+	grpcServer := grpc.NewServer(serverOptions...)
 
 	registerRepository := register.NewPostgresRepository(db)
 	registerUseCase := register.NewService(registerRepository, nil, nil, tokenIssuer)
@@ -51,6 +72,7 @@ func New(cfg *config.Config, logger *zap.Logger, db *sql.DB) (*Server, error) {
 	gophkeeperv1.RegisterAuthServiceServer(grpcServer, handler.NewAuthHandler(registerUseCase, loginUseCase))
 	gophkeeperv1.RegisterVaultServiceServer(grpcServer, handler.NewVaultHandler(vaultUseCase))
 
+	listenerOwned = false
 	return &Server{
 		grpcServer: grpcServer,
 		listener:   listener,

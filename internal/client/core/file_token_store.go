@@ -3,17 +3,11 @@ package core
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
-)
-
-var (
-	// ErrTokenStateNotFound означает, что сохраненный access token еще не создан
-	ErrTokenStateNotFound = errors.New("token state not found")
 )
 
 // FileTokenStore хранит состояние access token в локальном JSON-файле клиента
@@ -84,42 +78,6 @@ func (s *FileTokenStore) Save(ctx context.Context, state TokenState) error {
 	}
 
 	return nil
-}
-
-// Load загружает сохраненный token state из файла
-func (s *FileTokenStore) Load(ctx context.Context) (TokenState, error) {
-	if err := ctx.Err(); err != nil {
-		return TokenState{}, err
-	}
-
-	path, err := s.validatePath()
-	if err != nil {
-		return TokenState{}, err
-	}
-
-	data, err := os.ReadFile(path)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return TokenState{}, ErrTokenStateNotFound
-		}
-
-		return TokenState{}, fmt.Errorf("read token state file: %w", err)
-	}
-
-	var payload tokenStateFile
-	if err = json.Unmarshal(data, &payload); err != nil {
-		return TokenState{}, fmt.Errorf("decode token state file: %w", err)
-	}
-
-	state := TokenState{
-		AccessToken: payload.AccessToken,
-		ExpiresAt:   payload.ExpiresAt,
-	}
-	if err = state.validate(); err != nil {
-		return TokenState{}, fmt.Errorf("validate token state file: %w", err)
-	}
-
-	return state, nil
 }
 
 func (s *FileTokenStore) validatePath() (string, error) {

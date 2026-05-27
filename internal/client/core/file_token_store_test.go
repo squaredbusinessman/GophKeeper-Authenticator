@@ -2,14 +2,14 @@ package core
 
 import (
 	"context"
-	"errors"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 )
 
-func TestFileTokenStoreSaveAndLoad(t *testing.T) {
+func TestFileTokenStoreSaveWritesTokenState(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "nested", "token.json")
 	store := NewFileTokenStore(path)
 	expiresAt := time.Date(2026, 5, 19, 12, 30, 0, 0, time.UTC)
@@ -22,9 +22,14 @@ func TestFileTokenStoreSaveAndLoad(t *testing.T) {
 		t.Fatalf("Save() error = %v", err)
 	}
 
-	state, err := store.Load(context.Background())
+	data, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("Load() error = %v", err)
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+
+	var state tokenStateFile
+	if err = json.Unmarshal(data, &state); err != nil {
+		t.Fatalf("Unmarshal() error = %v", err)
 	}
 
 	if state.AccessToken != "access-token" {
@@ -55,29 +60,6 @@ func TestFileTokenStoreSaveCreatesPrivateFile(t *testing.T) {
 
 	if info.Mode().Perm() != 0o600 {
 		t.Fatalf("file permissions = %o, want 600", info.Mode().Perm())
-	}
-}
-
-func TestFileTokenStoreLoadReturnsNotFoundForMissingFile(t *testing.T) {
-	store := NewFileTokenStore(filepath.Join(t.TempDir(), "missing.json"))
-
-	_, err := store.Load(context.Background())
-	if !errors.Is(err, ErrTokenStateNotFound) {
-		t.Fatalf("Load() error = %v, want ErrTokenStateNotFound", err)
-	}
-}
-
-func TestFileTokenStoreLoadReturnsErrorForBrokenJSON(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "token.json")
-	if err := os.WriteFile(path, []byte("{broken json"), 0o600); err != nil {
-		t.Fatalf("WriteFile() error = %v", err)
-	}
-
-	store := NewFileTokenStore(path)
-
-	_, err := store.Load(context.Background())
-	if err == nil {
-		t.Fatalf("Load() error = nil, want error")
 	}
 }
 

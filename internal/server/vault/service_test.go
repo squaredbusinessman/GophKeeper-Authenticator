@@ -543,6 +543,57 @@ func TestServiceUpdateItemReturnsVersionConflict(t *testing.T) {
 	}
 }
 
+func TestServiceUpdateItemReturnsNotFoundWhenItemIsDeleted(t *testing.T) {
+	deletedAt := time.Date(2026, 5, 20, 14, 0, 0, 0, time.UTC)
+	repository := &fakeRepository{
+		findFunc: func(context.Context, string) (Item, error) {
+			item := validItem()
+			item.Version = 3
+			item.DeletedAt = &deletedAt
+			return item, nil
+		},
+	}
+	service := newTestService(repository)
+
+	_, err := service.UpdateItem(context.Background(), validUpdateInput())
+	if !errors.Is(err, ErrItemNotFound) {
+		t.Fatalf("UpdateItem() error = %v, want ErrItemNotFound", err)
+	}
+
+	if len(repository.updateCalls) != 0 {
+		t.Fatalf("repository update calls = %d, want 0", len(repository.updateCalls))
+	}
+}
+
+func TestServiceUpdateItemReturnsNotFoundWhenItemIsDeletedDuringUpdate(t *testing.T) {
+	deletedAt := time.Date(2026, 5, 20, 14, 0, 0, 0, time.UTC)
+	findCalls := 0
+	repository := &fakeRepository{
+		findFunc: func(context.Context, string) (Item, error) {
+			findCalls++
+			item := validItem()
+			item.Version = 3
+			if findCalls > 1 {
+				item.DeletedAt = &deletedAt
+			}
+			return item, nil
+		},
+		updateFunc: func(context.Context, UpdateItemParams) (Item, error) {
+			return Item{}, ErrVersionConflict
+		},
+	}
+	service := newTestService(repository)
+
+	_, err := service.UpdateItem(context.Background(), validUpdateInput())
+	if !errors.Is(err, ErrItemNotFound) {
+		t.Fatalf("UpdateItem() error = %v, want ErrItemNotFound", err)
+	}
+
+	if len(repository.updateCalls) != 1 {
+		t.Fatalf("repository update calls = %d, want 1", len(repository.updateCalls))
+	}
+}
+
 func TestServiceUpdateItemReturnsAccessDeniedForDifferentOwner(t *testing.T) {
 	repository := &fakeRepository{
 		findFunc: func(context.Context, string) (Item, error) {
@@ -681,6 +732,65 @@ func TestServiceDeleteItemReturnsVersionConflict(t *testing.T) {
 
 	if len(repository.deleteCalls) != 0 {
 		t.Fatalf("repository delete calls = %d, want 0", len(repository.deleteCalls))
+	}
+}
+
+func TestServiceDeleteItemReturnsNotFoundWhenItemIsDeleted(t *testing.T) {
+	deletedAt := time.Date(2026, 5, 20, 14, 0, 0, 0, time.UTC)
+	repository := &fakeRepository{
+		findFunc: func(context.Context, string) (Item, error) {
+			item := validItem()
+			item.Version = 5
+			item.DeletedAt = &deletedAt
+			return item, nil
+		},
+	}
+	service := newTestService(repository)
+
+	_, err := service.DeleteItem(context.Background(), DeleteItemInput{
+		UserID:          "user-id-1",
+		ItemID:          "item-id-1",
+		ExpectedVersion: 5,
+	})
+	if !errors.Is(err, ErrItemNotFound) {
+		t.Fatalf("DeleteItem() error = %v, want ErrItemNotFound", err)
+	}
+
+	if len(repository.deleteCalls) != 0 {
+		t.Fatalf("repository delete calls = %d, want 0", len(repository.deleteCalls))
+	}
+}
+
+func TestServiceDeleteItemReturnsNotFoundWhenItemIsDeletedDuringDelete(t *testing.T) {
+	deletedAt := time.Date(2026, 5, 20, 14, 0, 0, 0, time.UTC)
+	findCalls := 0
+	repository := &fakeRepository{
+		findFunc: func(context.Context, string) (Item, error) {
+			findCalls++
+			item := validItem()
+			item.Version = 5
+			if findCalls > 1 {
+				item.DeletedAt = &deletedAt
+			}
+			return item, nil
+		},
+		deleteFunc: func(context.Context, DeleteItemParams) (DeleteItemResult, error) {
+			return DeleteItemResult{}, ErrVersionConflict
+		},
+	}
+	service := newTestService(repository)
+
+	_, err := service.DeleteItem(context.Background(), DeleteItemInput{
+		UserID:          "user-id-1",
+		ItemID:          "item-id-1",
+		ExpectedVersion: 5,
+	})
+	if !errors.Is(err, ErrItemNotFound) {
+		t.Fatalf("DeleteItem() error = %v, want ErrItemNotFound", err)
+	}
+
+	if len(repository.deleteCalls) != 1 {
+		t.Fatalf("repository delete calls = %d, want 1", len(repository.deleteCalls))
 	}
 }
 

@@ -22,9 +22,11 @@ const (
 	// BinaryPayloadSchemaVersion версия схемы payload для бинарного секрета
 	BinaryPayloadSchemaVersion uint32 = 1
 
+	// MaxInlineBinaryPayloadSize задает максимальный размер binary payload для inline-хранения
 	MaxInlineBinaryPayloadSize = 5 * 1024 * 1024
 )
 
+// ErrBinaryFileTooLarge означает превышение лимита inline binary payload
 var ErrBinaryFileTooLarge = errors.New("binary file too large")
 
 // LoginPasswordPayload описывает payload секрета с логином и паролем
@@ -59,6 +61,7 @@ type BinaryPayload struct {
 	Data           []byte `json:"data"`
 }
 
+// EncodeLoginPasswordPayload валидирует и кодирует login/password payload в JSON-схему
 func EncodeLoginPasswordPayload(value LoginPasswordPayload) ([]byte, uint32, error) {
 	if strings.TrimSpace(value.Login) == "" {
 		return nil, 0, fmt.Errorf("login is required")
@@ -69,10 +72,12 @@ func EncodeLoginPasswordPayload(value LoginPasswordPayload) ([]byte, uint32, err
 	return encodePayload(value, LoginPasswordPayloadSchemaVersion)
 }
 
+// DecodeLoginPasswordPayload декодирует login/password payload с проверкой версии схемы
 func DecodeLoginPasswordPayload(raw []byte, version uint32) (LoginPasswordPayload, error) {
 	return decodePayload[LoginPasswordPayload](raw, version, LoginPasswordPayloadSchemaVersion)
 }
 
+// EncodeTextPayload валидирует и кодирует text payload в JSON-схему
 func EncodeTextPayload(value TextPayload) ([]byte, uint32, error) {
 	if value.Text == "" {
 		return nil, 0, fmt.Errorf("text is required")
@@ -80,10 +85,12 @@ func EncodeTextPayload(value TextPayload) ([]byte, uint32, error) {
 	return encodePayload(value, TextPayloadSchemaVersion)
 }
 
+// DecodeTextPayload декодирует text payload с проверкой версии схемы
 func DecodeTextPayload(raw []byte, version uint32) (TextPayload, error) {
 	return decodePayload[TextPayload](raw, version, TextPayloadSchemaVersion)
 }
 
+// EncodeBankCardPayload валидирует и кодирует bank card payload в JSON-схему
 func EncodeBankCardPayload(value BankCardPayload) ([]byte, uint32, error) {
 	if strings.TrimSpace(value.Number) == "" {
 		return nil, 0, fmt.Errorf("card number is required")
@@ -100,10 +107,12 @@ func EncodeBankCardPayload(value BankCardPayload) ([]byte, uint32, error) {
 	return encodePayload(value, BankCardPayloadSchemaVersion)
 }
 
+// DecodeBankCardPayload декодирует bank card payload с проверкой версии схемы
 func DecodeBankCardPayload(raw []byte, version uint32) (BankCardPayload, error) {
 	return decodePayload[BankCardPayload](raw, version, BankCardPayloadSchemaVersion)
 }
 
+// EncodeBinaryPayload валидирует binary payload, считает metadata и кодирует JSON-схему
 func EncodeBinaryPayload(value BinaryPayload) ([]byte, uint32, error) {
 	if strings.TrimSpace(value.FileName) == "" {
 		return nil, 0, fmt.Errorf("file name is required")
@@ -124,6 +133,7 @@ func EncodeBinaryPayload(value BinaryPayload) ([]byte, uint32, error) {
 	return encodePayload(value, BinaryPayloadSchemaVersion)
 }
 
+// DecodeBinaryPayload декодирует binary payload и проверяет размер с checksum
 func DecodeBinaryPayload(raw []byte, version uint32) (BinaryPayload, error) {
 	value, err := decodePayload[BinaryPayload](raw, version, BinaryPayloadSchemaVersion)
 	if err != nil {

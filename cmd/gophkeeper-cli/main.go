@@ -5,18 +5,22 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/client/config"
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/client/core"
 	gophkeeperv1 "github.com/squaredbusinessman/gophkeeper-authenticator/internal/gen/proto/gophkeeper/v1"
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/shared/version"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 )
 
 func main() {
 	if err := run(context.Background(), os.Args[1:], os.Stdout, os.Stderr); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error: %s\n", userFacingError(err))
 		os.Exit(1)
 	}
 }
@@ -43,12 +47,76 @@ func printUsageTo(stdout io.Writer) {
 	fmt.Fprintln(stdout, "  gophkeeper version")
 	fmt.Fprintln(stdout, "  gophkeeper register")
 	fmt.Fprintln(stdout, "  gophkeeper login")
-	fmt.Fprintln(stdout, "  gophkeeper create")
+	fmt.Fprintln(stdout, "  gophkeeper create [text|login-password|bank-card|binary]")
 	fmt.Fprintln(stdout, "  gophkeeper get")
 	fmt.Fprintln(stdout, "  gophkeeper list")
-	fmt.Fprintln(stdout, "  gophkeeper update")
+	fmt.Fprintln(stdout, "  gophkeeper update [text|login-password|bank-card|binary]")
 	fmt.Fprintln(stdout, "  gophkeeper delete")
 	fmt.Fprintln(stdout, "  gophkeeper sync")
+	fmt.Fprintln(stdout)
+	fmt.Fprintln(stdout, "Examples:")
+	fmt.Fprintln(stdout, "  gophkeeper create text")
+	fmt.Fprintln(stdout, "  gophkeeper create login-password")
+	fmt.Fprintln(stdout, "  gophkeeper create bank-card")
+	fmt.Fprintln(stdout, "  gophkeeper create binary")
+	fmt.Fprintln(stdout, "  gophkeeper update text")
+	fmt.Fprintln(stdout)
+	fmt.Fprintln(stdout, "Notes:")
+	fmt.Fprintln(stdout, "  delete работает для любого типа секрета")
+	fmt.Fprintln(stdout, "  version для update/delete берите из get, list или sync")
+}
+
+func userFacingError(err error) string {
+	if err == nil {
+		return ""
+	}
+
+	message := err.Error()
+	lowerMessage := strings.ToLower(message)
+
+	switch {
+	case strings.Contains(lowerMessage, "string field contains invalid utf-8"):
+		return "введенные данные содержат недопустимые символы. Используйте UTF-8 символы для login и пароля входа"
+	case strings.Contains(lowerMessage, "output file already exists"):
+		return "файл для сохранения binary-секрета уже существует. Укажите другой Output path, чтобы не перезаписать существующий файл"
+	case strings.Contains(lowerMessage, "invalid credentials"):
+		return "неверный login или пароль входа"
+	case strings.Contains(lowerMessage, "login already exists"):
+		return "пользователь с таким login уже существует. Выполните login или выберите другой login для регистрации"
+	case strings.Contains(lowerMessage, "connection refused") ||
+		strings.Contains(lowerMessage, "error while dialing") ||
+		strings.Contains(lowerMessage, "code = unavailable"):
+		return "не удалось подключиться к серверу. Проверьте, что gophkeeper-server запущен и адрес GOPHKEEPER_SERVER_ADDRESS указан верно"
+	case strings.Contains(lowerMessage, "version conflict") ||
+		strings.Contains(lowerMessage, "code = failedprecondition"):
+		return "version conflict: версия секрета устарела. Выполните gophkeeper list или gophkeeper sync и повторите команду с актуальной version"
+	case strings.Contains(lowerMessage, "could not decrypt vault key") ||
+		strings.Contains(lowerMessage, "message authentication failed"):
+		return "неверный мастер-пароль: vault key не удалось расшифровать"
+	}
+
+	switch status.Code(err) {
+	case codes.AlreadyExists:
+		return "пользователь с таким login уже существует. Выполните login или выберите другой login для регистрации"
+	case codes.Unauthenticated:
+		return "неверный login или пароль входа"
+	case codes.Unavailable:
+		return "не удалось подключиться к серверу. Проверьте, что gophkeeper-server запущен и адрес GOPHKEEPER_SERVER_ADDRESS указан верно"
+	case codes.FailedPrecondition:
+		return "version conflict: версия секрета устарела. Выполните gophkeeper list или gophkeeper sync и повторите команду с актуальной version"
+	case codes.Aborted:
+		return "version conflict: версия секрета устарела. Выполните gophkeeper list или gophkeeper sync и повторите команду с актуальной version"
+	case codes.NotFound:
+		return "секрет не найден. Проверьте Secret ID через gophkeeper list или gophkeeper sync"
+	case codes.PermissionDenied:
+		return "нет доступа к этому секрету"
+	case codes.InvalidArgument:
+		return "некорректные данные команды. Проверьте обязательные поля и повторите ввод"
+	case codes.Internal:
+		return "внутренняя ошибка сервера. Проверьте логи gophkeeper-server"
+	default:
+		return message
+	}
 }
 
 func run(ctx context.Context, args []string, stdout io.Writer, stderr io.Writer) error {
@@ -61,9 +129,19 @@ func run(ctx context.Context, args []string, stdout io.Writer, stderr io.Writer)
 		return fmt.Errorf("error loading config: %w", err)
 	}
 
+	transportCredentials := insecure.NewCredentials()
+	if cfg.ServerTLSEnabled {
+		tlsCredentials, err := credentials.NewClientTLSFromFile(cfg.ServerTLSCertFile, "")
+		if err != nil {
+			return fmt.Errorf("load server TLS credentials: %w", err)
+		}
+
+		transportCredentials = tlsCredentials
+	}
+
 	conn, err := grpc.NewClient(
 		cfg.ServerAddress,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithTransportCredentials(transportCredentials),
 	)
 	if err != nil {
 		return fmt.Errorf("error creating grpc client: %w", err)

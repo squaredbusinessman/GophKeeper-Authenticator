@@ -6,9 +6,11 @@ import (
 	"time"
 )
 
+const testAccessTokenSecret = "test-access-token-secret-32-bytes"
+
 func TestLoadReturnsServerConfigWithDefaults(t *testing.T) {
 	t.Setenv("GOPHKEEPER_DATABASE_DSN", "postgres://user:pass@localhost:5432/gophkeeper?sslmode=disable")
-	t.Setenv("GOPHKEEPER_ACCESS_TOKEN_SECRET", "secret")
+	t.Setenv("GOPHKEEPER_ACCESS_TOKEN_SECRET", testAccessTokenSecret)
 
 	cfg, err := Load()
 	if err != nil {
@@ -46,7 +48,7 @@ func TestLoadReturnsServerConfigFromEnv(t *testing.T) {
 	t.Setenv("GOPHKEEPER_GRPC_TLS_CERT_FILE", "/tmp/server.crt")
 	t.Setenv("GOPHKEEPER_GRPC_TLS_KEY_FILE", "/tmp/server.key")
 	t.Setenv("GOPHKEEPER_DATABASE_DSN", "postgres://custom")
-	t.Setenv("GOPHKEEPER_ACCESS_TOKEN_SECRET", "custom-secret")
+	t.Setenv("GOPHKEEPER_ACCESS_TOKEN_SECRET", testAccessTokenSecret)
 	t.Setenv("GOPHKEEPER_ACCESS_TOKEN_TTL", "30m")
 	t.Setenv("GOPHKEEPER_LOG_MODE", "prod")
 
@@ -75,8 +77,8 @@ func TestLoadReturnsServerConfigFromEnv(t *testing.T) {
 		t.Fatalf("DatabaseDSN = %q, want %q", cfg.DatabaseDSN, "postgres://custom")
 	}
 
-	if cfg.AccessTokenSecret != "custom-secret" {
-		t.Fatalf("AccessTokenSecret = %q, want %q", cfg.AccessTokenSecret, "custom-secret")
+	if cfg.AccessTokenSecret != testAccessTokenSecret {
+		t.Fatalf("AccessTokenSecret = %q, want %q", cfg.AccessTokenSecret, testAccessTokenSecret)
 	}
 
 	if cfg.AccessTokenTTL != 30*time.Minute {
@@ -89,7 +91,7 @@ func TestLoadReturnsServerConfigFromEnv(t *testing.T) {
 }
 
 func TestLoadReturnsErrorWhenDatabaseDSNMissing(t *testing.T) {
-	t.Setenv("GOPHKEEPER_ACCESS_TOKEN_SECRET", "secret")
+	t.Setenv("GOPHKEEPER_ACCESS_TOKEN_SECRET", testAccessTokenSecret)
 
 	_, err := Load()
 	if err == nil {
@@ -114,9 +116,23 @@ func TestLoadReturnsErrorWhenAccessTokenSecretMissing(t *testing.T) {
 	}
 }
 
+func TestLoadReturnsErrorWhenAccessTokenSecretTooShort(t *testing.T) {
+	t.Setenv("GOPHKEEPER_DATABASE_DSN", "postgres://custom")
+	t.Setenv("GOPHKEEPER_ACCESS_TOKEN_SECRET", "short-secret")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatalf("Load() error = nil, want error")
+	}
+
+	if !strings.Contains(err.Error(), "at least 32") {
+		t.Fatalf("Load() error = %q, want mention minimum length", err.Error())
+	}
+}
+
 func TestLoadReturnsErrorWhenTLSCertFileMissing(t *testing.T) {
 	t.Setenv("GOPHKEEPER_DATABASE_DSN", "postgres://custom")
-	t.Setenv("GOPHKEEPER_ACCESS_TOKEN_SECRET", "secret")
+	t.Setenv("GOPHKEEPER_ACCESS_TOKEN_SECRET", testAccessTokenSecret)
 	t.Setenv("GOPHKEEPER_GRPC_TLS_ENABLED", "true")
 	t.Setenv("GOPHKEEPER_GRPC_TLS_KEY_FILE", "/tmp/server.key")
 
@@ -132,7 +148,7 @@ func TestLoadReturnsErrorWhenTLSCertFileMissing(t *testing.T) {
 
 func TestLoadReturnsErrorWhenTLSKeyFileMissing(t *testing.T) {
 	t.Setenv("GOPHKEEPER_DATABASE_DSN", "postgres://custom")
-	t.Setenv("GOPHKEEPER_ACCESS_TOKEN_SECRET", "secret")
+	t.Setenv("GOPHKEEPER_ACCESS_TOKEN_SECRET", testAccessTokenSecret)
 	t.Setenv("GOPHKEEPER_GRPC_TLS_ENABLED", "true")
 	t.Setenv("GOPHKEEPER_GRPC_TLS_CERT_FILE", "/tmp/server.crt")
 
@@ -148,7 +164,7 @@ func TestLoadReturnsErrorWhenTLSKeyFileMissing(t *testing.T) {
 
 func TestLoadReturnsErrorWhenBoolInvalid(t *testing.T) {
 	t.Setenv("GOPHKEEPER_DATABASE_DSN", "postgres://custom")
-	t.Setenv("GOPHKEEPER_ACCESS_TOKEN_SECRET", "secret")
+	t.Setenv("GOPHKEEPER_ACCESS_TOKEN_SECRET", testAccessTokenSecret)
 	t.Setenv("GOPHKEEPER_GRPC_TLS_ENABLED", "not-bool")
 
 	_, err := Load()
@@ -163,7 +179,7 @@ func TestLoadReturnsErrorWhenBoolInvalid(t *testing.T) {
 
 func TestLoadReturnsErrorWhenDurationInvalid(t *testing.T) {
 	t.Setenv("GOPHKEEPER_DATABASE_DSN", "postgres://custom")
-	t.Setenv("GOPHKEEPER_ACCESS_TOKEN_SECRET", "secret")
+	t.Setenv("GOPHKEEPER_ACCESS_TOKEN_SECRET", testAccessTokenSecret)
 	t.Setenv("GOPHKEEPER_ACCESS_TOKEN_TTL", "not-duration")
 
 	_, err := Load()
@@ -178,7 +194,7 @@ func TestLoadReturnsErrorWhenDurationInvalid(t *testing.T) {
 
 func TestLoadReturnsErrorWhenLogModeInvalid(t *testing.T) {
 	t.Setenv("GOPHKEEPER_DATABASE_DSN", "postgres://custom")
-	t.Setenv("GOPHKEEPER_ACCESS_TOKEN_SECRET", "secret")
+	t.Setenv("GOPHKEEPER_ACCESS_TOKEN_SECRET", testAccessTokenSecret)
 	t.Setenv("GOPHKEEPER_LOG_MODE", "pretty")
 
 	_, err := Load()
@@ -195,7 +211,7 @@ func TestValidateReturnsErrorWhenGRPCAddressEmpty(t *testing.T) {
 	cfg := Config{
 		GRPCAddress:       " ",
 		DatabaseDSN:       "postgres://custom",
-		AccessTokenSecret: "secret",
+		AccessTokenSecret: testAccessTokenSecret,
 		AccessTokenTTL:    5 * time.Minute,
 	}
 
@@ -213,7 +229,7 @@ func TestValidateReturnsErrorWhenAccessTokenTTLNotPositive(t *testing.T) {
 	cfg := Config{
 		GRPCAddress:       ":9090",
 		DatabaseDSN:       "postgres://custom",
-		AccessTokenSecret: "secret",
+		AccessTokenSecret: testAccessTokenSecret,
 		AccessTokenTTL:    0,
 	}
 
