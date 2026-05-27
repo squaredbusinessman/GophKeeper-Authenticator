@@ -1,11 +1,50 @@
 site_name: GophKeeper Authenticator
 site_description: Клиент-серверный менеджер секретов с клиентским шифрованием vault.
+site_url: https://gophkeeper-authenticator.readthedocs.io/
 repo_url: https://github.com/squaredbusinessman/GophKeeper-Authenticator
+repo_name: squaredbusinessman/GophKeeper-Authenticator
+edit_uri: edit/main/docs/
+docs_dir: docs
+site_dir: site
 theme:
-  name: mkdocs
+  name: readthedocs
+  locale: ru
+  highlightjs: true
+  hljs_languages:
+    - bash
+    - go
+    - json
+    - protobuf
+    - yaml
+  navigation_depth: 4
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - fenced_code
+  - tables
+  - toc:
+      permalink: true
 nav:
-  - Обзор: index.md
-  - Клиент: client.md
-  - Сервер: server.md
-  - API: api.md
-  - Развертывание: deployment.md
+  - Обзор:
+      - Главная: index.md
+      - Требования: requirements.md
+      - Архитектура: architecture.md
+      - Безопасность: security.md
+  - Запуск:
+      - Быстрый старт: quickstart.md
+      - Развертывание: deployment.md
+      - Проверки качества: quality.md
+  - Клиенты:
+      - CLI: cli.md
+      - TUI: tui.md
+      - Общий клиентский слой: client.md
+  - Сервер:
+      - Серверное приложение: server.md
+      - Binary и MinIO: binary-storage.md
+      - Синхронизация: sync.md
+  - API:
+      - gRPC и protobuf: api.md
+      - OpenAPI: openapi.md
+  - Интеграции:
+      - Read the Docs и Codecov: integrations.md

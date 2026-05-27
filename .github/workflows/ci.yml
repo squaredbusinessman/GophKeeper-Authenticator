@@ -35,6 +35,13 @@ jobs:
       - name: Test coverage
         run: ./scripts/check_coverage.sh
 
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.out
+          fail_ci_if_error: true
+
       - name: Build CLI
         run: go build -o /tmp/gophkeeper-cli ./cmd/gophkeeper-cli
 
