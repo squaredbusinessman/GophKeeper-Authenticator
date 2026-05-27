@@ -71,7 +71,7 @@ jobs:
               ./scripts/check_coverage.sh | tee artifacts/coverage/coverage.txt
       - codecov/upload:
           files: artifacts/coverage/coverage.out
-          flags: unit
+          flags: circleci-go
       - store_artifacts:
           path: artifacts/coverage
           destination: coverage
