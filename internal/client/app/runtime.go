@@ -18,9 +18,11 @@ type Runtime struct {
 	Conn         *grpc.ClientConn
 	AuthClient   gophkeeperv1.AuthServiceClient
 	VaultClient  gophkeeperv1.VaultServiceClient
+	BlobClient   gophkeeperv1.BlobServiceClient
 	TokenStore   *core.FileTokenStore
 	AuthService  *core.AuthService
 	VaultService *core.VaultService
+	BlobService  *core.BlobService
 }
 
 // LoadRuntime загружает config и создает клиентские зависимости
@@ -58,6 +60,7 @@ func NewRuntime(cfg *config.Config) (*Runtime, error) {
 
 	authClient := gophkeeperv1.NewAuthServiceClient(conn)
 	vaultClient := gophkeeperv1.NewVaultServiceClient(conn)
+	blobClient := gophkeeperv1.NewBlobServiceClient(conn)
 	tokenStore := core.NewFileTokenStore(cfg.TokenFile)
 
 	return &Runtime{
@@ -65,9 +68,11 @@ func NewRuntime(cfg *config.Config) (*Runtime, error) {
 		Conn:         conn,
 		AuthClient:   authClient,
 		VaultClient:  vaultClient,
+		BlobClient:   blobClient,
 		TokenStore:   tokenStore,
 		AuthService:  core.NewAuthService(authClient, tokenStore),
 		VaultService: core.NewVaultService(vaultClient),
+		BlobService:  core.NewBlobService(blobClient),
 	}, nil
 }
 

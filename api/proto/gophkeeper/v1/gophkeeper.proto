@@ -74,6 +74,21 @@ service VaultService {
   }
 }
 
+// BlobService описывает загрузку и скачивание encrypted binary chunks
+service BlobService {
+  // CreateBlobUpload создает upload session для encrypted binary объекта
+  rpc CreateBlobUpload(CreateBlobUploadRequest) returns (CreateBlobUploadResponse);
+
+  // UploadBlob принимает encrypted chunks в рамках upload session
+  rpc UploadBlob(stream UploadBlobChunkRequest) returns (UploadBlobResponse);
+
+  // DownloadBlob возвращает encrypted chunks сохраненного binary объекта
+  rpc DownloadBlob(DownloadBlobRequest) returns (stream DownloadBlobChunk);
+
+  // AbortBlobUpload отменяет upload session
+  rpc AbortBlobUpload(AbortBlobUploadRequest) returns (AbortBlobUploadResponse);
+}
+
 // ItemType задает тип приватных данных в хранилище
 enum ItemType {
   // ITEM_TYPE_UNSPECIFIED используется, когда тип записи не задан
@@ -348,4 +363,103 @@ message SyncResponse {
 
   // next_page_token содержит токен следующей страницы изменений
   string next_page_token = 3;
+}
+
+// CreateBlobUploadRequest содержит параметры новой upload session
+message CreateBlobUploadRequest {
+  // expected_size содержит ожидаемый размер encrypted binary объекта
+  int64 expected_size = 1;
+
+  // chunk_size содержит размер encrypted chunk
+  int64 chunk_size = 2;
+
+  // expected_chunks содержит ожидаемое количество chunks
+  int32 expected_chunks = 3;
+
+  // checksum_sha256 содержит SHA256 checksum encrypted binary объекта
+  string checksum_sha256 = 4;
+}
+
+// CreateBlobUploadResponse содержит созданную upload session
+message CreateBlobUploadResponse {
+  // upload_id содержит идентификатор upload session
+  string upload_id = 1;
+
+  // expires_at содержит момент истечения upload session
+  google.protobuf.Timestamp expires_at = 2;
+
+  // chunk_size содержит согласованный размер encrypted chunk
+  int64 chunk_size = 3;
+}
+
+// UploadBlobChunkRequest содержит один encrypted chunk
+message UploadBlobChunkRequest {
+  // upload_id содержит идентификатор upload session
+  string upload_id = 1;
+
+  // chunk_index содержит порядковый номер chunk
+  int32 chunk_index = 2;
+
+  // data содержит encrypted bytes chunk
+  bytes data = 3;
+
+  // checksum_sha256 содержит SHA256 checksum encrypted chunk
+  string checksum_sha256 = 4;
+}
+
+// UploadBlobResponse содержит результат загрузки encrypted blob
+message UploadBlobResponse {
+  // blob_id содержит идентификатор сохраненного blob
+  string blob_id = 1;
+
+  // storage_bucket содержит bucket object storage
+  string storage_bucket = 2;
+
+  // object_prefix содержит префикс объектов blob
+  string object_prefix = 3;
+
+  // chunk_size содержит размер chunk
+  int64 chunk_size = 4;
+
+  // chunk_count содержит количество chunks
+  int32 chunk_count = 5;
+
+  // size_bytes содержит полный размер encrypted blob
+  int64 size_bytes = 6;
+
+  // checksum_sha256 содержит checksum encrypted blob
+  string checksum_sha256 = 7;
+}
+
+// DownloadBlobRequest содержит параметры скачивания encrypted blob
+message DownloadBlobRequest {
+  // blob_id содержит идентификатор blob
+  string blob_id = 1;
+}
+
+// DownloadBlobChunk содержит один encrypted chunk при скачивании
+message DownloadBlobChunk {
+  // blob_id содержит идентификатор blob
+  string blob_id = 1;
+
+  // chunk_index содержит порядковый номер chunk
+  int32 chunk_index = 2;
+
+  // data содержит encrypted bytes chunk
+  bytes data = 3;
+
+  // checksum_sha256 содержит SHA256 checksum encrypted chunk
+  string checksum_sha256 = 4;
+}
+
+// AbortBlobUploadRequest содержит параметры отмены upload session
+message AbortBlobUploadRequest {
+  // upload_id содержит идентификатор upload session
+  string upload_id = 1;
+}
+
+// AbortBlobUploadResponse содержит результат отмены upload session
+message AbortBlobUploadResponse {
+  // upload_id содержит идентификатор upload session
+  string upload_id = 1;
 }

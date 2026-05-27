@@ -1413,6 +1413,527 @@ func (x *SyncResponse) GetNextPageToken() string {
 	return ""
 }
 
+// CreateBlobUploadRequest содержит параметры новой upload session
+type CreateBlobUploadRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// expected_size содержит ожидаемый размер encrypted binary объекта
+	ExpectedSize int64 `protobuf:"varint,1,opt,name=expected_size,json=expectedSize,proto3" json:"expected_size,omitempty"`
+	// chunk_size содержит размер encrypted chunk
+	ChunkSize int64 `protobuf:"varint,2,opt,name=chunk_size,json=chunkSize,proto3" json:"chunk_size,omitempty"`
+	// expected_chunks содержит ожидаемое количество chunks
+	ExpectedChunks int32 `protobuf:"varint,3,opt,name=expected_chunks,json=expectedChunks,proto3" json:"expected_chunks,omitempty"`
+	// checksum_sha256 содержит SHA256 checksum encrypted binary объекта
+	ChecksumSha256 string `protobuf:"bytes,4,opt,name=checksum_sha256,json=checksumSha256,proto3" json:"checksum_sha256,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *CreateBlobUploadRequest) Reset() {
+	*x = CreateBlobUploadRequest{}
+	mi := &file_api_proto_gophkeeper_v1_gophkeeper_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateBlobUploadRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateBlobUploadRequest) ProtoMessage() {}
+
+func (x *CreateBlobUploadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_gophkeeper_v1_gophkeeper_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateBlobUploadRequest.ProtoReflect.Descriptor instead.
+func (*CreateBlobUploadRequest) Descriptor() ([]byte, []int) {
+	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *CreateBlobUploadRequest) GetExpectedSize() int64 {
+	if x != nil {
+		return x.ExpectedSize
+	}
+	return 0
+}
+
+func (x *CreateBlobUploadRequest) GetChunkSize() int64 {
+	if x != nil {
+		return x.ChunkSize
+	}
+	return 0
+}
+
+func (x *CreateBlobUploadRequest) GetExpectedChunks() int32 {
+	if x != nil {
+		return x.ExpectedChunks
+	}
+	return 0
+}
+
+func (x *CreateBlobUploadRequest) GetChecksumSha256() string {
+	if x != nil {
+		return x.ChecksumSha256
+	}
+	return ""
+}
+
+// CreateBlobUploadResponse содержит созданную upload session
+type CreateBlobUploadResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// upload_id содержит идентификатор upload session
+	UploadId string `protobuf:"bytes,1,opt,name=upload_id,json=uploadId,proto3" json:"upload_id,omitempty"`
+	// expires_at содержит момент истечения upload session
+	ExpiresAt *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	// chunk_size содержит согласованный размер encrypted chunk
+	ChunkSize     int64 `protobuf:"varint,3,opt,name=chunk_size,json=chunkSize,proto3" json:"chunk_size,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateBlobUploadResponse) Reset() {
+	*x = CreateBlobUploadResponse{}
+	mi := &file_api_proto_gophkeeper_v1_gophkeeper_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateBlobUploadResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateBlobUploadResponse) ProtoMessage() {}
+
+func (x *CreateBlobUploadResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_gophkeeper_v1_gophkeeper_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateBlobUploadResponse.ProtoReflect.Descriptor instead.
+func (*CreateBlobUploadResponse) Descriptor() ([]byte, []int) {
+	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *CreateBlobUploadResponse) GetUploadId() string {
+	if x != nil {
+		return x.UploadId
+	}
+	return ""
+}
+
+func (x *CreateBlobUploadResponse) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return nil
+}
+
+func (x *CreateBlobUploadResponse) GetChunkSize() int64 {
+	if x != nil {
+		return x.ChunkSize
+	}
+	return 0
+}
+
+// UploadBlobChunkRequest содержит один encrypted chunk
+type UploadBlobChunkRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// upload_id содержит идентификатор upload session
+	UploadId string `protobuf:"bytes,1,opt,name=upload_id,json=uploadId,proto3" json:"upload_id,omitempty"`
+	// chunk_index содержит порядковый номер chunk
+	ChunkIndex int32 `protobuf:"varint,2,opt,name=chunk_index,json=chunkIndex,proto3" json:"chunk_index,omitempty"`
+	// data содержит encrypted bytes chunk
+	Data []byte `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
+	// checksum_sha256 содержит SHA256 checksum encrypted chunk
+	ChecksumSha256 string `protobuf:"bytes,4,opt,name=checksum_sha256,json=checksumSha256,proto3" json:"checksum_sha256,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *UploadBlobChunkRequest) Reset() {
+	*x = UploadBlobChunkRequest{}
+	mi := &file_api_proto_gophkeeper_v1_gophkeeper_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UploadBlobChunkRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UploadBlobChunkRequest) ProtoMessage() {}
+
+func (x *UploadBlobChunkRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_gophkeeper_v1_gophkeeper_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UploadBlobChunkRequest.ProtoReflect.Descriptor instead.
+func (*UploadBlobChunkRequest) Descriptor() ([]byte, []int) {
+	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *UploadBlobChunkRequest) GetUploadId() string {
+	if x != nil {
+		return x.UploadId
+	}
+	return ""
+}
+
+func (x *UploadBlobChunkRequest) GetChunkIndex() int32 {
+	if x != nil {
+		return x.ChunkIndex
+	}
+	return 0
+}
+
+func (x *UploadBlobChunkRequest) GetData() []byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *UploadBlobChunkRequest) GetChecksumSha256() string {
+	if x != nil {
+		return x.ChecksumSha256
+	}
+	return ""
+}
+
+// UploadBlobResponse содержит результат загрузки encrypted blob
+type UploadBlobResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// blob_id содержит идентификатор сохраненного blob
+	BlobId string `protobuf:"bytes,1,opt,name=blob_id,json=blobId,proto3" json:"blob_id,omitempty"`
+	// storage_bucket содержит bucket object storage
+	StorageBucket string `protobuf:"bytes,2,opt,name=storage_bucket,json=storageBucket,proto3" json:"storage_bucket,omitempty"`
+	// object_prefix содержит префикс объектов blob
+	ObjectPrefix string `protobuf:"bytes,3,opt,name=object_prefix,json=objectPrefix,proto3" json:"object_prefix,omitempty"`
+	// chunk_size содержит размер chunk
+	ChunkSize int64 `protobuf:"varint,4,opt,name=chunk_size,json=chunkSize,proto3" json:"chunk_size,omitempty"`
+	// chunk_count содержит количество chunks
+	ChunkCount int32 `protobuf:"varint,5,opt,name=chunk_count,json=chunkCount,proto3" json:"chunk_count,omitempty"`
+	// size_bytes содержит полный размер encrypted blob
+	SizeBytes int64 `protobuf:"varint,6,opt,name=size_bytes,json=sizeBytes,proto3" json:"size_bytes,omitempty"`
+	// checksum_sha256 содержит checksum encrypted blob
+	ChecksumSha256 string `protobuf:"bytes,7,opt,name=checksum_sha256,json=checksumSha256,proto3" json:"checksum_sha256,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *UploadBlobResponse) Reset() {
+	*x = UploadBlobResponse{}
+	mi := &file_api_proto_gophkeeper_v1_gophkeeper_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UploadBlobResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UploadBlobResponse) ProtoMessage() {}
+
+func (x *UploadBlobResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_gophkeeper_v1_gophkeeper_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UploadBlobResponse.ProtoReflect.Descriptor instead.
+func (*UploadBlobResponse) Descriptor() ([]byte, []int) {
+	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *UploadBlobResponse) GetBlobId() string {
+	if x != nil {
+		return x.BlobId
+	}
+	return ""
+}
+
+func (x *UploadBlobResponse) GetStorageBucket() string {
+	if x != nil {
+		return x.StorageBucket
+	}
+	return ""
+}
+
+func (x *UploadBlobResponse) GetObjectPrefix() string {
+	if x != nil {
+		return x.ObjectPrefix
+	}
+	return ""
+}
+
+func (x *UploadBlobResponse) GetChunkSize() int64 {
+	if x != nil {
+		return x.ChunkSize
+	}
+	return 0
+}
+
+func (x *UploadBlobResponse) GetChunkCount() int32 {
+	if x != nil {
+		return x.ChunkCount
+	}
+	return 0
+}
+
+func (x *UploadBlobResponse) GetSizeBytes() int64 {
+	if x != nil {
+		return x.SizeBytes
+	}
+	return 0
+}
+
+func (x *UploadBlobResponse) GetChecksumSha256() string {
+	if x != nil {
+		return x.ChecksumSha256
+	}
+	return ""
+}
+
+// DownloadBlobRequest содержит параметры скачивания encrypted blob
+type DownloadBlobRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// blob_id содержит идентификатор blob
+	BlobId        string `protobuf:"bytes,1,opt,name=blob_id,json=blobId,proto3" json:"blob_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DownloadBlobRequest) Reset() {
+	*x = DownloadBlobRequest{}
+	mi := &file_api_proto_gophkeeper_v1_gophkeeper_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DownloadBlobRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DownloadBlobRequest) ProtoMessage() {}
+
+func (x *DownloadBlobRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_gophkeeper_v1_gophkeeper_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DownloadBlobRequest.ProtoReflect.Descriptor instead.
+func (*DownloadBlobRequest) Descriptor() ([]byte, []int) {
+	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *DownloadBlobRequest) GetBlobId() string {
+	if x != nil {
+		return x.BlobId
+	}
+	return ""
+}
+
+// DownloadBlobChunk содержит один encrypted chunk при скачивании
+type DownloadBlobChunk struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// blob_id содержит идентификатор blob
+	BlobId string `protobuf:"bytes,1,opt,name=blob_id,json=blobId,proto3" json:"blob_id,omitempty"`
+	// chunk_index содержит порядковый номер chunk
+	ChunkIndex int32 `protobuf:"varint,2,opt,name=chunk_index,json=chunkIndex,proto3" json:"chunk_index,omitempty"`
+	// data содержит encrypted bytes chunk
+	Data []byte `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
+	// checksum_sha256 содержит SHA256 checksum encrypted chunk
+	ChecksumSha256 string `protobuf:"bytes,4,opt,name=checksum_sha256,json=checksumSha256,proto3" json:"checksum_sha256,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *DownloadBlobChunk) Reset() {
+	*x = DownloadBlobChunk{}
+	mi := &file_api_proto_gophkeeper_v1_gophkeeper_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DownloadBlobChunk) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DownloadBlobChunk) ProtoMessage() {}
+
+func (x *DownloadBlobChunk) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_gophkeeper_v1_gophkeeper_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DownloadBlobChunk.ProtoReflect.Descriptor instead.
+func (*DownloadBlobChunk) Descriptor() ([]byte, []int) {
+	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *DownloadBlobChunk) GetBlobId() string {
+	if x != nil {
+		return x.BlobId
+	}
+	return ""
+}
+
+func (x *DownloadBlobChunk) GetChunkIndex() int32 {
+	if x != nil {
+		return x.ChunkIndex
+	}
+	return 0
+}
+
+func (x *DownloadBlobChunk) GetData() []byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *DownloadBlobChunk) GetChecksumSha256() string {
+	if x != nil {
+		return x.ChecksumSha256
+	}
+	return ""
+}
+
+// AbortBlobUploadRequest содержит параметры отмены upload session
+type AbortBlobUploadRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// upload_id содержит идентификатор upload session
+	UploadId      string `protobuf:"bytes,1,opt,name=upload_id,json=uploadId,proto3" json:"upload_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AbortBlobUploadRequest) Reset() {
+	*x = AbortBlobUploadRequest{}
+	mi := &file_api_proto_gophkeeper_v1_gophkeeper_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AbortBlobUploadRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AbortBlobUploadRequest) ProtoMessage() {}
+
+func (x *AbortBlobUploadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_gophkeeper_v1_gophkeeper_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AbortBlobUploadRequest.ProtoReflect.Descriptor instead.
+func (*AbortBlobUploadRequest) Descriptor() ([]byte, []int) {
+	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *AbortBlobUploadRequest) GetUploadId() string {
+	if x != nil {
+		return x.UploadId
+	}
+	return ""
+}
+
+// AbortBlobUploadResponse содержит результат отмены upload session
+type AbortBlobUploadResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// upload_id содержит идентификатор upload session
+	UploadId      string `protobuf:"bytes,1,opt,name=upload_id,json=uploadId,proto3" json:"upload_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AbortBlobUploadResponse) Reset() {
+	*x = AbortBlobUploadResponse{}
+	mi := &file_api_proto_gophkeeper_v1_gophkeeper_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AbortBlobUploadResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AbortBlobUploadResponse) ProtoMessage() {}
+
+func (x *AbortBlobUploadResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_gophkeeper_v1_gophkeeper_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AbortBlobUploadResponse.ProtoReflect.Descriptor instead.
+func (*AbortBlobUploadResponse) Descriptor() ([]byte, []int) {
+	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *AbortBlobUploadResponse) GetUploadId() string {
+	if x != nil {
+		return x.UploadId
+	}
+	return ""
+}
+
 var File_api_proto_gophkeeper_v1_gophkeeper_proto protoreflect.FileDescriptor
 
 const file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDesc = "" +
@@ -1514,7 +2035,48 @@ const file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDesc = "" +
 	"\fSyncResponse\x12.\n" +
 	"\x05items\x18\x01 \x03(\v2\x18.gophkeeper.v1.VaultItemR\x05items\x12H\n" +
 	"\x12next_changed_after\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x10nextChangedAfter\x12&\n" +
-	"\x0fnext_page_token\x18\x03 \x01(\tR\rnextPageToken*\x99\x01\n" +
+	"\x0fnext_page_token\x18\x03 \x01(\tR\rnextPageToken\"\xaf\x01\n" +
+	"\x17CreateBlobUploadRequest\x12#\n" +
+	"\rexpected_size\x18\x01 \x01(\x03R\fexpectedSize\x12\x1d\n" +
+	"\n" +
+	"chunk_size\x18\x02 \x01(\x03R\tchunkSize\x12'\n" +
+	"\x0fexpected_chunks\x18\x03 \x01(\x05R\x0eexpectedChunks\x12'\n" +
+	"\x0fchecksum_sha256\x18\x04 \x01(\tR\x0echecksumSha256\"\x91\x01\n" +
+	"\x18CreateBlobUploadResponse\x12\x1b\n" +
+	"\tupload_id\x18\x01 \x01(\tR\buploadId\x129\n" +
+	"\n" +
+	"expires_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x12\x1d\n" +
+	"\n" +
+	"chunk_size\x18\x03 \x01(\x03R\tchunkSize\"\x93\x01\n" +
+	"\x16UploadBlobChunkRequest\x12\x1b\n" +
+	"\tupload_id\x18\x01 \x01(\tR\buploadId\x12\x1f\n" +
+	"\vchunk_index\x18\x02 \x01(\x05R\n" +
+	"chunkIndex\x12\x12\n" +
+	"\x04data\x18\x03 \x01(\fR\x04data\x12'\n" +
+	"\x0fchecksum_sha256\x18\x04 \x01(\tR\x0echecksumSha256\"\x81\x02\n" +
+	"\x12UploadBlobResponse\x12\x17\n" +
+	"\ablob_id\x18\x01 \x01(\tR\x06blobId\x12%\n" +
+	"\x0estorage_bucket\x18\x02 \x01(\tR\rstorageBucket\x12#\n" +
+	"\robject_prefix\x18\x03 \x01(\tR\fobjectPrefix\x12\x1d\n" +
+	"\n" +
+	"chunk_size\x18\x04 \x01(\x03R\tchunkSize\x12\x1f\n" +
+	"\vchunk_count\x18\x05 \x01(\x05R\n" +
+	"chunkCount\x12\x1d\n" +
+	"\n" +
+	"size_bytes\x18\x06 \x01(\x03R\tsizeBytes\x12'\n" +
+	"\x0fchecksum_sha256\x18\a \x01(\tR\x0echecksumSha256\".\n" +
+	"\x13DownloadBlobRequest\x12\x17\n" +
+	"\ablob_id\x18\x01 \x01(\tR\x06blobId\"\x8a\x01\n" +
+	"\x11DownloadBlobChunk\x12\x17\n" +
+	"\ablob_id\x18\x01 \x01(\tR\x06blobId\x12\x1f\n" +
+	"\vchunk_index\x18\x02 \x01(\x05R\n" +
+	"chunkIndex\x12\x12\n" +
+	"\x04data\x18\x03 \x01(\fR\x04data\x12'\n" +
+	"\x0fchecksum_sha256\x18\x04 \x01(\tR\x0echecksumSha256\"5\n" +
+	"\x16AbortBlobUploadRequest\x12\x1b\n" +
+	"\tupload_id\x18\x01 \x01(\tR\buploadId\"6\n" +
+	"\x17AbortBlobUploadResponse\x12\x1b\n" +
+	"\tupload_id\x18\x01 \x01(\tR\buploadId*\x99\x01\n" +
 	"\bItemType\x12\x19\n" +
 	"\x15ITEM_TYPE_UNSPECIFIED\x10\x00\x12\x1c\n" +
 	"\x18ITEM_TYPE_LOGIN_PASSWORD\x10\x01\x12\x12\n" +
@@ -1534,7 +2096,13 @@ const file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDesc = "" +
 	"UpdateItem\x12 .gophkeeper.v1.UpdateItemRequest\x1a!.gophkeeper.v1.UpdateItemResponse\"\x1f\x82\xd3\xe4\x93\x02\x19:\x01*\x1a\x14/v1/vault/items/{id}\x12o\n" +
 	"\n" +
 	"DeleteItem\x12 .gophkeeper.v1.DeleteItemRequest\x1a!.gophkeeper.v1.DeleteItemResponse\"\x1c\x82\xd3\xe4\x93\x02\x16*\x14/v1/vault/items/{id}\x12Z\n" +
-	"\x04Sync\x12\x1a.gophkeeper.v1.SyncRequest\x1a\x1b.gophkeeper.v1.SyncResponse\"\x19\x82\xd3\xe4\x93\x02\x13:\x01*\"\x0e/v1/vault/syncBfZdgithub.com/squaredbusinessman/gophkeeper-authenticator/internal/gen/proto/gophkeeper/v1;gophkeeperv1b\x06proto3"
+	"\x04Sync\x12\x1a.gophkeeper.v1.SyncRequest\x1a\x1b.gophkeeper.v1.SyncResponse\"\x19\x82\xd3\xe4\x93\x02\x13:\x01*\"\x0e/v1/vault/sync2\x86\x03\n" +
+	"\vBlobService\x12c\n" +
+	"\x10CreateBlobUpload\x12&.gophkeeper.v1.CreateBlobUploadRequest\x1a'.gophkeeper.v1.CreateBlobUploadResponse\x12X\n" +
+	"\n" +
+	"UploadBlob\x12%.gophkeeper.v1.UploadBlobChunkRequest\x1a!.gophkeeper.v1.UploadBlobResponse(\x01\x12V\n" +
+	"\fDownloadBlob\x12\".gophkeeper.v1.DownloadBlobRequest\x1a .gophkeeper.v1.DownloadBlobChunk0\x01\x12`\n" +
+	"\x0fAbortBlobUpload\x12%.gophkeeper.v1.AbortBlobUploadRequest\x1a&.gophkeeper.v1.AbortBlobUploadResponseBfZdgithub.com/squaredbusinessman/gophkeeper-authenticator/internal/gen/proto/gophkeeper/v1;gophkeeperv1b\x06proto3"
 
 var (
 	file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescOnce sync.Once
@@ -1549,44 +2117,52 @@ func file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP() []byte {
 }
 
 var file_api_proto_gophkeeper_v1_gophkeeper_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_api_proto_gophkeeper_v1_gophkeeper_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
+var file_api_proto_gophkeeper_v1_gophkeeper_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
 var file_api_proto_gophkeeper_v1_gophkeeper_proto_goTypes = []any{
-	(ItemType)(0),                 // 0: gophkeeper.v1.ItemType
-	(*KDFParams)(nil),             // 1: gophkeeper.v1.KDFParams
-	(*VaultKeyEnvelope)(nil),      // 2: gophkeeper.v1.VaultKeyEnvelope
-	(*RegisterResponse)(nil),      // 3: gophkeeper.v1.RegisterResponse
-	(*LoginResponse)(nil),         // 4: gophkeeper.v1.LoginResponse
-	(*RegisterRequest)(nil),       // 5: gophkeeper.v1.RegisterRequest
-	(*LoginRequest)(nil),          // 6: gophkeeper.v1.LoginRequest
-	(*EncryptedData)(nil),         // 7: gophkeeper.v1.EncryptedData
-	(*VaultItem)(nil),             // 8: gophkeeper.v1.VaultItem
-	(*CreateItemRequest)(nil),     // 9: gophkeeper.v1.CreateItemRequest
-	(*UpdateItemRequest)(nil),     // 10: gophkeeper.v1.UpdateItemRequest
-	(*DeleteItemRequest)(nil),     // 11: gophkeeper.v1.DeleteItemRequest
-	(*GetItemRequest)(nil),        // 12: gophkeeper.v1.GetItemRequest
-	(*ListItemsRequest)(nil),      // 13: gophkeeper.v1.ListItemsRequest
-	(*ListItemsResponse)(nil),     // 14: gophkeeper.v1.ListItemsResponse
-	(*CreateItemResponse)(nil),    // 15: gophkeeper.v1.CreateItemResponse
-	(*GetItemResponse)(nil),       // 16: gophkeeper.v1.GetItemResponse
-	(*UpdateItemResponse)(nil),    // 17: gophkeeper.v1.UpdateItemResponse
-	(*DeleteItemResponse)(nil),    // 18: gophkeeper.v1.DeleteItemResponse
-	(*SyncRequest)(nil),           // 19: gophkeeper.v1.SyncRequest
-	(*SyncResponse)(nil),          // 20: gophkeeper.v1.SyncResponse
-	(*timestamppb.Timestamp)(nil), // 21: google.protobuf.Timestamp
+	(ItemType)(0),                    // 0: gophkeeper.v1.ItemType
+	(*KDFParams)(nil),                // 1: gophkeeper.v1.KDFParams
+	(*VaultKeyEnvelope)(nil),         // 2: gophkeeper.v1.VaultKeyEnvelope
+	(*RegisterResponse)(nil),         // 3: gophkeeper.v1.RegisterResponse
+	(*LoginResponse)(nil),            // 4: gophkeeper.v1.LoginResponse
+	(*RegisterRequest)(nil),          // 5: gophkeeper.v1.RegisterRequest
+	(*LoginRequest)(nil),             // 6: gophkeeper.v1.LoginRequest
+	(*EncryptedData)(nil),            // 7: gophkeeper.v1.EncryptedData
+	(*VaultItem)(nil),                // 8: gophkeeper.v1.VaultItem
+	(*CreateItemRequest)(nil),        // 9: gophkeeper.v1.CreateItemRequest
+	(*UpdateItemRequest)(nil),        // 10: gophkeeper.v1.UpdateItemRequest
+	(*DeleteItemRequest)(nil),        // 11: gophkeeper.v1.DeleteItemRequest
+	(*GetItemRequest)(nil),           // 12: gophkeeper.v1.GetItemRequest
+	(*ListItemsRequest)(nil),         // 13: gophkeeper.v1.ListItemsRequest
+	(*ListItemsResponse)(nil),        // 14: gophkeeper.v1.ListItemsResponse
+	(*CreateItemResponse)(nil),       // 15: gophkeeper.v1.CreateItemResponse
+	(*GetItemResponse)(nil),          // 16: gophkeeper.v1.GetItemResponse
+	(*UpdateItemResponse)(nil),       // 17: gophkeeper.v1.UpdateItemResponse
+	(*DeleteItemResponse)(nil),       // 18: gophkeeper.v1.DeleteItemResponse
+	(*SyncRequest)(nil),              // 19: gophkeeper.v1.SyncRequest
+	(*SyncResponse)(nil),             // 20: gophkeeper.v1.SyncResponse
+	(*CreateBlobUploadRequest)(nil),  // 21: gophkeeper.v1.CreateBlobUploadRequest
+	(*CreateBlobUploadResponse)(nil), // 22: gophkeeper.v1.CreateBlobUploadResponse
+	(*UploadBlobChunkRequest)(nil),   // 23: gophkeeper.v1.UploadBlobChunkRequest
+	(*UploadBlobResponse)(nil),       // 24: gophkeeper.v1.UploadBlobResponse
+	(*DownloadBlobRequest)(nil),      // 25: gophkeeper.v1.DownloadBlobRequest
+	(*DownloadBlobChunk)(nil),        // 26: gophkeeper.v1.DownloadBlobChunk
+	(*AbortBlobUploadRequest)(nil),   // 27: gophkeeper.v1.AbortBlobUploadRequest
+	(*AbortBlobUploadResponse)(nil),  // 28: gophkeeper.v1.AbortBlobUploadResponse
+	(*timestamppb.Timestamp)(nil),    // 29: google.protobuf.Timestamp
 }
 var file_api_proto_gophkeeper_v1_gophkeeper_proto_depIdxs = []int32{
 	1,  // 0: gophkeeper.v1.VaultKeyEnvelope.kdf_params:type_name -> gophkeeper.v1.KDFParams
-	21, // 1: gophkeeper.v1.RegisterResponse.access_token_expires_at:type_name -> google.protobuf.Timestamp
+	29, // 1: gophkeeper.v1.RegisterResponse.access_token_expires_at:type_name -> google.protobuf.Timestamp
 	2,  // 2: gophkeeper.v1.RegisterResponse.vault_key:type_name -> gophkeeper.v1.VaultKeyEnvelope
-	21, // 3: gophkeeper.v1.LoginResponse.access_token_expires_at:type_name -> google.protobuf.Timestamp
+	29, // 3: gophkeeper.v1.LoginResponse.access_token_expires_at:type_name -> google.protobuf.Timestamp
 	2,  // 4: gophkeeper.v1.LoginResponse.vault_key:type_name -> gophkeeper.v1.VaultKeyEnvelope
 	2,  // 5: gophkeeper.v1.RegisterRequest.vault_key:type_name -> gophkeeper.v1.VaultKeyEnvelope
 	0,  // 6: gophkeeper.v1.VaultItem.type:type_name -> gophkeeper.v1.ItemType
 	7,  // 7: gophkeeper.v1.VaultItem.metadata:type_name -> gophkeeper.v1.EncryptedData
 	7,  // 8: gophkeeper.v1.VaultItem.payload:type_name -> gophkeeper.v1.EncryptedData
-	21, // 9: gophkeeper.v1.VaultItem.created_at:type_name -> google.protobuf.Timestamp
-	21, // 10: gophkeeper.v1.VaultItem.updated_at:type_name -> google.protobuf.Timestamp
-	21, // 11: gophkeeper.v1.VaultItem.deleted_at:type_name -> google.protobuf.Timestamp
+	29, // 9: gophkeeper.v1.VaultItem.created_at:type_name -> google.protobuf.Timestamp
+	29, // 10: gophkeeper.v1.VaultItem.updated_at:type_name -> google.protobuf.Timestamp
+	29, // 11: gophkeeper.v1.VaultItem.deleted_at:type_name -> google.protobuf.Timestamp
 	0,  // 12: gophkeeper.v1.CreateItemRequest.type:type_name -> gophkeeper.v1.ItemType
 	7,  // 13: gophkeeper.v1.CreateItemRequest.metadata:type_name -> gophkeeper.v1.EncryptedData
 	7,  // 14: gophkeeper.v1.CreateItemRequest.payload:type_name -> gophkeeper.v1.EncryptedData
@@ -1597,31 +2173,40 @@ var file_api_proto_gophkeeper_v1_gophkeeper_proto_depIdxs = []int32{
 	8,  // 19: gophkeeper.v1.CreateItemResponse.item:type_name -> gophkeeper.v1.VaultItem
 	8,  // 20: gophkeeper.v1.GetItemResponse.item:type_name -> gophkeeper.v1.VaultItem
 	8,  // 21: gophkeeper.v1.UpdateItemResponse.item:type_name -> gophkeeper.v1.VaultItem
-	21, // 22: gophkeeper.v1.DeleteItemResponse.deleted_at:type_name -> google.protobuf.Timestamp
-	21, // 23: gophkeeper.v1.SyncRequest.changed_after:type_name -> google.protobuf.Timestamp
+	29, // 22: gophkeeper.v1.DeleteItemResponse.deleted_at:type_name -> google.protobuf.Timestamp
+	29, // 23: gophkeeper.v1.SyncRequest.changed_after:type_name -> google.protobuf.Timestamp
 	8,  // 24: gophkeeper.v1.SyncResponse.items:type_name -> gophkeeper.v1.VaultItem
-	21, // 25: gophkeeper.v1.SyncResponse.next_changed_after:type_name -> google.protobuf.Timestamp
-	5,  // 26: gophkeeper.v1.AuthService.Register:input_type -> gophkeeper.v1.RegisterRequest
-	6,  // 27: gophkeeper.v1.AuthService.Login:input_type -> gophkeeper.v1.LoginRequest
-	9,  // 28: gophkeeper.v1.VaultService.CreateItem:input_type -> gophkeeper.v1.CreateItemRequest
-	12, // 29: gophkeeper.v1.VaultService.GetItem:input_type -> gophkeeper.v1.GetItemRequest
-	13, // 30: gophkeeper.v1.VaultService.ListItems:input_type -> gophkeeper.v1.ListItemsRequest
-	10, // 31: gophkeeper.v1.VaultService.UpdateItem:input_type -> gophkeeper.v1.UpdateItemRequest
-	11, // 32: gophkeeper.v1.VaultService.DeleteItem:input_type -> gophkeeper.v1.DeleteItemRequest
-	19, // 33: gophkeeper.v1.VaultService.Sync:input_type -> gophkeeper.v1.SyncRequest
-	3,  // 34: gophkeeper.v1.AuthService.Register:output_type -> gophkeeper.v1.RegisterResponse
-	4,  // 35: gophkeeper.v1.AuthService.Login:output_type -> gophkeeper.v1.LoginResponse
-	15, // 36: gophkeeper.v1.VaultService.CreateItem:output_type -> gophkeeper.v1.CreateItemResponse
-	16, // 37: gophkeeper.v1.VaultService.GetItem:output_type -> gophkeeper.v1.GetItemResponse
-	14, // 38: gophkeeper.v1.VaultService.ListItems:output_type -> gophkeeper.v1.ListItemsResponse
-	17, // 39: gophkeeper.v1.VaultService.UpdateItem:output_type -> gophkeeper.v1.UpdateItemResponse
-	18, // 40: gophkeeper.v1.VaultService.DeleteItem:output_type -> gophkeeper.v1.DeleteItemResponse
-	20, // 41: gophkeeper.v1.VaultService.Sync:output_type -> gophkeeper.v1.SyncResponse
-	34, // [34:42] is the sub-list for method output_type
-	26, // [26:34] is the sub-list for method input_type
-	26, // [26:26] is the sub-list for extension type_name
-	26, // [26:26] is the sub-list for extension extendee
-	0,  // [0:26] is the sub-list for field type_name
+	29, // 25: gophkeeper.v1.SyncResponse.next_changed_after:type_name -> google.protobuf.Timestamp
+	29, // 26: gophkeeper.v1.CreateBlobUploadResponse.expires_at:type_name -> google.protobuf.Timestamp
+	5,  // 27: gophkeeper.v1.AuthService.Register:input_type -> gophkeeper.v1.RegisterRequest
+	6,  // 28: gophkeeper.v1.AuthService.Login:input_type -> gophkeeper.v1.LoginRequest
+	9,  // 29: gophkeeper.v1.VaultService.CreateItem:input_type -> gophkeeper.v1.CreateItemRequest
+	12, // 30: gophkeeper.v1.VaultService.GetItem:input_type -> gophkeeper.v1.GetItemRequest
+	13, // 31: gophkeeper.v1.VaultService.ListItems:input_type -> gophkeeper.v1.ListItemsRequest
+	10, // 32: gophkeeper.v1.VaultService.UpdateItem:input_type -> gophkeeper.v1.UpdateItemRequest
+	11, // 33: gophkeeper.v1.VaultService.DeleteItem:input_type -> gophkeeper.v1.DeleteItemRequest
+	19, // 34: gophkeeper.v1.VaultService.Sync:input_type -> gophkeeper.v1.SyncRequest
+	21, // 35: gophkeeper.v1.BlobService.CreateBlobUpload:input_type -> gophkeeper.v1.CreateBlobUploadRequest
+	23, // 36: gophkeeper.v1.BlobService.UploadBlob:input_type -> gophkeeper.v1.UploadBlobChunkRequest
+	25, // 37: gophkeeper.v1.BlobService.DownloadBlob:input_type -> gophkeeper.v1.DownloadBlobRequest
+	27, // 38: gophkeeper.v1.BlobService.AbortBlobUpload:input_type -> gophkeeper.v1.AbortBlobUploadRequest
+	3,  // 39: gophkeeper.v1.AuthService.Register:output_type -> gophkeeper.v1.RegisterResponse
+	4,  // 40: gophkeeper.v1.AuthService.Login:output_type -> gophkeeper.v1.LoginResponse
+	15, // 41: gophkeeper.v1.VaultService.CreateItem:output_type -> gophkeeper.v1.CreateItemResponse
+	16, // 42: gophkeeper.v1.VaultService.GetItem:output_type -> gophkeeper.v1.GetItemResponse
+	14, // 43: gophkeeper.v1.VaultService.ListItems:output_type -> gophkeeper.v1.ListItemsResponse
+	17, // 44: gophkeeper.v1.VaultService.UpdateItem:output_type -> gophkeeper.v1.UpdateItemResponse
+	18, // 45: gophkeeper.v1.VaultService.DeleteItem:output_type -> gophkeeper.v1.DeleteItemResponse
+	20, // 46: gophkeeper.v1.VaultService.Sync:output_type -> gophkeeper.v1.SyncResponse
+	22, // 47: gophkeeper.v1.BlobService.CreateBlobUpload:output_type -> gophkeeper.v1.CreateBlobUploadResponse
+	24, // 48: gophkeeper.v1.BlobService.UploadBlob:output_type -> gophkeeper.v1.UploadBlobResponse
+	26, // 49: gophkeeper.v1.BlobService.DownloadBlob:output_type -> gophkeeper.v1.DownloadBlobChunk
+	28, // 50: gophkeeper.v1.BlobService.AbortBlobUpload:output_type -> gophkeeper.v1.AbortBlobUploadResponse
+	39, // [39:51] is the sub-list for method output_type
+	27, // [27:39] is the sub-list for method input_type
+	27, // [27:27] is the sub-list for extension type_name
+	27, // [27:27] is the sub-list for extension extendee
+	0,  // [0:27] is the sub-list for field type_name
 }
 
 func init() { file_api_proto_gophkeeper_v1_gophkeeper_proto_init() }
@@ -1635,9 +2220,9 @@ func file_api_proto_gophkeeper_v1_gophkeeper_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDesc), len(file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   20,
+			NumMessages:   28,
 			NumExtensions: 0,
-			NumServices:   2,
+			NumServices:   3,
 		},
 		GoTypes:           file_api_proto_gophkeeper_v1_gophkeeper_proto_goTypes,
 		DependencyIndexes: file_api_proto_gophkeeper_v1_gophkeeper_proto_depIdxs,

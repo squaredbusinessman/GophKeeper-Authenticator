@@ -578,7 +578,7 @@ func startSmokeServer(t *testing.T, db *sql.DB, dsn string, address string) *grp
 		AccessTokenSecret: "smoke-local-secret-32-bytes-value",
 		AccessTokenTTL:    5 * time.Minute,
 		LogMode:           "prod",
-	}, zap.NewNop(), db)
+	}, zap.NewNop(), db, nil)
 	if err != nil {
 		t.Fatalf("create grpc server: %v", err)
 	}

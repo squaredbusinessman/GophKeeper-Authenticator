@@ -41,6 +41,15 @@ func testUnaryHandler(t *testing.T, called *bool) grpc.UnaryHandler {
 	}
 }
 
+type fakeServerStream struct {
+	grpc.ServerStream
+	ctx context.Context
+}
+
+func (s fakeServerStream) Context() context.Context {
+	return s.ctx
+}
+
 func TestAuthUnaryInterceptorAllowsPublicMethodsWithoutToken(t *testing.T) {
 	publicMethods := []string{
 		gophkeeperv1.AuthService_Register_FullMethodName,
@@ -75,6 +84,59 @@ func TestAuthUnaryInterceptorAllowsPublicMethodsWithoutToken(t *testing.T) {
 				t.Fatalf("validator calls = %d, want 0", len(validator.calls))
 			}
 		})
+	}
+}
+
+func TestAuthStreamInterceptorAddsUserIDToContext(t *testing.T) {
+	validator := &fakeTokenValidator{
+		claims: token.Claims{UserID: "user-id"},
+	}
+	interceptor := AuthStreamInterceptor(validator)
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", "Bearer access-token"))
+	called := false
+
+	err := interceptor(
+		nil,
+		fakeServerStream{ctx: ctx},
+		&grpc.StreamServerInfo{FullMethod: gophkeeperv1.BlobService_UploadBlob_FullMethodName},
+		func(_ any, stream grpc.ServerStream) error {
+			called = true
+			userID, ok := UserIDFromContext(stream.Context())
+			if !ok {
+				t.Fatalf("user id missing from stream context")
+			}
+			if userID != "user-id" {
+				t.Fatalf("user id = %q, want user-id", userID)
+			}
+
+			return nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("interceptor() error = %v", err)
+	}
+	if !called {
+		t.Fatalf("handler was not called")
+	}
+	if len(validator.calls) != 1 || validator.calls[0] != "access-token" {
+		t.Fatalf("validator calls = %v, want access-token", validator.calls)
+	}
+}
+
+func TestAuthStreamInterceptorRejectsProtectedMethodWithoutMetadata(t *testing.T) {
+	interceptor := AuthStreamInterceptor(&fakeTokenValidator{})
+
+	err := interceptor(
+		nil,
+		fakeServerStream{ctx: context.Background()},
+		&grpc.StreamServerInfo{FullMethod: gophkeeperv1.BlobService_DownloadBlob_FullMethodName},
+		func(any, grpc.ServerStream) error {
+			t.Fatalf("handler was called")
+			return nil
+		},
+	)
+	if status.Code(err) != codes.Unauthenticated {
+		t.Fatalf("code = %s, want Unauthenticated", status.Code(err))
 	}
 }
 
@@ -248,7 +310,7 @@ func TestNewProtectsVaultServiceWithAuthInterceptor(t *testing.T) {
 		AccessTokenTTL:    time.Minute,
 	}
 
-	server, err := New(cfg, zap.NewNop(), nil)
+	server, err := New(cfg, zap.NewNop(), nil, nil)
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}

@@ -87,7 +87,7 @@ func TestNewRuntimeConnectsToTLSServer(t *testing.T) {
 		GRPCTLSKeyFile:    keyFile,
 		AccessTokenSecret: "test-access-token-secret-32-bytes",
 		AccessTokenTTL:    time.Minute,
-	}, zap.NewNop(), nil)
+	}, zap.NewNop(), nil, nil)
 	if err != nil {
 		t.Fatalf("grpcserver.New() error = %v", err)
 	}

@@ -473,3 +473,228 @@ var VaultService_ServiceDesc = grpc.ServiceDesc{
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "api/proto/gophkeeper/v1/gophkeeper.proto",
 }
+
+const (
+	BlobService_CreateBlobUpload_FullMethodName = "/gophkeeper.v1.BlobService/CreateBlobUpload"
+	BlobService_UploadBlob_FullMethodName       = "/gophkeeper.v1.BlobService/UploadBlob"
+	BlobService_DownloadBlob_FullMethodName     = "/gophkeeper.v1.BlobService/DownloadBlob"
+	BlobService_AbortBlobUpload_FullMethodName  = "/gophkeeper.v1.BlobService/AbortBlobUpload"
+)
+
+// BlobServiceClient is the client API for BlobService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// BlobService описывает загрузку и скачивание encrypted binary chunks
+type BlobServiceClient interface {
+	// CreateBlobUpload создает upload session для encrypted binary объекта
+	CreateBlobUpload(ctx context.Context, in *CreateBlobUploadRequest, opts ...grpc.CallOption) (*CreateBlobUploadResponse, error)
+	// UploadBlob принимает encrypted chunks в рамках upload session
+	UploadBlob(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[UploadBlobChunkRequest, UploadBlobResponse], error)
+	// DownloadBlob возвращает encrypted chunks сохраненного binary объекта
+	DownloadBlob(ctx context.Context, in *DownloadBlobRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DownloadBlobChunk], error)
+	// AbortBlobUpload отменяет upload session
+	AbortBlobUpload(ctx context.Context, in *AbortBlobUploadRequest, opts ...grpc.CallOption) (*AbortBlobUploadResponse, error)
+}
+
+type blobServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewBlobServiceClient(cc grpc.ClientConnInterface) BlobServiceClient {
+	return &blobServiceClient{cc}
+}
+
+func (c *blobServiceClient) CreateBlobUpload(ctx context.Context, in *CreateBlobUploadRequest, opts ...grpc.CallOption) (*CreateBlobUploadResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateBlobUploadResponse)
+	err := c.cc.Invoke(ctx, BlobService_CreateBlobUpload_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *blobServiceClient) UploadBlob(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[UploadBlobChunkRequest, UploadBlobResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &BlobService_ServiceDesc.Streams[0], BlobService_UploadBlob_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[UploadBlobChunkRequest, UploadBlobResponse]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type BlobService_UploadBlobClient = grpc.ClientStreamingClient[UploadBlobChunkRequest, UploadBlobResponse]
+
+func (c *blobServiceClient) DownloadBlob(ctx context.Context, in *DownloadBlobRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DownloadBlobChunk], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &BlobService_ServiceDesc.Streams[1], BlobService_DownloadBlob_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[DownloadBlobRequest, DownloadBlobChunk]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type BlobService_DownloadBlobClient = grpc.ServerStreamingClient[DownloadBlobChunk]
+
+func (c *blobServiceClient) AbortBlobUpload(ctx context.Context, in *AbortBlobUploadRequest, opts ...grpc.CallOption) (*AbortBlobUploadResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AbortBlobUploadResponse)
+	err := c.cc.Invoke(ctx, BlobService_AbortBlobUpload_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// BlobServiceServer is the server API for BlobService service.
+// All implementations must embed UnimplementedBlobServiceServer
+// for forward compatibility.
+//
+// BlobService описывает загрузку и скачивание encrypted binary chunks
+type BlobServiceServer interface {
+	// CreateBlobUpload создает upload session для encrypted binary объекта
+	CreateBlobUpload(context.Context, *CreateBlobUploadRequest) (*CreateBlobUploadResponse, error)
+	// UploadBlob принимает encrypted chunks в рамках upload session
+	UploadBlob(grpc.ClientStreamingServer[UploadBlobChunkRequest, UploadBlobResponse]) error
+	// DownloadBlob возвращает encrypted chunks сохраненного binary объекта
+	DownloadBlob(*DownloadBlobRequest, grpc.ServerStreamingServer[DownloadBlobChunk]) error
+	// AbortBlobUpload отменяет upload session
+	AbortBlobUpload(context.Context, *AbortBlobUploadRequest) (*AbortBlobUploadResponse, error)
+	mustEmbedUnimplementedBlobServiceServer()
+}
+
+// UnimplementedBlobServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedBlobServiceServer struct{}
+
+func (UnimplementedBlobServiceServer) CreateBlobUpload(context.Context, *CreateBlobUploadRequest) (*CreateBlobUploadResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateBlobUpload not implemented")
+}
+func (UnimplementedBlobServiceServer) UploadBlob(grpc.ClientStreamingServer[UploadBlobChunkRequest, UploadBlobResponse]) error {
+	return status.Error(codes.Unimplemented, "method UploadBlob not implemented")
+}
+func (UnimplementedBlobServiceServer) DownloadBlob(*DownloadBlobRequest, grpc.ServerStreamingServer[DownloadBlobChunk]) error {
+	return status.Error(codes.Unimplemented, "method DownloadBlob not implemented")
+}
+func (UnimplementedBlobServiceServer) AbortBlobUpload(context.Context, *AbortBlobUploadRequest) (*AbortBlobUploadResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AbortBlobUpload not implemented")
+}
+func (UnimplementedBlobServiceServer) mustEmbedUnimplementedBlobServiceServer() {}
+func (UnimplementedBlobServiceServer) testEmbeddedByValue()                     {}
+
+// UnsafeBlobServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to BlobServiceServer will
+// result in compilation errors.
+type UnsafeBlobServiceServer interface {
+	mustEmbedUnimplementedBlobServiceServer()
+}
+
+func RegisterBlobServiceServer(s grpc.ServiceRegistrar, srv BlobServiceServer) {
+	// If the following call panics, it indicates UnimplementedBlobServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&BlobService_ServiceDesc, srv)
+}
+
+func _BlobService_CreateBlobUpload_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateBlobUploadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BlobServiceServer).CreateBlobUpload(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BlobService_CreateBlobUpload_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BlobServiceServer).CreateBlobUpload(ctx, req.(*CreateBlobUploadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BlobService_UploadBlob_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(BlobServiceServer).UploadBlob(&grpc.GenericServerStream[UploadBlobChunkRequest, UploadBlobResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type BlobService_UploadBlobServer = grpc.ClientStreamingServer[UploadBlobChunkRequest, UploadBlobResponse]
+
+func _BlobService_DownloadBlob_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(DownloadBlobRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(BlobServiceServer).DownloadBlob(m, &grpc.GenericServerStream[DownloadBlobRequest, DownloadBlobChunk]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type BlobService_DownloadBlobServer = grpc.ServerStreamingServer[DownloadBlobChunk]
+
+func _BlobService_AbortBlobUpload_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AbortBlobUploadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BlobServiceServer).AbortBlobUpload(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BlobService_AbortBlobUpload_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BlobServiceServer).AbortBlobUpload(ctx, req.(*AbortBlobUploadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// BlobService_ServiceDesc is the grpc.ServiceDesc for BlobService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var BlobService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "gophkeeper.v1.BlobService",
+	HandlerType: (*BlobServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "CreateBlobUpload",
+			Handler:    _BlobService_CreateBlobUpload_Handler,
+		},
+		{
+			MethodName: "AbortBlobUpload",
+			Handler:    _BlobService_AbortBlobUpload_Handler,
+		},
+	},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "UploadBlob",
+			Handler:       _BlobService_UploadBlob_Handler,
+			ClientStreams: true,
+		},
+		{
+			StreamName:    "DownloadBlob",
+			Handler:       _BlobService_DownloadBlob_Handler,
+			ServerStreams: true,
+		},
+	},
+	Metadata: "api/proto/gophkeeper/v1/gophkeeper.proto",
+}

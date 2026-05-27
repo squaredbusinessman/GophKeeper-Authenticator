@@ -34,7 +34,7 @@ func TestNewStartsServerWithTLSCredentials(t *testing.T) {
 		AccessTokenTTL:    time.Minute,
 	}
 
-	server, err := New(cfg, zap.NewNop(), nil)
+	server, err := New(cfg, zap.NewNop(), nil, nil)
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}

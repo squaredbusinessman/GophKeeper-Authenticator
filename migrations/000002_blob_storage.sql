@@ -11,6 +11,7 @@ CREATE TABLE blob_uploads (
     expected_size BIGINT NOT NULL,
     expected_chunks INTEGER NOT NULL,
     received_chunks INTEGER NOT NULL DEFAULT 0,
+    checksum_sha256 TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     expires_at TIMESTAMPTZ NOT NULL,
@@ -30,6 +31,7 @@ COMMENT ON COLUMN blob_uploads.chunk_size IS 'Размер chunk в байтах
 COMMENT ON COLUMN blob_uploads.expected_size IS 'Ожидаемый размер encrypted blob в байтах';
 COMMENT ON COLUMN blob_uploads.expected_chunks IS 'Ожидаемое количество chunks';
 COMMENT ON COLUMN blob_uploads.received_chunks IS 'Количество принятых chunks';
+COMMENT ON COLUMN blob_uploads.checksum_sha256 IS 'SHA256 checksum encrypted blob';
 COMMENT ON COLUMN blob_uploads.created_at IS 'Дата и время создания upload session';
 COMMENT ON COLUMN blob_uploads.updated_at IS 'Дата и время последнего изменения upload session';
 COMMENT ON COLUMN blob_uploads.expires_at IS 'Дата и время истечения upload session';
@@ -57,6 +59,7 @@ COMMENT ON COLUMN blob_upload_parts.created_at IS 'Дата и время сох
 CREATE TABLE blobs (
     id UUID PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    upload_id UUID NOT NULL REFERENCES blob_uploads(id) ON DELETE RESTRICT,
     item_id UUID REFERENCES vault_items(id) ON DELETE SET NULL,
     status TEXT NOT NULL,
     storage_bucket TEXT NOT NULL,
@@ -76,6 +79,7 @@ CREATE TABLE blobs (
 COMMENT ON TABLE blobs IS 'Metadata постоянных encrypted binary объектов';
 COMMENT ON COLUMN blobs.id IS 'Идентификатор blob';
 COMMENT ON COLUMN blobs.user_id IS 'Идентификатор владельца blob';
+COMMENT ON COLUMN blobs.upload_id IS 'Идентификатор upload session, из которой создан blob';
 COMMENT ON COLUMN blobs.item_id IS 'Идентификатор vault item, который ссылается на blob';
 COMMENT ON COLUMN blobs.status IS 'Состояние blob';
 COMMENT ON COLUMN blobs.storage_bucket IS 'Bucket object storage';

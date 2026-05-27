@@ -53,9 +53,56 @@ func AuthUnaryInterceptor(validator TokenValidator) grpc.UnaryServerInterceptor 
 	}
 }
 
+// AuthStreamInterceptor закрывает приватные stream методы gRPC проверкой access token
+func AuthStreamInterceptor(validator TokenValidator) grpc.StreamServerInterceptor {
+	return func(srv any, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		fullMethod := ""
+		if info != nil {
+			fullMethod = info.FullMethod
+		}
+
+		if isPublicMethod(fullMethod) {
+			return handler(srv, stream)
+		}
+
+		if validator == nil {
+			return status.Error(codes.Internal, "token validator is not configured")
+		}
+
+		rawToken, err := bearerTokenFromContext(stream.Context())
+		if err != nil {
+			return err
+		}
+
+		claims, err := validator.Validate(rawToken)
+		if err != nil {
+			return status.Error(codes.Unauthenticated, "invalid access token")
+		}
+
+		userID := strings.TrimSpace(claims.UserID)
+		if userID == "" {
+			return status.Error(codes.Unauthenticated, "invalid access token")
+		}
+
+		return handler(srv, authenticatedServerStream{
+			ServerStream: stream,
+			ctx:          authcontext.ContextWithUserID(stream.Context(), userID),
+		})
+	}
+}
+
 // UserIDFromContext достает user id, который middleware положил в context
 func UserIDFromContext(ctx context.Context) (string, bool) {
 	return authcontext.UserIDFromContext(ctx)
+}
+
+type authenticatedServerStream struct {
+	grpc.ServerStream
+	ctx context.Context
+}
+
+func (s authenticatedServerStream) Context() context.Context {
+	return s.ctx
 }
 
 func isPublicMethod(method string) bool {
