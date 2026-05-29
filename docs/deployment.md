@@ -14,11 +14,13 @@
 
 ```bash
 cp deploy/.env.example deploy/.env
+make certs
 ```
 
 Запустить инфраструктуру:
 
 ```bash
+make certs
 docker compose -f deploy/docker-compose.yml up -d
 ```
 

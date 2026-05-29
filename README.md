@@ -370,11 +370,9 @@ TOTP-код рассчитывается на клиенте по RFC 6238. По
 
 ### TLS
 
-Для локальной проверки допускается dev-режим без TLS.
+gRPC-сервер и клиенты всегда используют TLS. Для локальной проверки выполните `make certs`, чтобы создать самоподписанный сертификат `certs/server.crt` и ключ `certs/server.key`.
 
-Dev-режим без TLS предназначен только для запуска на локальной машине. Его нельзя использовать для сетевого или production-like развертывания.
-
-Для production-like режима нужен TLS, потому что пароль входа, access token и gRPC metadata не должны передаваться по незащищенному каналу.
+Пароль входа, access token и gRPC metadata не передаются по открытому каналу.
 
 ## Синхронизация
 
@@ -473,9 +471,8 @@ GOPHKEEPER_LOG_MODE=dev
 
 ```env
 GOPHKEEPER_GRPC_ADDRESS=:9090
-GOPHKEEPER_GRPC_TLS_ENABLED=false
-GOPHKEEPER_GRPC_TLS_CERT_FILE=
-GOPHKEEPER_GRPC_TLS_KEY_FILE=
+GOPHKEEPER_GRPC_TLS_CERT_FILE=certs/server.crt
+GOPHKEEPER_GRPC_TLS_KEY_FILE=certs/server.key
 GOPHKEEPER_DATABASE_DSN=postgres://gophkeeper:gophkeeper@localhost:5432/gophkeeper?sslmode=disable
 GOPHKEEPER_ACCESS_TOKEN_SECRET=local-dev-access-token-secret-32-bytes
 GOPHKEEPER_ACCESS_TOKEN_TTL=5m
@@ -494,7 +491,7 @@ GOPHKEEPER_DATABASE_PING_TTL=5s
 GOPHKEEPER_LOG_MODE=dev
 ```
 
-TLS включается через `GOPHKEEPER_GRPC_TLS_ENABLED=true`. В этом режиме обязательны `GOPHKEEPER_GRPC_TLS_CERT_FILE` и `GOPHKEEPER_GRPC_TLS_KEY_FILE`.
+gRPC TLS включен всегда. Для локального запуска выполните `make certs`, затем используйте `GOPHKEEPER_GRPC_TLS_CERT_FILE` и `GOPHKEEPER_GRPC_TLS_KEY_FILE`.
 
 `GOPHKEEPER_BLOB_STORAGE_ENABLED=true` включает регистрацию server-side `BlobService`. В этом режиме сервер обязан подключиться к MinIO, проверить bucket и подготовить object storage. Если MinIO недоступен, сервер завершит старт с ошибкой.
 
@@ -509,18 +506,18 @@ CLI и TUI используют общий client app layer и читают од
 
 ```env
 GOPHKEEPER_SERVER_ADDRESS=localhost:9090
-GOPHKEEPER_SERVER_TLS_ENABLED=false
-GOPHKEEPER_SERVER_TLS_CERT_FILE=
+GOPHKEEPER_SERVER_TLS_CERT_FILE=certs/server.crt
 GOPHKEEPER_TOKEN_FILE=$HOME/.gophkeeper/token.json
 ```
 
-TLS-клиент включается через `GOPHKEEPER_SERVER_TLS_ENABLED=true`. В этом режиме обязательна переменная `GOPHKEEPER_SERVER_TLS_CERT_FILE` с путем к server certificate.
+TLS-клиент всегда использует TLS. Для локального запуска выполните `make certs`, затем используйте `GOPHKEEPER_SERVER_TLS_CERT_FILE` с путем к server certificate.
 
 ## Локальные PostgreSQL и MinIO через Docker Compose
 
 Запуск локальной инфраструктуры:
 
 ```bash
+make certs
 docker compose -f deploy/docker-compose.yml up -d
 ```
 
@@ -597,6 +594,8 @@ docker compose -f deploy/docker-compose.yml down -v
 Перед запуском сервера нужно передать обязательные переменные окружения:
 
 ```bash
+make certs
+
 GOPHKEEPER_DATABASE_DSN='postgres://gophkeeper:gophkeeper@localhost:5432/gophkeeper?sslmode=disable' \
 GOPHKEEPER_ACCESS_TOKEN_SECRET='local-dev-access-token-secret-32-bytes' \
 GOPHKEEPER_BLOB_STORAGE_ENABLED='true' \
@@ -722,11 +721,10 @@ GOPHKEEPER_SERVER_ADDRESS='localhost:9091' \
 make tui
 ```
 
-Пример запуска TUI с TLS:
+Пример запуска TUI с явным TLS-сертификатом:
 
 ```bash
 GOPHKEEPER_SERVER_ADDRESS='localhost:9090' \
-GOPHKEEPER_SERVER_TLS_ENABLED='true' \
 GOPHKEEPER_SERVER_TLS_CERT_FILE='/path/to/server.crt' \
 make tui
 ```
@@ -1016,6 +1014,8 @@ make vet
 - `make proto` - генерирует Go protobuf/gRPC код и Swagger/OpenAPI;
 - `make test` - запускает `go test ./...`;
 - `make smoke` - запускает smoke-тесты с живым PostgreSQL и gRPC-сервером;
+- `make certs` - генерирует локальный самоподписанный TLS-сертификат;
+- `make server` - запускает gRPC-сервер после подготовки локального TLS-сертификата;
 - `make tui` - запускает TUI-клиент через `go run ./cmd/gophkeeper-tui`;
 - `make build-cli` - собирает CLI для текущей платформы;
 - `make build-tui` - собирает TUI для текущей платформы;
@@ -1073,6 +1073,7 @@ make vet
 Интеграционный smoke-сценарий с живым PostgreSQL и gRPC-сервером:
 
 ```bash
+make certs
 docker compose -f deploy/docker-compose.yml up -d
 make smoke
 ```
@@ -1124,9 +1125,10 @@ docker compose version
 make --version
 ```
 
-### 2. Запустить PostgreSQL
+### 2. Подготовить TLS и запустить PostgreSQL
 
 ```bash
+make certs
 docker compose -f deploy/docker-compose.yml up -d
 docker compose -f deploy/docker-compose.yml ps
 docker compose -f deploy/docker-compose.yml exec postgres pg_isready -U gophkeeper -d gophkeeper
@@ -1185,6 +1187,8 @@ gophkeeper-cli_windows_amd64.exe
 В отдельном терминале:
 
 ```bash
+make certs
+
 GOPHKEEPER_DATABASE_DSN='postgres://gophkeeper:gophkeeper@localhost:5432/gophkeeper?sslmode=disable' \
 GOPHKEEPER_ACCESS_TOKEN_SECRET='local-dev-access-token-secret-32-bytes' \
 GOPHKEEPER_LOG_MODE='dev' \

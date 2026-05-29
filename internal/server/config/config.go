@@ -14,9 +14,8 @@ const minAccessTokenSecretLength = 32
 // Config описывает настройки серверного приложения
 type Config struct {
 	GRPCAddress        string        `env:"GOPHKEEPER_GRPC_ADDRESS" env-default:":9090"`
-	GRPCTLSEnabled     bool          `env:"GOPHKEEPER_GRPC_TLS_ENABLED" env-default:"false"`
-	GRPCTLSCertFile    string        `env:"GOPHKEEPER_GRPC_TLS_CERT_FILE"`
-	GRPCTLSKeyFile     string        `env:"GOPHKEEPER_GRPC_TLS_KEY_FILE"`
+	GRPCTLSCertFile    string        `env:"GOPHKEEPER_GRPC_TLS_CERT_FILE" env-default:"certs/server.crt"`
+	GRPCTLSKeyFile     string        `env:"GOPHKEEPER_GRPC_TLS_KEY_FILE" env-default:"certs/server.key"`
 	DatabaseDSN        string        `env:"GOPHKEEPER_DATABASE_DSN" env-required:"true"`
 	AccessTokenSecret  string        `env:"GOPHKEEPER_ACCESS_TOKEN_SECRET" env-required:"true"`
 	AccessTokenTTL     time.Duration `env:"GOPHKEEPER_ACCESS_TOKEN_TTL" env-default:"5m"`
@@ -98,14 +97,12 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	if c.GRPCTLSEnabled {
-		if strings.TrimSpace(c.GRPCTLSCertFile) == "" {
-			return fmt.Errorf("grpc TLS cert file is required when tls is enabled")
-		}
+	if strings.TrimSpace(c.GRPCTLSCertFile) == "" {
+		return fmt.Errorf("grpc TLS cert file is required")
+	}
 
-		if strings.TrimSpace(c.GRPCTLSKeyFile) == "" {
-			return fmt.Errorf("grpc TLS key file is required when tls is enabled")
-		}
+	if strings.TrimSpace(c.GRPCTLSKeyFile) == "" {
+		return fmt.Errorf("grpc TLS key file is required")
 	}
 
 	if c.DatabasePingTTL <= 0 {

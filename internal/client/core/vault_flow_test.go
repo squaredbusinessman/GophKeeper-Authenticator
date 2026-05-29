@@ -120,8 +120,8 @@ func TestVaultServiceCreateSecretEncryptsPayloadAndSendsAccessToken(t *testing.T
 			assertEncryptedDataDecrypts(t, session.VaultKey, req.GetMetadata(), metadataPlaintext)
 			assertEncryptedDataDecrypts(t, session.VaultKey, req.GetPayload(), payloadPlaintext)
 
-			return &gophkeeperv1.CreateItemResponse{
-				Item: &gophkeeperv1.VaultItem{
+			return gophkeeperv1.CreateItemResponse_builder{
+				Item: gophkeeperv1.VaultItem_builder{
 					Id:                   "item-id-1",
 					Type:                 req.GetType(),
 					Metadata:             req.GetMetadata(),
@@ -131,8 +131,8 @@ func TestVaultServiceCreateSecretEncryptsPayloadAndSendsAccessToken(t *testing.T
 					Version:              1,
 					CreatedAt:            timestamppb.New(createdAt),
 					UpdatedAt:            timestamppb.New(updatedAt),
-				},
-			}, nil
+				}.Build(),
+			}.Build(), nil
 		},
 	}
 	service := NewVaultService(vaultClient)
@@ -216,8 +216,8 @@ func TestVaultServiceSupportsOTPSecretType(t *testing.T) {
 				t.Fatalf("request type = %s, want ITEM_TYPE_OTP", req.GetType())
 			}
 
-			return &gophkeeperv1.CreateItemResponse{
-				Item: &gophkeeperv1.VaultItem{
+			return gophkeeperv1.CreateItemResponse_builder{
+				Item: gophkeeperv1.VaultItem_builder{
 					Id:                   "otp-id-1",
 					Type:                 req.GetType(),
 					Metadata:             req.GetMetadata(),
@@ -225,8 +225,8 @@ func TestVaultServiceSupportsOTPSecretType(t *testing.T) {
 					EncryptionAlg:        req.GetEncryptionAlg(),
 					PayloadSchemaVersion: req.GetPayloadSchemaVersion(),
 					Version:              1,
-				},
-			}, nil
+				}.Build(),
+			}.Build(), nil
 		},
 	}
 	service := NewVaultService(vaultClient)
@@ -276,8 +276,8 @@ func TestVaultServiceGetSecretDecryptsPayloadAndSendsAccessToken(t *testing.T) {
 				t.Fatalf("request id = %q, want item-id-1", req.GetId())
 			}
 
-			return &gophkeeperv1.GetItemResponse{
-				Item: &gophkeeperv1.VaultItem{
+			return gophkeeperv1.GetItemResponse_builder{
+				Item: gophkeeperv1.VaultItem_builder{
 					Id:                   "item-id-1",
 					Type:                 gophkeeperv1.ItemType_ITEM_TYPE_TEXT,
 					Metadata:             encryptedDataToProto(encryptedMetadata),
@@ -285,8 +285,8 @@ func TestVaultServiceGetSecretDecryptsPayloadAndSendsAccessToken(t *testing.T) {
 					EncryptionAlg:        payload.EncryptionAlgorithm,
 					PayloadSchemaVersion: 1,
 					Version:              3,
-				},
-			}, nil
+				}.Build(),
+			}.Build(), nil
 		},
 	}
 	service := NewVaultService(vaultClient)
@@ -329,7 +329,7 @@ func TestVaultServiceListSecretsDecryptsActiveItemsAndSendsAccessToken(t *testin
 
 	activeItem := encryptedVaultItem(t, session.VaultKey, "active-id", gophkeeperv1.ItemType_ITEM_TYPE_TEXT, activeMetadata, activePayload)
 	deletedItem := encryptedVaultItem(t, session.VaultKey, "deleted-id", gophkeeperv1.ItemType_ITEM_TYPE_TEXT, deletedMetadata, deletedPayload)
-	deletedItem.DeletedAt = timestamppb.New(deletedAt)
+	deletedItem.SetDeletedAt(timestamppb.New(deletedAt))
 
 	vaultClient := &fakeVaultClient{
 		listItemsFunc: func(_ context.Context, req *gophkeeperv1.ListItemsRequest, _ ...grpc.CallOption) (*gophkeeperv1.ListItemsResponse, error) {
@@ -337,9 +337,9 @@ func TestVaultServiceListSecretsDecryptsActiveItemsAndSendsAccessToken(t *testin
 				t.Fatalf("IncludeDeleted = true, want false for active list")
 			}
 
-			return &gophkeeperv1.ListItemsResponse{
+			return gophkeeperv1.ListItemsResponse_builder{
 				Items: []*gophkeeperv1.VaultItem{activeItem, deletedItem},
-			}, nil
+			}.Build(), nil
 		},
 	}
 	service := NewVaultService(vaultClient)
@@ -376,7 +376,7 @@ func TestVaultServiceListSecretsCanIncludeDeletedItems(t *testing.T) {
 	session := testSession()
 	deletedAt := time.Date(2026, 5, 20, 10, 0, 0, 0, time.UTC)
 	deletedItem := encryptedVaultItem(t, session.VaultKey, "deleted-id", gophkeeperv1.ItemType_ITEM_TYPE_TEXT, []byte(`{"title":"deleted"}`), []byte("deleted payload"))
-	deletedItem.DeletedAt = timestamppb.New(deletedAt)
+	deletedItem.SetDeletedAt(timestamppb.New(deletedAt))
 
 	vaultClient := &fakeVaultClient{
 		listItemsFunc: func(_ context.Context, req *gophkeeperv1.ListItemsRequest, _ ...grpc.CallOption) (*gophkeeperv1.ListItemsResponse, error) {
@@ -384,9 +384,9 @@ func TestVaultServiceListSecretsCanIncludeDeletedItems(t *testing.T) {
 				t.Fatalf("IncludeDeleted = false, want true")
 			}
 
-			return &gophkeeperv1.ListItemsResponse{
+			return gophkeeperv1.ListItemsResponse_builder{
 				Items: []*gophkeeperv1.VaultItem{deletedItem},
-			}, nil
+			}.Build(), nil
 		},
 	}
 	service := NewVaultService(vaultClient)
@@ -423,8 +423,8 @@ func TestVaultServiceUpdateSecretEncryptsPayloadAndSendsExpectedVersion(t *testi
 			assertEncryptedDataDecrypts(t, session.VaultKey, req.GetMetadata(), metadataPlaintext)
 			assertEncryptedDataDecrypts(t, session.VaultKey, req.GetPayload(), payloadPlaintext)
 
-			return &gophkeeperv1.UpdateItemResponse{
-				Item: &gophkeeperv1.VaultItem{
+			return gophkeeperv1.UpdateItemResponse_builder{
+				Item: gophkeeperv1.VaultItem_builder{
 					Id:                   req.GetId(),
 					Type:                 req.GetType(),
 					Metadata:             req.GetMetadata(),
@@ -432,8 +432,8 @@ func TestVaultServiceUpdateSecretEncryptsPayloadAndSendsExpectedVersion(t *testi
 					EncryptionAlg:        req.GetEncryptionAlg(),
 					PayloadSchemaVersion: req.GetPayloadSchemaVersion(),
 					Version:              4,
-				},
-			}, nil
+				}.Build(),
+			}.Build(), nil
 		},
 	}
 	service := NewVaultService(vaultClient)
@@ -479,11 +479,11 @@ func TestVaultServiceDeleteSecretSendsExpectedVersion(t *testing.T) {
 				t.Fatalf("expected version = %d, want 7", req.GetExpectedVersion())
 			}
 
-			return &gophkeeperv1.DeleteItemResponse{
+			return gophkeeperv1.DeleteItemResponse_builder{
 				Id:        req.GetId(),
 				Version:   8,
 				DeletedAt: timestamppb.New(deletedAt),
-			}, nil
+			}.Build(), nil
 		},
 	}
 	service := NewVaultService(vaultClient)
@@ -528,7 +528,7 @@ func TestVaultServiceSyncSecretsDecryptsChangedItemsAndSendsAccessToken(t *testi
 
 	activeItem := encryptedVaultItem(t, session.VaultKey, "active-id", gophkeeperv1.ItemType_ITEM_TYPE_TEXT, activeMetadata, activePayload)
 	deletedItem := encryptedVaultItem(t, session.VaultKey, "deleted-id", gophkeeperv1.ItemType_ITEM_TYPE_TEXT, deletedMetadata, deletedPayload)
-	deletedItem.DeletedAt = timestamppb.New(deletedAt)
+	deletedItem.SetDeletedAt(timestamppb.New(deletedAt))
 
 	vaultClient := &fakeVaultClient{
 		syncFunc: func(_ context.Context, req *gophkeeperv1.SyncRequest, _ ...grpc.CallOption) (*gophkeeperv1.SyncResponse, error) {
@@ -540,10 +540,10 @@ func TestVaultServiceSyncSecretsDecryptsChangedItemsAndSendsAccessToken(t *testi
 				t.Fatalf("ChangedAfter = %s, want %s", req.GetChangedAfter().AsTime(), changedAfter)
 			}
 
-			return &gophkeeperv1.SyncResponse{
+			return gophkeeperv1.SyncResponse_builder{
 				Items:            []*gophkeeperv1.VaultItem{activeItem, deletedItem},
 				NextChangedAfter: timestamppb.New(nextChangedAfter),
-			}, nil
+			}.Build(), nil
 		},
 	}
 	service := NewVaultService(vaultClient)
@@ -601,16 +601,16 @@ func TestVaultServiceGetSecretReturnsErrorWhenCiphertextIsDamaged(t *testing.T) 
 
 	vaultClient := &fakeVaultClient{
 		getItemFunc: func(context.Context, *gophkeeperv1.GetItemRequest, ...grpc.CallOption) (*gophkeeperv1.GetItemResponse, error) {
-			return &gophkeeperv1.GetItemResponse{
-				Item: &gophkeeperv1.VaultItem{
+			return gophkeeperv1.GetItemResponse_builder{
+				Item: gophkeeperv1.VaultItem_builder{
 					Id:                   "item-id-1",
 					Type:                 gophkeeperv1.ItemType_ITEM_TYPE_TEXT,
 					Metadata:             encryptedDataToProto(encryptedMetadata),
 					Payload:              encryptedDataToProto(encryptedPayload),
 					EncryptionAlg:        payload.EncryptionAlgorithm,
 					PayloadSchemaVersion: 1,
-				},
-			}, nil
+				}.Build(),
+			}.Build(), nil
 		},
 	}
 	service := NewVaultService(vaultClient)
@@ -908,7 +908,7 @@ func encryptedVaultItem(t *testing.T, vaultKey []byte, id string, itemType gophk
 		t.Fatalf("encrypt payload: %v", err)
 	}
 
-	return &gophkeeperv1.VaultItem{
+	return gophkeeperv1.VaultItem_builder{
 		Id:                   id,
 		Type:                 itemType,
 		Metadata:             encryptedDataToProto(encryptedMetadata),
@@ -916,5 +916,5 @@ func encryptedVaultItem(t *testing.T, vaultKey []byte, id string, itemType gophk
 		EncryptionAlg:        payload.EncryptionAlgorithm,
 		PayloadSchemaVersion: 1,
 		Version:              1,
-	}
+	}.Build()
 }

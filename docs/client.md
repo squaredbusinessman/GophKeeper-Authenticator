@@ -19,10 +19,11 @@ Runtime собирает:
 
 ```env
 GOPHKEEPER_SERVER_ADDRESS=localhost:9090
-GOPHKEEPER_SERVER_TLS_ENABLED=false
-GOPHKEEPER_SERVER_TLS_CERT_FILE=
+GOPHKEEPER_SERVER_TLS_CERT_FILE=certs/server.crt
 GOPHKEEPER_TOKEN_FILE=$HOME/.gophkeeper/token.json
 ```
+
+Клиент всегда использует TLS. Для локального запуска выполните `make certs` и используйте сертификат `certs/server.crt`.
 
 ## Vault session
 

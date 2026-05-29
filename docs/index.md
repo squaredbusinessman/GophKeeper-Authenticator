@@ -21,6 +21,7 @@ GophKeeper Authenticator - учебный клиент-серверный мен
 
 ```bash
 cp deploy/.env.example deploy/.env
+make certs
 docker compose -f deploy/docker-compose.yml up -d
 
 set -a

@@ -102,12 +102,12 @@ func (s *BlobService) CreateUpload(ctx context.Context, session Session, input C
 
 	ctx = contextWithAccessToken(ctx, session.AccessToken)
 
-	response, err := s.blobClient.CreateBlobUpload(ctx, &gophkeeperv1.CreateBlobUploadRequest{
+	response, err := s.blobClient.CreateBlobUpload(ctx, gophkeeperv1.CreateBlobUploadRequest_builder{
 		ExpectedSize:   input.ExpectedSize,
 		ChunkSize:      input.ChunkSize,
 		ExpectedChunks: input.ExpectedChunks,
 		ChecksumSha256: input.ChecksumSHA256,
-	})
+	}.Build())
 	if err != nil {
 		return BlobUpload{}, fmt.Errorf("create blob upload: %w", err)
 	}
@@ -145,12 +145,12 @@ func (s *BlobService) Upload(ctx context.Context, session Session, input UploadB
 			return UploadedBlob{}, err
 		}
 
-		if err = stream.Send(&gophkeeperv1.UploadBlobChunkRequest{
+		if err = stream.Send(gophkeeperv1.UploadBlobChunkRequest_builder{
 			UploadId:       input.UploadID,
 			ChunkIndex:     chunk.Index,
 			Data:           chunk.Data,
 			ChecksumSha256: chunk.ChecksumSHA256,
-		}); err != nil {
+		}.Build()); err != nil {
 			return UploadedBlob{}, fmt.Errorf("send blob chunk: %w", err)
 		}
 	}
@@ -179,9 +179,9 @@ func (s *BlobService) Download(ctx context.Context, session Session, input Downl
 
 	ctx = contextWithAccessToken(ctx, session.AccessToken)
 
-	stream, err := s.blobClient.DownloadBlob(ctx, &gophkeeperv1.DownloadBlobRequest{
+	stream, err := s.blobClient.DownloadBlob(ctx, gophkeeperv1.DownloadBlobRequest_builder{
 		BlobId: strings.TrimSpace(input.BlobID),
-	})
+	}.Build())
 	if err != nil {
 		return DownloadBlobResult{}, fmt.Errorf("open blob download stream: %w", err)
 	}
@@ -227,9 +227,9 @@ func (s *BlobService) AbortUpload(ctx context.Context, session Session, input Ab
 
 	ctx = contextWithAccessToken(ctx, session.AccessToken)
 
-	if _, err := s.blobClient.AbortBlobUpload(ctx, &gophkeeperv1.AbortBlobUploadRequest{
+	if _, err := s.blobClient.AbortBlobUpload(ctx, gophkeeperv1.AbortBlobUploadRequest_builder{
 		UploadId: strings.TrimSpace(input.UploadID),
-	}); err != nil {
+	}.Build()); err != nil {
 		return fmt.Errorf("abort blob upload: %w", err)
 	}
 

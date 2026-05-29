@@ -111,7 +111,6 @@ var (
 )
 
 type model struct {
-	ctx     context.Context
 	deps    appDeps
 	screen  screen
 	width   int
@@ -166,9 +165,36 @@ type saveDoneMsg struct {
 
 type otpTickMsg time.Time
 
-func newModel(ctx context.Context, deps appDeps) model {
+type programModel struct {
+	inner    model
+	updateFn func(model, tea.Msg) (model, tea.Cmd)
+}
+
+func newProgramModel(ctx context.Context, deps appDeps) programModel {
+	return programModel{
+		inner: newModel(deps),
+		updateFn: func(m model, msg tea.Msg) (model, tea.Cmd) {
+			return m.update(ctx, msg)
+		},
+	}
+}
+
+func (m programModel) Init() tea.Cmd {
+	return m.inner.init()
+}
+
+func (m programModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	inner, cmd := m.updateFn(m.inner, msg)
+	m.inner = inner
+	return m, cmd
+}
+
+func (m programModel) View() string {
+	return m.inner.View()
+}
+
+func newModel(deps appDeps) model {
 	m := model{
-		ctx:    ctx,
 		deps:   deps,
 		screen: screenWelcome,
 		detail: viewport.New(80, 20),
@@ -177,11 +203,11 @@ func newModel(ctx context.Context, deps appDeps) model {
 	return m
 }
 
-func (m model) Init() tea.Cmd {
+func (m model) init() tea.Cmd {
 	return textinput.Blink
 }
 
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m model) update(ctx context.Context, msg tea.Msg) (model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -202,7 +228,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.statusOK("vault открыт")
 		m.screen = screenList
 		m.busy = true
-		return m, m.loadSecretsCmd(false)
+		return m, m.loadSecretsCmd(ctx, false)
 	case listDoneMsg:
 		m.busy = false
 		if msg.err != nil {
@@ -228,9 +254,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.formMode == formModeCreate || m.formMode == formModeUpdate {
 			m.busy = true
 			if msg.secret.Type == core.SecretTypeOTP {
-				return m, tea.Batch(m.loadSecretsCmd(false), otpTickCmd())
+				return m, tea.Batch(m.loadSecretsCmd(ctx, false), otpTickCmd())
 			}
-			return m, m.loadSecretsCmd(false)
+			return m, m.loadSecretsCmd(ctx, false)
 		}
 		if msg.secret.Type == core.SecretTypeOTP {
 			return m, otpTickCmd()
@@ -246,7 +272,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.screen = screenList
 		m.statusOK("секрет удален")
 		m.busy = true
-		return m, m.loadSecretsCmd(false)
+		return m, m.loadSecretsCmd(ctx, false)
 	case syncDoneMsg:
 		m.busy = false
 		if msg.err != nil {
@@ -255,7 +281,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.statusOK(fmt.Sprintf("синхронизация выполнена, изменений: %d", msg.count))
 		m.busy = true
-		return m, m.loadSecretsCmd(false)
+		return m, m.loadSecretsCmd(ctx, false)
 	case saveDoneMsg:
 		m.busy = false
 		if msg.err != nil {
@@ -289,19 +315,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case screenWelcome:
 		return m.updateWelcome(key)
 	case screenAuth:
-		return m.updateAuth(key)
+		return m.updateAuth(ctx, key)
 	case screenList:
-		return m.updateList(key)
+		return m.updateList(ctx, key)
 	case screenDetail:
-		return m.updateDetail(key)
+		return m.updateDetail(ctx, key)
 	case screenTypeSelect:
 		return m.updateTypeSelect(key)
 	case screenForm:
-		return m.updateForm(key)
+		return m.updateForm(ctx, key)
 	case screenDelete:
-		return m.updateDelete(key)
+		return m.updateDelete(ctx, key)
 	case screenSaveBinary:
-		return m.updateSaveBinary(key)
+		return m.updateSaveBinary(ctx, key)
 	default:
 		return m, nil
 	}
@@ -341,7 +367,7 @@ func (m *model) setAuthInputs() {
 	m.inputs[0].Focus()
 }
 
-func (m model) updateWelcome(key tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m model) updateWelcome(key tea.KeyMsg) (model, tea.Cmd) {
 	switch key.String() {
 	case "enter":
 		m.screen = screenAuth
@@ -351,7 +377,7 @@ func (m model) updateWelcome(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m model) updateAuth(key tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m model) updateAuth(ctx context.Context, key tea.KeyMsg) (model, tea.Cmd) {
 	switch key.String() {
 	case "ctrl+r":
 		m.authMode = authModeRegister
@@ -373,12 +399,12 @@ func (m model) updateAuth(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.busy = true
-		return m, m.submitAuthCmd()
+		return m, m.submitAuthCmd(ctx)
 	}
 	return m.updateFocusedInput(key)
 }
 
-func (m model) updateList(key tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m model) updateList(ctx context.Context, key tea.KeyMsg) (model, tea.Cmd) {
 	switch key.String() {
 	case "q":
 		m.resetToWelcome()
@@ -393,16 +419,16 @@ func (m model) updateList(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "r":
 		m.busy = true
-		return m, m.loadSecretsCmd(false)
+		return m, m.loadSecretsCmd(ctx, false)
 	case "s":
 		m.busy = true
-		return m, m.syncCmd()
+		return m, m.syncCmd(ctx)
 	case "n":
 		m.screen = screenTypeSelect
 	case "enter":
 		if len(m.secrets) > 0 {
 			m.busy = true
-			return m, m.getSecretCmd(m.secrets[m.selected].ID)
+			return m, m.getSecretCmd(ctx, m.secrets[m.selected].ID)
 		}
 	case "u":
 		if len(m.secrets) > 0 {
@@ -418,7 +444,7 @@ func (m model) updateList(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m model) updateDetail(key tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m model) updateDetail(_ context.Context, key tea.KeyMsg) (model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.detail, cmd = m.detail.Update(key)
 
@@ -449,7 +475,7 @@ func (m model) updateDetail(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m model) updateTypeSelect(key tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m model) updateTypeSelect(key tea.KeyMsg) (model, tea.Cmd) {
 	switch key.String() {
 	case "esc", "backspace":
 		m.screen = screenList
@@ -467,7 +493,7 @@ func (m model) updateTypeSelect(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m model) updateForm(key tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m model) updateForm(ctx context.Context, key tea.KeyMsg) (model, tea.Cmd) {
 	switch key.String() {
 	case "esc":
 		m.screen = screenList
@@ -484,12 +510,12 @@ func (m model) updateForm(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.busy = true
-		return m, m.submitFormCmd()
+		return m, m.submitFormCmd(ctx)
 	}
 	return m.updateFocusedInput(key)
 }
 
-func (m model) updateDelete(key tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m model) updateDelete(ctx context.Context, key tea.KeyMsg) (model, tea.Cmd) {
 	switch key.String() {
 	case "y":
 		if m.current == nil {
@@ -497,14 +523,14 @@ func (m model) updateDelete(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.busy = true
-		return m, m.deleteCmd(*m.current)
+		return m, m.deleteCmd(ctx, *m.current)
 	case "n", "esc":
 		m.screen = screenList
 	}
 	return m, nil
 }
 
-func (m model) updateSaveBinary(key tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m model) updateSaveBinary(ctx context.Context, key tea.KeyMsg) (model, tea.Cmd) {
 	switch key.String() {
 	case "esc":
 		m.screen = screenDetail
@@ -515,17 +541,17 @@ func (m model) updateSaveBinary(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.busy = true
-		return m, m.saveBinaryCmd(*m.current, m.inputs[0].Value())
+		return m, m.saveBinaryCmd(ctx, *m.current, m.inputs[0].Value())
 	}
 	return m.updateFocusedInput(key)
 }
 
-func (m model) submitAuthCmd() tea.Cmd {
+func (m model) submitAuthCmd(ctx context.Context) tea.Cmd {
 	login := m.inputs[0].Value()
 	loginPassword := m.inputs[1].Value()
 	masterPassword := m.inputs[2].Value()
 	if m.authMode == authModeRegister && masterPassword != m.inputs[3].Value() {
-		return func() tea.Msg { return authDoneMsg{err: fmt.Errorf("master passwords do not match")} }
+		return func() tea.Msg { return authDoneMsg{err: clientapp.ErrMasterPasswordsMismatch} }
 	}
 
 	return func() tea.Msg {
@@ -534,13 +560,13 @@ func (m model) submitAuthCmd() tea.Cmd {
 			err     error
 		)
 		if m.authMode == authModeRegister {
-			session, err = m.deps.authService.Register(m.ctx, core.RegisterInput{
+			session, err = m.deps.authService.Register(ctx, core.RegisterInput{
 				Login:          strings.TrimSpace(login),
 				LoginPassword:  loginPassword,
 				MasterPassword: masterPassword,
 			})
 		} else {
-			session, err = m.deps.authService.Login(m.ctx, core.LoginInput{
+			session, err = m.deps.authService.Login(ctx, core.LoginInput{
 				Login:          strings.TrimSpace(login),
 				LoginPassword:  loginPassword,
 				MasterPassword: masterPassword,
@@ -550,46 +576,46 @@ func (m model) submitAuthCmd() tea.Cmd {
 	}
 }
 
-func (m model) loadSecretsCmd(includeDeleted bool) tea.Cmd {
+func (m model) loadSecretsCmd(ctx context.Context, includeDeleted bool) tea.Cmd {
 	session, ok := m.deps.sessionState.Session()
 	if !ok {
-		return func() tea.Msg { return listDoneMsg{err: fmt.Errorf("vault session is not open")} }
+		return func() tea.Msg { return listDoneMsg{err: clientapp.ErrVaultSessionClosed} }
 	}
 	return func() tea.Msg {
-		secrets, err := m.deps.vaultService.ListSecrets(m.ctx, session, core.ListSecretsInput{IncludeDeleted: includeDeleted})
+		secrets, err := m.deps.vaultService.ListSecrets(ctx, session, core.ListSecretsInput{IncludeDeleted: includeDeleted})
 		return listDoneMsg{secrets: secrets, err: err}
 	}
 }
 
-func (m model) getSecretCmd(id string) tea.Cmd {
+func (m model) getSecretCmd(ctx context.Context, id string) tea.Cmd {
 	session, ok := m.deps.sessionState.Session()
 	if !ok {
-		return func() tea.Msg { return secretDoneMsg{err: fmt.Errorf("vault session is not open")} }
+		return func() tea.Msg { return secretDoneMsg{err: clientapp.ErrVaultSessionClosed} }
 	}
 	return func() tea.Msg {
-		secret, err := m.deps.vaultService.GetSecret(m.ctx, session, core.GetSecretInput{ID: id})
+		secret, err := m.deps.vaultService.GetSecret(ctx, session, core.GetSecretInput{ID: id})
 		return secretDoneMsg{secret: secret, err: err}
 	}
 }
 
-func (m model) syncCmd() tea.Cmd {
+func (m model) syncCmd(ctx context.Context) tea.Cmd {
 	session, ok := m.deps.sessionState.Session()
 	if !ok {
-		return func() tea.Msg { return syncDoneMsg{err: fmt.Errorf("vault session is not open")} }
+		return func() tea.Msg { return syncDoneMsg{err: clientapp.ErrVaultSessionClosed} }
 	}
 	return func() tea.Msg {
-		result, err := m.deps.vaultService.SyncSecrets(m.ctx, session, core.SyncSecretsInput{})
+		result, err := m.deps.vaultService.SyncSecrets(ctx, session, core.SyncSecretsInput{})
 		return syncDoneMsg{count: len(result.Secrets), err: err}
 	}
 }
 
-func (m model) deleteCmd(secret core.Secret) tea.Cmd {
+func (m model) deleteCmd(ctx context.Context, secret core.Secret) tea.Cmd {
 	session, ok := m.deps.sessionState.Session()
 	if !ok {
-		return func() tea.Msg { return deleteDoneMsg{err: fmt.Errorf("vault session is not open")} }
+		return func() tea.Msg { return deleteDoneMsg{err: clientapp.ErrVaultSessionClosed} }
 	}
 	return func() tea.Msg {
-		_, err := m.deps.vaultService.DeleteSecret(m.ctx, session, core.DeleteSecretInput{
+		_, err := m.deps.vaultService.DeleteSecret(ctx, session, core.DeleteSecretInput{
 			ID:              secret.ID,
 			ExpectedVersion: secret.Version,
 		})
@@ -597,20 +623,20 @@ func (m model) deleteCmd(secret core.Secret) tea.Cmd {
 	}
 }
 
-func (m model) submitFormCmd() tea.Cmd {
+func (m model) submitFormCmd(ctx context.Context) tea.Cmd {
 	session, ok := m.deps.sessionState.Session()
 	if !ok {
-		return func() tea.Msg { return secretDoneMsg{err: fmt.Errorf("vault session is not open")} }
+		return func() tea.Msg { return secretDoneMsg{err: clientapp.ErrVaultSessionClosed} }
 	}
 
-	input, err := m.secretInputFromForm()
+	input, err := m.secretInputFromForm(ctx)
 	if err != nil {
 		return func() tea.Msg { return secretDoneMsg{err: err} }
 	}
 
 	if m.formMode == formModeUpdate {
 		return func() tea.Msg {
-			secret, err := m.deps.vaultService.UpdateSecret(m.ctx, session, core.UpdateSecretInput{
+			secret, err := m.deps.vaultService.UpdateSecret(ctx, session, core.UpdateSecretInput{
 				ID:                   m.editID,
 				ExpectedVersion:      m.editVer,
 				Type:                 input.Type,
@@ -623,12 +649,12 @@ func (m model) submitFormCmd() tea.Cmd {
 	}
 
 	return func() tea.Msg {
-		secret, err := m.deps.vaultService.CreateSecret(m.ctx, session, input)
+		secret, err := m.deps.vaultService.CreateSecret(ctx, session, input)
 		return secretDoneMsg{secret: secret, err: err}
 	}
 }
 
-func (m model) saveBinaryCmd(secret core.Secret, outputPath string) tea.Cmd {
+func (m model) saveBinaryCmd(ctx context.Context, secret core.Secret, outputPath string) tea.Cmd {
 	return func() tea.Msg {
 		binaryPayload, err := core.DecodeBinaryPayload(secret.Payload, secret.PayloadSchemaVersion)
 		if err != nil {
@@ -640,18 +666,18 @@ func (m model) saveBinaryCmd(secret core.Secret, outputPath string) tea.Cmd {
 		}
 
 		if m.deps.blobService == nil {
-			return saveDoneMsg{err: fmt.Errorf("blob service is required")}
+			return saveDoneMsg{err: clientapp.ErrBlobServiceRequired}
 		}
 		session, ok := m.deps.sessionState.Session()
 		if !ok {
-			return saveDoneMsg{err: fmt.Errorf("vault session is not open")}
+			return saveDoneMsg{err: clientapp.ErrVaultSessionClosed}
 		}
 
 		if err = os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 			return saveDoneMsg{err: fmt.Errorf("create output dir: %w", err)}
 		}
 
-		data, err := m.deps.blobService.DownloadBinary(m.ctx, session, core.DownloadBinaryInput{
+		data, err := m.deps.blobService.DownloadBinary(ctx, session, core.DownloadBinaryInput{
 			Payload: binaryPayload,
 		})
 		if err != nil {
@@ -673,7 +699,7 @@ func resolveBinaryOutputPath(outputDir string, fileName string) (string, error) 
 
 	if info, err := os.Stat(dir); err == nil {
 		if !info.IsDir() {
-			return "", fmt.Errorf("output directory is not a directory: %s", dir)
+			return "", fmt.Errorf("%w: %s", clientapp.ErrOutputDirectoryNotDirectory, dir)
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return "", fmt.Errorf("check output file: %w", err)
@@ -681,7 +707,7 @@ func resolveBinaryOutputPath(outputDir string, fileName string) (string, error) 
 
 	path := filepath.Join(dir, safeBinaryFileName(fileName))
 	if _, err := os.Stat(path); err == nil {
-		return "", fmt.Errorf("output file already exists: %s", path)
+		return "", fmt.Errorf("%w: %s", clientapp.ErrOutputFileExists, path)
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return "", fmt.Errorf("check output file: %w", err)
 	}
@@ -692,7 +718,7 @@ func resolveBinaryOutputPath(outputDir string, fileName string) (string, error) 
 func normalizeBinaryOutputPath(outputPath string) (string, error) {
 	path := strings.TrimSpace(outputPath)
 	if path == "" {
-		return "", fmt.Errorf("output directory is required")
+		return "", clientapp.ErrOutputDirectoryRequired
 	}
 
 	if path == "~" || strings.HasPrefix(path, "~/") {
@@ -740,7 +766,7 @@ func otpTickCmd() tea.Cmd {
 	})
 }
 
-func (m model) startCreateForm(kind secretKind) (tea.Model, tea.Cmd) {
+func (m model) startCreateForm(kind secretKind) (model, tea.Cmd) {
 	m.formMode = formModeCreate
 	m.formKind = kind
 	m.editID = ""
@@ -752,7 +778,7 @@ func (m model) startCreateForm(kind secretKind) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m model) startUpdateForm(secret core.Secret) (tea.Model, tea.Cmd) {
+func (m model) startUpdateForm(secret core.Secret) (model, tea.Cmd) {
 	m.formMode = formModeUpdate
 	m.formKind = kindFromSecretType(secret.Type)
 	m.editID = secret.ID
@@ -769,7 +795,7 @@ func (m model) startUpdateForm(secret core.Secret) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m model) secretInputFromForm() (core.CreateSecretInput, error) {
+func (m model) secretInputFromForm(ctx context.Context) (core.CreateSecretInput, error) {
 	title := m.inputs[0].Value()
 	metadata, err := encodeTextSecretMetadata(title)
 	if err != nil {
@@ -800,11 +826,11 @@ func (m model) secretInputFromForm() (core.CreateSecretInput, error) {
 		return createInput(core.SecretTypeBankCard, metadata, payload, version), err
 	case secretKindBinary:
 		if m.deps.blobService == nil {
-			return core.CreateSecretInput{}, fmt.Errorf("blob service is required")
+			return core.CreateSecretInput{}, clientapp.ErrBlobServiceRequired
 		}
 		session, ok := m.deps.sessionState.Session()
 		if !ok {
-			return core.CreateSecretInput{}, fmt.Errorf("vault session is not open")
+			return core.CreateSecretInput{}, clientapp.ErrVaultSessionClosed
 		}
 
 		data, err := os.ReadFile(m.inputs[1].Value())
@@ -812,7 +838,7 @@ func (m model) secretInputFromForm() (core.CreateSecretInput, error) {
 			return core.CreateSecretInput{}, fmt.Errorf("read binary file: %w", err)
 		}
 
-		binaryPayload, err := m.deps.blobService.UploadBinary(m.ctx, session, core.UploadBinaryInput{
+		binaryPayload, err := m.deps.blobService.UploadBinary(ctx, session, core.UploadBinaryInput{
 			FileName:    filepath.Base(m.inputs[1].Value()),
 			ContentType: strings.TrimSpace(m.inputs[2].Value()),
 			Data:        data,
@@ -1072,7 +1098,7 @@ func (m *model) focusPrev() {
 	m.inputs[m.focus].Focus()
 }
 
-func (m model) updateFocusedInput(key tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m model) updateFocusedInput(key tea.KeyMsg) (model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.inputs[m.focus], cmd = m.inputs[m.focus].Update(key)
 	return m, cmd

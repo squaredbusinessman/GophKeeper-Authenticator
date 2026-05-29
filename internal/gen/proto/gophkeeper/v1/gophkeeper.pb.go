@@ -12,7 +12,6 @@ import (
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
-	sync "sync"
 	unsafe "unsafe"
 )
 
@@ -83,28 +82,17 @@ func (x ItemType) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
 }
 
-// Deprecated: Use ItemType.Descriptor instead.
-func (ItemType) EnumDescriptor() ([]byte, []int) {
-	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{0}
-}
-
 // KDFParams описывает параметры функции формирования ключа из мастер-пароля
 type KDFParams struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// algorithm содержит название алгоритма KDF
-	Algorithm string `protobuf:"bytes,1,opt,name=algorithm,proto3" json:"algorithm,omitempty"`
-	// salt содержит соль для формирования ключа
-	Salt []byte `protobuf:"bytes,2,opt,name=salt,proto3" json:"salt,omitempty"`
-	// time_cost задает вычислительную стоимость KDF
-	TimeCost uint32 `protobuf:"varint,3,opt,name=time_cost,json=timeCost,proto3" json:"time_cost,omitempty"`
-	// memory_kib задает объем памяти для KDF в KiB
-	MemoryKib uint32 `protobuf:"varint,4,opt,name=memory_kib,json=memoryKib,proto3" json:"memory_kib,omitempty"`
-	// parallelism задает уровень параллелизма KDF
-	Parallelism uint32 `protobuf:"varint,5,opt,name=parallelism,proto3" json:"parallelism,omitempty"`
-	// key_length задает длину результирующего ключа в байтах
-	KeyLength     uint32 `protobuf:"varint,6,opt,name=key_length,json=keyLength,proto3" json:"key_length,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Algorithm   string                 `protobuf:"bytes,1,opt,name=algorithm,proto3"`
+	xxx_hidden_Salt        []byte                 `protobuf:"bytes,2,opt,name=salt,proto3"`
+	xxx_hidden_TimeCost    uint32                 `protobuf:"varint,3,opt,name=time_cost,json=timeCost,proto3"`
+	xxx_hidden_MemoryKib   uint32                 `protobuf:"varint,4,opt,name=memory_kib,json=memoryKib,proto3"`
+	xxx_hidden_Parallelism uint32                 `protobuf:"varint,5,opt,name=parallelism,proto3"`
+	xxx_hidden_KeyLength   uint32                 `protobuf:"varint,6,opt,name=key_length,json=keyLength,proto3"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *KDFParams) Reset() {
@@ -132,66 +120,114 @@ func (x *KDFParams) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use KDFParams.ProtoReflect.Descriptor instead.
-func (*KDFParams) Descriptor() ([]byte, []int) {
-	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{0}
-}
-
 func (x *KDFParams) GetAlgorithm() string {
 	if x != nil {
-		return x.Algorithm
+		return x.xxx_hidden_Algorithm
 	}
 	return ""
 }
 
 func (x *KDFParams) GetSalt() []byte {
 	if x != nil {
-		return x.Salt
+		return x.xxx_hidden_Salt
 	}
 	return nil
 }
 
 func (x *KDFParams) GetTimeCost() uint32 {
 	if x != nil {
-		return x.TimeCost
+		return x.xxx_hidden_TimeCost
 	}
 	return 0
 }
 
 func (x *KDFParams) GetMemoryKib() uint32 {
 	if x != nil {
-		return x.MemoryKib
+		return x.xxx_hidden_MemoryKib
 	}
 	return 0
 }
 
 func (x *KDFParams) GetParallelism() uint32 {
 	if x != nil {
-		return x.Parallelism
+		return x.xxx_hidden_Parallelism
 	}
 	return 0
 }
 
 func (x *KDFParams) GetKeyLength() uint32 {
 	if x != nil {
-		return x.KeyLength
+		return x.xxx_hidden_KeyLength
 	}
 	return 0
 }
 
+func (x *KDFParams) SetAlgorithm(v string) {
+	x.xxx_hidden_Algorithm = v
+}
+
+func (x *KDFParams) SetSalt(v []byte) {
+	if v == nil {
+		v = []byte{}
+	}
+	x.xxx_hidden_Salt = v
+}
+
+func (x *KDFParams) SetTimeCost(v uint32) {
+	x.xxx_hidden_TimeCost = v
+}
+
+func (x *KDFParams) SetMemoryKib(v uint32) {
+	x.xxx_hidden_MemoryKib = v
+}
+
+func (x *KDFParams) SetParallelism(v uint32) {
+	x.xxx_hidden_Parallelism = v
+}
+
+func (x *KDFParams) SetKeyLength(v uint32) {
+	x.xxx_hidden_KeyLength = v
+}
+
+type KDFParams_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	// algorithm содержит название алгоритма KDF
+	Algorithm string
+	// salt содержит соль для формирования ключа
+	Salt []byte
+	// time_cost задает вычислительную стоимость KDF
+	TimeCost uint32
+	// memory_kib задает объем памяти для KDF в KiB
+	MemoryKib uint32
+	// parallelism задает уровень параллелизма KDF
+	Parallelism uint32
+	// key_length задает длину результирующего ключа в байтах
+	KeyLength uint32
+}
+
+func (b0 KDFParams_builder) Build() *KDFParams {
+	m0 := &KDFParams{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_Algorithm = b.Algorithm
+	x.xxx_hidden_Salt = b.Salt
+	x.xxx_hidden_TimeCost = b.TimeCost
+	x.xxx_hidden_MemoryKib = b.MemoryKib
+	x.xxx_hidden_Parallelism = b.Parallelism
+	x.xxx_hidden_KeyLength = b.KeyLength
+	return m0
+}
+
 // VaultKeyEnvelope хранит зашифрованный ключ пользовательского хранилища
 type VaultKeyEnvelope struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// encrypted_vault_key содержит ключ хранилища, зашифрованный ключом из мастер-пароля
-	EncryptedVaultKey []byte `protobuf:"bytes,1,opt,name=encrypted_vault_key,json=encryptedVaultKey,proto3" json:"encrypted_vault_key,omitempty"`
-	// nonce содержит одноразовое значение для расшифровки ключа хранилища
-	Nonce []byte `protobuf:"bytes,2,opt,name=nonce,proto3" json:"nonce,omitempty"`
-	// encryption_alg содержит название алгоритма шифрования ключа хранилища
-	EncryptionAlg string `protobuf:"bytes,3,opt,name=encryption_alg,json=encryptionAlg,proto3" json:"encryption_alg,omitempty"`
-	// kdf_params содержит параметры получения ключа из мастер-пароля
-	KdfParams     *KDFParams `protobuf:"bytes,4,opt,name=kdf_params,json=kdfParams,proto3" json:"kdf_params,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                        protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_EncryptedVaultKey []byte                 `protobuf:"bytes,1,opt,name=encrypted_vault_key,json=encryptedVaultKey,proto3"`
+	xxx_hidden_Nonce             []byte                 `protobuf:"bytes,2,opt,name=nonce,proto3"`
+	xxx_hidden_EncryptionAlg     string                 `protobuf:"bytes,3,opt,name=encryption_alg,json=encryptionAlg,proto3"`
+	xxx_hidden_KdfParams         *KDFParams             `protobuf:"bytes,4,opt,name=kdf_params,json=kdfParams,proto3"`
+	unknownFields                protoimpl.UnknownFields
+	sizeCache                    protoimpl.SizeCache
 }
 
 func (x *VaultKeyEnvelope) Reset() {
@@ -219,50 +255,99 @@ func (x *VaultKeyEnvelope) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use VaultKeyEnvelope.ProtoReflect.Descriptor instead.
-func (*VaultKeyEnvelope) Descriptor() ([]byte, []int) {
-	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{1}
-}
-
 func (x *VaultKeyEnvelope) GetEncryptedVaultKey() []byte {
 	if x != nil {
-		return x.EncryptedVaultKey
+		return x.xxx_hidden_EncryptedVaultKey
 	}
 	return nil
 }
 
 func (x *VaultKeyEnvelope) GetNonce() []byte {
 	if x != nil {
-		return x.Nonce
+		return x.xxx_hidden_Nonce
 	}
 	return nil
 }
 
 func (x *VaultKeyEnvelope) GetEncryptionAlg() string {
 	if x != nil {
-		return x.EncryptionAlg
+		return x.xxx_hidden_EncryptionAlg
 	}
 	return ""
 }
 
 func (x *VaultKeyEnvelope) GetKdfParams() *KDFParams {
 	if x != nil {
-		return x.KdfParams
+		return x.xxx_hidden_KdfParams
 	}
 	return nil
 }
 
+func (x *VaultKeyEnvelope) SetEncryptedVaultKey(v []byte) {
+	if v == nil {
+		v = []byte{}
+	}
+	x.xxx_hidden_EncryptedVaultKey = v
+}
+
+func (x *VaultKeyEnvelope) SetNonce(v []byte) {
+	if v == nil {
+		v = []byte{}
+	}
+	x.xxx_hidden_Nonce = v
+}
+
+func (x *VaultKeyEnvelope) SetEncryptionAlg(v string) {
+	x.xxx_hidden_EncryptionAlg = v
+}
+
+func (x *VaultKeyEnvelope) SetKdfParams(v *KDFParams) {
+	x.xxx_hidden_KdfParams = v
+}
+
+func (x *VaultKeyEnvelope) HasKdfParams() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_KdfParams != nil
+}
+
+func (x *VaultKeyEnvelope) ClearKdfParams() {
+	x.xxx_hidden_KdfParams = nil
+}
+
+type VaultKeyEnvelope_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	// encrypted_vault_key содержит ключ хранилища, зашифрованный ключом из мастер-пароля
+	EncryptedVaultKey []byte
+	// nonce содержит одноразовое значение для расшифровки ключа хранилища
+	Nonce []byte
+	// encryption_alg содержит название алгоритма шифрования ключа хранилища
+	EncryptionAlg string
+	// kdf_params содержит параметры получения ключа из мастер-пароля
+	KdfParams *KDFParams
+}
+
+func (b0 VaultKeyEnvelope_builder) Build() *VaultKeyEnvelope {
+	m0 := &VaultKeyEnvelope{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_EncryptedVaultKey = b.EncryptedVaultKey
+	x.xxx_hidden_Nonce = b.Nonce
+	x.xxx_hidden_EncryptionAlg = b.EncryptionAlg
+	x.xxx_hidden_KdfParams = b.KdfParams
+	return m0
+}
+
 // RegisterResponse содержит результат успешной регистрации пользователя
 type RegisterResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// access_token содержит токен доступа к API
-	AccessToken string `protobuf:"bytes,1,opt,name=access_token,json=accessToken,proto3" json:"access_token,omitempty"`
-	// access_token_expires_at содержит момент истечения токена доступа
-	AccessTokenExpiresAt *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=access_token_expires_at,json=accessTokenExpiresAt,proto3" json:"access_token_expires_at,omitempty"`
-	// vault_key содержит зашифрованный ключ хранилища пользователя
-	VaultKey      *VaultKeyEnvelope `protobuf:"bytes,3,opt,name=vault_key,json=vaultKey,proto3" json:"vault_key,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                           protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_AccessToken          string                 `protobuf:"bytes,1,opt,name=access_token,json=accessToken,proto3"`
+	xxx_hidden_AccessTokenExpiresAt *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=access_token_expires_at,json=accessTokenExpiresAt,proto3"`
+	xxx_hidden_VaultKey             *VaultKeyEnvelope      `protobuf:"bytes,3,opt,name=vault_key,json=vaultKey,proto3"`
+	unknownFields                   protoimpl.UnknownFields
+	sizeCache                       protoimpl.SizeCache
 }
 
 func (x *RegisterResponse) Reset() {
@@ -290,43 +375,90 @@ func (x *RegisterResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use RegisterResponse.ProtoReflect.Descriptor instead.
-func (*RegisterResponse) Descriptor() ([]byte, []int) {
-	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{2}
-}
-
 func (x *RegisterResponse) GetAccessToken() string {
 	if x != nil {
-		return x.AccessToken
+		return x.xxx_hidden_AccessToken
 	}
 	return ""
 }
 
 func (x *RegisterResponse) GetAccessTokenExpiresAt() *timestamppb.Timestamp {
 	if x != nil {
-		return x.AccessTokenExpiresAt
+		return x.xxx_hidden_AccessTokenExpiresAt
 	}
 	return nil
 }
 
 func (x *RegisterResponse) GetVaultKey() *VaultKeyEnvelope {
 	if x != nil {
-		return x.VaultKey
+		return x.xxx_hidden_VaultKey
 	}
 	return nil
 }
 
+func (x *RegisterResponse) SetAccessToken(v string) {
+	x.xxx_hidden_AccessToken = v
+}
+
+func (x *RegisterResponse) SetAccessTokenExpiresAt(v *timestamppb.Timestamp) {
+	x.xxx_hidden_AccessTokenExpiresAt = v
+}
+
+func (x *RegisterResponse) SetVaultKey(v *VaultKeyEnvelope) {
+	x.xxx_hidden_VaultKey = v
+}
+
+func (x *RegisterResponse) HasAccessTokenExpiresAt() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_AccessTokenExpiresAt != nil
+}
+
+func (x *RegisterResponse) HasVaultKey() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_VaultKey != nil
+}
+
+func (x *RegisterResponse) ClearAccessTokenExpiresAt() {
+	x.xxx_hidden_AccessTokenExpiresAt = nil
+}
+
+func (x *RegisterResponse) ClearVaultKey() {
+	x.xxx_hidden_VaultKey = nil
+}
+
+type RegisterResponse_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	// access_token содержит токен доступа к API
+	AccessToken string
+	// access_token_expires_at содержит момент истечения токена доступа
+	AccessTokenExpiresAt *timestamppb.Timestamp
+	// vault_key содержит зашифрованный ключ хранилища пользователя
+	VaultKey *VaultKeyEnvelope
+}
+
+func (b0 RegisterResponse_builder) Build() *RegisterResponse {
+	m0 := &RegisterResponse{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_AccessToken = b.AccessToken
+	x.xxx_hidden_AccessTokenExpiresAt = b.AccessTokenExpiresAt
+	x.xxx_hidden_VaultKey = b.VaultKey
+	return m0
+}
+
 // LoginResponse содержит результат успешной аутентификации пользователя
 type LoginResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// access_token содержит токен доступа к API
-	AccessToken string `protobuf:"bytes,1,opt,name=access_token,json=accessToken,proto3" json:"access_token,omitempty"`
-	// access_token_expires_at содержит момент истечения токена доступа
-	AccessTokenExpiresAt *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=access_token_expires_at,json=accessTokenExpiresAt,proto3" json:"access_token_expires_at,omitempty"`
-	// vault_key содержит зашифрованный ключ хранилища пользователя
-	VaultKey      *VaultKeyEnvelope `protobuf:"bytes,3,opt,name=vault_key,json=vaultKey,proto3" json:"vault_key,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                           protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_AccessToken          string                 `protobuf:"bytes,1,opt,name=access_token,json=accessToken,proto3"`
+	xxx_hidden_AccessTokenExpiresAt *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=access_token_expires_at,json=accessTokenExpiresAt,proto3"`
+	xxx_hidden_VaultKey             *VaultKeyEnvelope      `protobuf:"bytes,3,opt,name=vault_key,json=vaultKey,proto3"`
+	unknownFields                   protoimpl.UnknownFields
+	sizeCache                       protoimpl.SizeCache
 }
 
 func (x *LoginResponse) Reset() {
@@ -354,43 +486,90 @@ func (x *LoginResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use LoginResponse.ProtoReflect.Descriptor instead.
-func (*LoginResponse) Descriptor() ([]byte, []int) {
-	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{3}
-}
-
 func (x *LoginResponse) GetAccessToken() string {
 	if x != nil {
-		return x.AccessToken
+		return x.xxx_hidden_AccessToken
 	}
 	return ""
 }
 
 func (x *LoginResponse) GetAccessTokenExpiresAt() *timestamppb.Timestamp {
 	if x != nil {
-		return x.AccessTokenExpiresAt
+		return x.xxx_hidden_AccessTokenExpiresAt
 	}
 	return nil
 }
 
 func (x *LoginResponse) GetVaultKey() *VaultKeyEnvelope {
 	if x != nil {
-		return x.VaultKey
+		return x.xxx_hidden_VaultKey
 	}
 	return nil
 }
 
+func (x *LoginResponse) SetAccessToken(v string) {
+	x.xxx_hidden_AccessToken = v
+}
+
+func (x *LoginResponse) SetAccessTokenExpiresAt(v *timestamppb.Timestamp) {
+	x.xxx_hidden_AccessTokenExpiresAt = v
+}
+
+func (x *LoginResponse) SetVaultKey(v *VaultKeyEnvelope) {
+	x.xxx_hidden_VaultKey = v
+}
+
+func (x *LoginResponse) HasAccessTokenExpiresAt() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_AccessTokenExpiresAt != nil
+}
+
+func (x *LoginResponse) HasVaultKey() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_VaultKey != nil
+}
+
+func (x *LoginResponse) ClearAccessTokenExpiresAt() {
+	x.xxx_hidden_AccessTokenExpiresAt = nil
+}
+
+func (x *LoginResponse) ClearVaultKey() {
+	x.xxx_hidden_VaultKey = nil
+}
+
+type LoginResponse_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	// access_token содержит токен доступа к API
+	AccessToken string
+	// access_token_expires_at содержит момент истечения токена доступа
+	AccessTokenExpiresAt *timestamppb.Timestamp
+	// vault_key содержит зашифрованный ключ хранилища пользователя
+	VaultKey *VaultKeyEnvelope
+}
+
+func (b0 LoginResponse_builder) Build() *LoginResponse {
+	m0 := &LoginResponse{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_AccessToken = b.AccessToken
+	x.xxx_hidden_AccessTokenExpiresAt = b.AccessTokenExpiresAt
+	x.xxx_hidden_VaultKey = b.VaultKey
+	return m0
+}
+
 // RegisterRequest содержит данные для регистрации нового пользователя
 type RegisterRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// login содержит уникальный логин пользователя
-	Login string `protobuf:"bytes,1,opt,name=login,proto3" json:"login,omitempty"`
-	// login_password содержит пароль входа, который не используется для шифрования секретов
-	LoginPassword string `protobuf:"bytes,2,opt,name=login_password,json=loginPassword,proto3" json:"login_password,omitempty"`
-	// vault_key содержит зашифрованный ключ хранилища, подготовленный клиентом
-	VaultKey      *VaultKeyEnvelope `protobuf:"bytes,3,opt,name=vault_key,json=vaultKey,proto3" json:"vault_key,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                    protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Login         string                 `protobuf:"bytes,1,opt,name=login,proto3"`
+	xxx_hidden_LoginPassword string                 `protobuf:"bytes,2,opt,name=login_password,json=loginPassword,proto3"`
+	xxx_hidden_VaultKey      *VaultKeyEnvelope      `protobuf:"bytes,3,opt,name=vault_key,json=vaultKey,proto3"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
 }
 
 func (x *RegisterRequest) Reset() {
@@ -418,41 +597,78 @@ func (x *RegisterRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use RegisterRequest.ProtoReflect.Descriptor instead.
-func (*RegisterRequest) Descriptor() ([]byte, []int) {
-	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{4}
-}
-
 func (x *RegisterRequest) GetLogin() string {
 	if x != nil {
-		return x.Login
+		return x.xxx_hidden_Login
 	}
 	return ""
 }
 
 func (x *RegisterRequest) GetLoginPassword() string {
 	if x != nil {
-		return x.LoginPassword
+		return x.xxx_hidden_LoginPassword
 	}
 	return ""
 }
 
 func (x *RegisterRequest) GetVaultKey() *VaultKeyEnvelope {
 	if x != nil {
-		return x.VaultKey
+		return x.xxx_hidden_VaultKey
 	}
 	return nil
 }
 
+func (x *RegisterRequest) SetLogin(v string) {
+	x.xxx_hidden_Login = v
+}
+
+func (x *RegisterRequest) SetLoginPassword(v string) {
+	x.xxx_hidden_LoginPassword = v
+}
+
+func (x *RegisterRequest) SetVaultKey(v *VaultKeyEnvelope) {
+	x.xxx_hidden_VaultKey = v
+}
+
+func (x *RegisterRequest) HasVaultKey() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_VaultKey != nil
+}
+
+func (x *RegisterRequest) ClearVaultKey() {
+	x.xxx_hidden_VaultKey = nil
+}
+
+type RegisterRequest_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	// login содержит уникальный логин пользователя
+	Login string
+	// login_password содержит пароль входа, который не используется для шифрования секретов
+	LoginPassword string
+	// vault_key содержит зашифрованный ключ хранилища, подготовленный клиентом
+	VaultKey *VaultKeyEnvelope
+}
+
+func (b0 RegisterRequest_builder) Build() *RegisterRequest {
+	m0 := &RegisterRequest{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_Login = b.Login
+	x.xxx_hidden_LoginPassword = b.LoginPassword
+	x.xxx_hidden_VaultKey = b.VaultKey
+	return m0
+}
+
 // LoginRequest содержит данные для аутентификации пользователя
 type LoginRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// login содержит логин пользователя
-	Login string `protobuf:"bytes,1,opt,name=login,proto3" json:"login,omitempty"`
-	// login_password содержит пароль входа пользователя
-	LoginPassword string `protobuf:"bytes,2,opt,name=login_password,json=loginPassword,proto3" json:"login_password,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                    protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Login         string                 `protobuf:"bytes,1,opt,name=login,proto3"`
+	xxx_hidden_LoginPassword string                 `protobuf:"bytes,2,opt,name=login_password,json=loginPassword,proto3"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
 }
 
 func (x *LoginRequest) Reset() {
@@ -480,34 +696,53 @@ func (x *LoginRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use LoginRequest.ProtoReflect.Descriptor instead.
-func (*LoginRequest) Descriptor() ([]byte, []int) {
-	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{5}
-}
-
 func (x *LoginRequest) GetLogin() string {
 	if x != nil {
-		return x.Login
+		return x.xxx_hidden_Login
 	}
 	return ""
 }
 
 func (x *LoginRequest) GetLoginPassword() string {
 	if x != nil {
-		return x.LoginPassword
+		return x.xxx_hidden_LoginPassword
 	}
 	return ""
 }
 
+func (x *LoginRequest) SetLogin(v string) {
+	x.xxx_hidden_Login = v
+}
+
+func (x *LoginRequest) SetLoginPassword(v string) {
+	x.xxx_hidden_LoginPassword = v
+}
+
+type LoginRequest_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	// login содержит логин пользователя
+	Login string
+	// login_password содержит пароль входа пользователя
+	LoginPassword string
+}
+
+func (b0 LoginRequest_builder) Build() *LoginRequest {
+	m0 := &LoginRequest{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_Login = b.Login
+	x.xxx_hidden_LoginPassword = b.LoginPassword
+	return m0
+}
+
 // EncryptedData описывает зашифрованный блок данных
 type EncryptedData struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// ciphertext содержит зашифрованные данные
-	Ciphertext []byte `protobuf:"bytes,1,opt,name=ciphertext,proto3" json:"ciphertext,omitempty"`
-	// nonce содержит одноразовое значение для расшифровки данных
-	Nonce         []byte `protobuf:"bytes,2,opt,name=nonce,proto3" json:"nonce,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                 protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Ciphertext []byte                 `protobuf:"bytes,1,opt,name=ciphertext,proto3"`
+	xxx_hidden_Nonce      []byte                 `protobuf:"bytes,2,opt,name=nonce,proto3"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *EncryptedData) Reset() {
@@ -535,50 +770,67 @@ func (x *EncryptedData) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use EncryptedData.ProtoReflect.Descriptor instead.
-func (*EncryptedData) Descriptor() ([]byte, []int) {
-	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{6}
-}
-
 func (x *EncryptedData) GetCiphertext() []byte {
 	if x != nil {
-		return x.Ciphertext
+		return x.xxx_hidden_Ciphertext
 	}
 	return nil
 }
 
 func (x *EncryptedData) GetNonce() []byte {
 	if x != nil {
-		return x.Nonce
+		return x.xxx_hidden_Nonce
 	}
 	return nil
 }
 
+func (x *EncryptedData) SetCiphertext(v []byte) {
+	if v == nil {
+		v = []byte{}
+	}
+	x.xxx_hidden_Ciphertext = v
+}
+
+func (x *EncryptedData) SetNonce(v []byte) {
+	if v == nil {
+		v = []byte{}
+	}
+	x.xxx_hidden_Nonce = v
+}
+
+type EncryptedData_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	// ciphertext содержит зашифрованные данные
+	Ciphertext []byte
+	// nonce содержит одноразовое значение для расшифровки данных
+	Nonce []byte
+}
+
+func (b0 EncryptedData_builder) Build() *EncryptedData {
+	m0 := &EncryptedData{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_Ciphertext = b.Ciphertext
+	x.xxx_hidden_Nonce = b.Nonce
+	return m0
+}
+
 // VaultItem описывает одну запись зашифрованного хранилища пользователя
 type VaultItem struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// id содержит уникальный идентификатор записи
-	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	// type содержит тип приватных данных
-	Type ItemType `protobuf:"varint,2,opt,name=type,proto3,enum=gophkeeper.v1.ItemType" json:"type,omitempty"`
-	// metadata содержит зашифрованную произвольную метаинформацию записи
-	Metadata *EncryptedData `protobuf:"bytes,3,opt,name=metadata,proto3" json:"metadata,omitempty"`
-	// payload содержит зашифрованное содержимое записи
-	Payload *EncryptedData `protobuf:"bytes,4,opt,name=payload,proto3" json:"payload,omitempty"`
-	// encryption_alg содержит название алгоритма шифрования записи
-	EncryptionAlg string `protobuf:"bytes,5,opt,name=encryption_alg,json=encryptionAlg,proto3" json:"encryption_alg,omitempty"`
-	// payload_schema_version содержит версию схемы зашифрованного содержимого
-	PayloadSchemaVersion uint32 `protobuf:"varint,6,opt,name=payload_schema_version,json=payloadSchemaVersion,proto3" json:"payload_schema_version,omitempty"`
-	// version содержит версию записи для оптимистичной блокировки
-	Version int64 `protobuf:"varint,7,opt,name=version,proto3" json:"version,omitempty"`
-	// created_at содержит момент создания записи на сервере
-	CreatedAt *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	// updated_at содержит момент последнего обновления записи на сервере
-	UpdatedAt *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	// deleted_at содержит момент мягкого удаления записи, если запись удалена
-	DeletedAt     *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=deleted_at,json=deletedAt,proto3" json:"deleted_at,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                           protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Id                   string                 `protobuf:"bytes,1,opt,name=id,proto3"`
+	xxx_hidden_Type                 ItemType               `protobuf:"varint,2,opt,name=type,proto3,enum=gophkeeper.v1.ItemType"`
+	xxx_hidden_Metadata             *EncryptedData         `protobuf:"bytes,3,opt,name=metadata,proto3"`
+	xxx_hidden_Payload              *EncryptedData         `protobuf:"bytes,4,opt,name=payload,proto3"`
+	xxx_hidden_EncryptionAlg        string                 `protobuf:"bytes,5,opt,name=encryption_alg,json=encryptionAlg,proto3"`
+	xxx_hidden_PayloadSchemaVersion uint32                 `protobuf:"varint,6,opt,name=payload_schema_version,json=payloadSchemaVersion,proto3"`
+	xxx_hidden_Version              int64                  `protobuf:"varint,7,opt,name=version,proto3"`
+	xxx_hidden_CreatedAt            *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=created_at,json=createdAt,proto3"`
+	xxx_hidden_UpdatedAt            *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=updated_at,json=updatedAt,proto3"`
+	xxx_hidden_DeletedAt            *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=deleted_at,json=deletedAt,proto3"`
+	unknownFields                   protoimpl.UnknownFields
+	sizeCache                       protoimpl.SizeCache
 }
 
 func (x *VaultItem) Reset() {
@@ -606,96 +858,223 @@ func (x *VaultItem) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use VaultItem.ProtoReflect.Descriptor instead.
-func (*VaultItem) Descriptor() ([]byte, []int) {
-	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{7}
-}
-
 func (x *VaultItem) GetId() string {
 	if x != nil {
-		return x.Id
+		return x.xxx_hidden_Id
 	}
 	return ""
 }
 
 func (x *VaultItem) GetType() ItemType {
 	if x != nil {
-		return x.Type
+		return x.xxx_hidden_Type
 	}
 	return ItemType_ITEM_TYPE_UNSPECIFIED
 }
 
 func (x *VaultItem) GetMetadata() *EncryptedData {
 	if x != nil {
-		return x.Metadata
+		return x.xxx_hidden_Metadata
 	}
 	return nil
 }
 
 func (x *VaultItem) GetPayload() *EncryptedData {
 	if x != nil {
-		return x.Payload
+		return x.xxx_hidden_Payload
 	}
 	return nil
 }
 
 func (x *VaultItem) GetEncryptionAlg() string {
 	if x != nil {
-		return x.EncryptionAlg
+		return x.xxx_hidden_EncryptionAlg
 	}
 	return ""
 }
 
 func (x *VaultItem) GetPayloadSchemaVersion() uint32 {
 	if x != nil {
-		return x.PayloadSchemaVersion
+		return x.xxx_hidden_PayloadSchemaVersion
 	}
 	return 0
 }
 
 func (x *VaultItem) GetVersion() int64 {
 	if x != nil {
-		return x.Version
+		return x.xxx_hidden_Version
 	}
 	return 0
 }
 
 func (x *VaultItem) GetCreatedAt() *timestamppb.Timestamp {
 	if x != nil {
-		return x.CreatedAt
+		return x.xxx_hidden_CreatedAt
 	}
 	return nil
 }
 
 func (x *VaultItem) GetUpdatedAt() *timestamppb.Timestamp {
 	if x != nil {
-		return x.UpdatedAt
+		return x.xxx_hidden_UpdatedAt
 	}
 	return nil
 }
 
 func (x *VaultItem) GetDeletedAt() *timestamppb.Timestamp {
 	if x != nil {
-		return x.DeletedAt
+		return x.xxx_hidden_DeletedAt
 	}
 	return nil
 }
 
+func (x *VaultItem) SetId(v string) {
+	x.xxx_hidden_Id = v
+}
+
+func (x *VaultItem) SetType(v ItemType) {
+	x.xxx_hidden_Type = v
+}
+
+func (x *VaultItem) SetMetadata(v *EncryptedData) {
+	x.xxx_hidden_Metadata = v
+}
+
+func (x *VaultItem) SetPayload(v *EncryptedData) {
+	x.xxx_hidden_Payload = v
+}
+
+func (x *VaultItem) SetEncryptionAlg(v string) {
+	x.xxx_hidden_EncryptionAlg = v
+}
+
+func (x *VaultItem) SetPayloadSchemaVersion(v uint32) {
+	x.xxx_hidden_PayloadSchemaVersion = v
+}
+
+func (x *VaultItem) SetVersion(v int64) {
+	x.xxx_hidden_Version = v
+}
+
+func (x *VaultItem) SetCreatedAt(v *timestamppb.Timestamp) {
+	x.xxx_hidden_CreatedAt = v
+}
+
+func (x *VaultItem) SetUpdatedAt(v *timestamppb.Timestamp) {
+	x.xxx_hidden_UpdatedAt = v
+}
+
+func (x *VaultItem) SetDeletedAt(v *timestamppb.Timestamp) {
+	x.xxx_hidden_DeletedAt = v
+}
+
+func (x *VaultItem) HasMetadata() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_Metadata != nil
+}
+
+func (x *VaultItem) HasPayload() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_Payload != nil
+}
+
+func (x *VaultItem) HasCreatedAt() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_CreatedAt != nil
+}
+
+func (x *VaultItem) HasUpdatedAt() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_UpdatedAt != nil
+}
+
+func (x *VaultItem) HasDeletedAt() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_DeletedAt != nil
+}
+
+func (x *VaultItem) ClearMetadata() {
+	x.xxx_hidden_Metadata = nil
+}
+
+func (x *VaultItem) ClearPayload() {
+	x.xxx_hidden_Payload = nil
+}
+
+func (x *VaultItem) ClearCreatedAt() {
+	x.xxx_hidden_CreatedAt = nil
+}
+
+func (x *VaultItem) ClearUpdatedAt() {
+	x.xxx_hidden_UpdatedAt = nil
+}
+
+func (x *VaultItem) ClearDeletedAt() {
+	x.xxx_hidden_DeletedAt = nil
+}
+
+type VaultItem_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	// id содержит уникальный идентификатор записи
+	Id string
+	// type содержит тип приватных данных
+	Type ItemType
+	// metadata содержит зашифрованную произвольную метаинформацию записи
+	Metadata *EncryptedData
+	// payload содержит зашифрованное содержимое записи
+	Payload *EncryptedData
+	// encryption_alg содержит название алгоритма шифрования записи
+	EncryptionAlg string
+	// payload_schema_version содержит версию схемы зашифрованного содержимого
+	PayloadSchemaVersion uint32
+	// version содержит версию записи для оптимистичной блокировки
+	Version int64
+	// created_at содержит момент создания записи на сервере
+	CreatedAt *timestamppb.Timestamp
+	// updated_at содержит момент последнего обновления записи на сервере
+	UpdatedAt *timestamppb.Timestamp
+	// deleted_at содержит момент мягкого удаления записи, если запись удалена
+	DeletedAt *timestamppb.Timestamp
+}
+
+func (b0 VaultItem_builder) Build() *VaultItem {
+	m0 := &VaultItem{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_Id = b.Id
+	x.xxx_hidden_Type = b.Type
+	x.xxx_hidden_Metadata = b.Metadata
+	x.xxx_hidden_Payload = b.Payload
+	x.xxx_hidden_EncryptionAlg = b.EncryptionAlg
+	x.xxx_hidden_PayloadSchemaVersion = b.PayloadSchemaVersion
+	x.xxx_hidden_Version = b.Version
+	x.xxx_hidden_CreatedAt = b.CreatedAt
+	x.xxx_hidden_UpdatedAt = b.UpdatedAt
+	x.xxx_hidden_DeletedAt = b.DeletedAt
+	return m0
+}
+
 // CreateItemRequest содержит данные для создания новой записи хранилища
 type CreateItemRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// type содержит тип создаваемых приватных данных
-	Type ItemType `protobuf:"varint,1,opt,name=type,proto3,enum=gophkeeper.v1.ItemType" json:"type,omitempty"`
-	// metadata содержит зашифрованную метаинформацию записи
-	Metadata *EncryptedData `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
-	// payload содержит зашифрованное содержимое записи
-	Payload *EncryptedData `protobuf:"bytes,3,opt,name=payload,proto3" json:"payload,omitempty"`
-	// encryption_alg содержит название алгоритма шифрования записи
-	EncryptionAlg string `protobuf:"bytes,4,opt,name=encryption_alg,json=encryptionAlg,proto3" json:"encryption_alg,omitempty"`
-	// payload_schema_version содержит версию схемы зашифрованного содержимого
-	PayloadSchemaVersion uint32 `protobuf:"varint,5,opt,name=payload_schema_version,json=payloadSchemaVersion,proto3" json:"payload_schema_version,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	state                           protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Type                 ItemType               `protobuf:"varint,1,opt,name=type,proto3,enum=gophkeeper.v1.ItemType"`
+	xxx_hidden_Metadata             *EncryptedData         `protobuf:"bytes,2,opt,name=metadata,proto3"`
+	xxx_hidden_Payload              *EncryptedData         `protobuf:"bytes,3,opt,name=payload,proto3"`
+	xxx_hidden_EncryptionAlg        string                 `protobuf:"bytes,4,opt,name=encryption_alg,json=encryptionAlg,proto3"`
+	xxx_hidden_PayloadSchemaVersion uint32                 `protobuf:"varint,5,opt,name=payload_schema_version,json=payloadSchemaVersion,proto3"`
+	unknownFields                   protoimpl.UnknownFields
+	sizeCache                       protoimpl.SizeCache
 }
 
 func (x *CreateItemRequest) Reset() {
@@ -723,65 +1102,122 @@ func (x *CreateItemRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CreateItemRequest.ProtoReflect.Descriptor instead.
-func (*CreateItemRequest) Descriptor() ([]byte, []int) {
-	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{8}
-}
-
 func (x *CreateItemRequest) GetType() ItemType {
 	if x != nil {
-		return x.Type
+		return x.xxx_hidden_Type
 	}
 	return ItemType_ITEM_TYPE_UNSPECIFIED
 }
 
 func (x *CreateItemRequest) GetMetadata() *EncryptedData {
 	if x != nil {
-		return x.Metadata
+		return x.xxx_hidden_Metadata
 	}
 	return nil
 }
 
 func (x *CreateItemRequest) GetPayload() *EncryptedData {
 	if x != nil {
-		return x.Payload
+		return x.xxx_hidden_Payload
 	}
 	return nil
 }
 
 func (x *CreateItemRequest) GetEncryptionAlg() string {
 	if x != nil {
-		return x.EncryptionAlg
+		return x.xxx_hidden_EncryptionAlg
 	}
 	return ""
 }
 
 func (x *CreateItemRequest) GetPayloadSchemaVersion() uint32 {
 	if x != nil {
-		return x.PayloadSchemaVersion
+		return x.xxx_hidden_PayloadSchemaVersion
 	}
 	return 0
 }
 
+func (x *CreateItemRequest) SetType(v ItemType) {
+	x.xxx_hidden_Type = v
+}
+
+func (x *CreateItemRequest) SetMetadata(v *EncryptedData) {
+	x.xxx_hidden_Metadata = v
+}
+
+func (x *CreateItemRequest) SetPayload(v *EncryptedData) {
+	x.xxx_hidden_Payload = v
+}
+
+func (x *CreateItemRequest) SetEncryptionAlg(v string) {
+	x.xxx_hidden_EncryptionAlg = v
+}
+
+func (x *CreateItemRequest) SetPayloadSchemaVersion(v uint32) {
+	x.xxx_hidden_PayloadSchemaVersion = v
+}
+
+func (x *CreateItemRequest) HasMetadata() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_Metadata != nil
+}
+
+func (x *CreateItemRequest) HasPayload() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_Payload != nil
+}
+
+func (x *CreateItemRequest) ClearMetadata() {
+	x.xxx_hidden_Metadata = nil
+}
+
+func (x *CreateItemRequest) ClearPayload() {
+	x.xxx_hidden_Payload = nil
+}
+
+type CreateItemRequest_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	// type содержит тип создаваемых приватных данных
+	Type ItemType
+	// metadata содержит зашифрованную метаинформацию записи
+	Metadata *EncryptedData
+	// payload содержит зашифрованное содержимое записи
+	Payload *EncryptedData
+	// encryption_alg содержит название алгоритма шифрования записи
+	EncryptionAlg string
+	// payload_schema_version содержит версию схемы зашифрованного содержимого
+	PayloadSchemaVersion uint32
+}
+
+func (b0 CreateItemRequest_builder) Build() *CreateItemRequest {
+	m0 := &CreateItemRequest{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_Type = b.Type
+	x.xxx_hidden_Metadata = b.Metadata
+	x.xxx_hidden_Payload = b.Payload
+	x.xxx_hidden_EncryptionAlg = b.EncryptionAlg
+	x.xxx_hidden_PayloadSchemaVersion = b.PayloadSchemaVersion
+	return m0
+}
+
 // UpdateItemRequest содержит данные для обновления существующей записи
 type UpdateItemRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// id содержит идентификатор обновляемой записи
-	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	// expected_version содержит версию записи, которую клиент ожидает изменить
-	ExpectedVersion int64 `protobuf:"varint,2,opt,name=expected_version,json=expectedVersion,proto3" json:"expected_version,omitempty"`
-	// type содержит новый тип приватных данных
-	Type ItemType `protobuf:"varint,3,opt,name=type,proto3,enum=gophkeeper.v1.ItemType" json:"type,omitempty"`
-	// metadata содержит новую зашифрованную метаинформацию записи
-	Metadata *EncryptedData `protobuf:"bytes,4,opt,name=metadata,proto3" json:"metadata,omitempty"`
-	// payload содержит новое зашифрованное содержимое записи
-	Payload *EncryptedData `protobuf:"bytes,5,opt,name=payload,proto3" json:"payload,omitempty"`
-	// encryption_alg содержит название алгоритма шифрования записи
-	EncryptionAlg string `protobuf:"bytes,6,opt,name=encryption_alg,json=encryptionAlg,proto3" json:"encryption_alg,omitempty"`
-	// payload_schema_version содержит версию схемы зашифрованного содержимого
-	PayloadSchemaVersion uint32 `protobuf:"varint,7,opt,name=payload_schema_version,json=payloadSchemaVersion,proto3" json:"payload_schema_version,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	state                           protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Id                   string                 `protobuf:"bytes,1,opt,name=id,proto3"`
+	xxx_hidden_ExpectedVersion      int64                  `protobuf:"varint,2,opt,name=expected_version,json=expectedVersion,proto3"`
+	xxx_hidden_Type                 ItemType               `protobuf:"varint,3,opt,name=type,proto3,enum=gophkeeper.v1.ItemType"`
+	xxx_hidden_Metadata             *EncryptedData         `protobuf:"bytes,4,opt,name=metadata,proto3"`
+	xxx_hidden_Payload              *EncryptedData         `protobuf:"bytes,5,opt,name=payload,proto3"`
+	xxx_hidden_EncryptionAlg        string                 `protobuf:"bytes,6,opt,name=encryption_alg,json=encryptionAlg,proto3"`
+	xxx_hidden_PayloadSchemaVersion uint32                 `protobuf:"varint,7,opt,name=payload_schema_version,json=payloadSchemaVersion,proto3"`
+	unknownFields                   protoimpl.UnknownFields
+	sizeCache                       protoimpl.SizeCache
 }
 
 func (x *UpdateItemRequest) Reset() {
@@ -809,69 +1245,145 @@ func (x *UpdateItemRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use UpdateItemRequest.ProtoReflect.Descriptor instead.
-func (*UpdateItemRequest) Descriptor() ([]byte, []int) {
-	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{9}
-}
-
 func (x *UpdateItemRequest) GetId() string {
 	if x != nil {
-		return x.Id
+		return x.xxx_hidden_Id
 	}
 	return ""
 }
 
 func (x *UpdateItemRequest) GetExpectedVersion() int64 {
 	if x != nil {
-		return x.ExpectedVersion
+		return x.xxx_hidden_ExpectedVersion
 	}
 	return 0
 }
 
 func (x *UpdateItemRequest) GetType() ItemType {
 	if x != nil {
-		return x.Type
+		return x.xxx_hidden_Type
 	}
 	return ItemType_ITEM_TYPE_UNSPECIFIED
 }
 
 func (x *UpdateItemRequest) GetMetadata() *EncryptedData {
 	if x != nil {
-		return x.Metadata
+		return x.xxx_hidden_Metadata
 	}
 	return nil
 }
 
 func (x *UpdateItemRequest) GetPayload() *EncryptedData {
 	if x != nil {
-		return x.Payload
+		return x.xxx_hidden_Payload
 	}
 	return nil
 }
 
 func (x *UpdateItemRequest) GetEncryptionAlg() string {
 	if x != nil {
-		return x.EncryptionAlg
+		return x.xxx_hidden_EncryptionAlg
 	}
 	return ""
 }
 
 func (x *UpdateItemRequest) GetPayloadSchemaVersion() uint32 {
 	if x != nil {
-		return x.PayloadSchemaVersion
+		return x.xxx_hidden_PayloadSchemaVersion
 	}
 	return 0
 }
 
+func (x *UpdateItemRequest) SetId(v string) {
+	x.xxx_hidden_Id = v
+}
+
+func (x *UpdateItemRequest) SetExpectedVersion(v int64) {
+	x.xxx_hidden_ExpectedVersion = v
+}
+
+func (x *UpdateItemRequest) SetType(v ItemType) {
+	x.xxx_hidden_Type = v
+}
+
+func (x *UpdateItemRequest) SetMetadata(v *EncryptedData) {
+	x.xxx_hidden_Metadata = v
+}
+
+func (x *UpdateItemRequest) SetPayload(v *EncryptedData) {
+	x.xxx_hidden_Payload = v
+}
+
+func (x *UpdateItemRequest) SetEncryptionAlg(v string) {
+	x.xxx_hidden_EncryptionAlg = v
+}
+
+func (x *UpdateItemRequest) SetPayloadSchemaVersion(v uint32) {
+	x.xxx_hidden_PayloadSchemaVersion = v
+}
+
+func (x *UpdateItemRequest) HasMetadata() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_Metadata != nil
+}
+
+func (x *UpdateItemRequest) HasPayload() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_Payload != nil
+}
+
+func (x *UpdateItemRequest) ClearMetadata() {
+	x.xxx_hidden_Metadata = nil
+}
+
+func (x *UpdateItemRequest) ClearPayload() {
+	x.xxx_hidden_Payload = nil
+}
+
+type UpdateItemRequest_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	// id содержит идентификатор обновляемой записи
+	Id string
+	// expected_version содержит версию записи, которую клиент ожидает изменить
+	ExpectedVersion int64
+	// type содержит новый тип приватных данных
+	Type ItemType
+	// metadata содержит новую зашифрованную метаинформацию записи
+	Metadata *EncryptedData
+	// payload содержит новое зашифрованное содержимое записи
+	Payload *EncryptedData
+	// encryption_alg содержит название алгоритма шифрования записи
+	EncryptionAlg string
+	// payload_schema_version содержит версию схемы зашифрованного содержимого
+	PayloadSchemaVersion uint32
+}
+
+func (b0 UpdateItemRequest_builder) Build() *UpdateItemRequest {
+	m0 := &UpdateItemRequest{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_Id = b.Id
+	x.xxx_hidden_ExpectedVersion = b.ExpectedVersion
+	x.xxx_hidden_Type = b.Type
+	x.xxx_hidden_Metadata = b.Metadata
+	x.xxx_hidden_Payload = b.Payload
+	x.xxx_hidden_EncryptionAlg = b.EncryptionAlg
+	x.xxx_hidden_PayloadSchemaVersion = b.PayloadSchemaVersion
+	return m0
+}
+
 // DeleteItemRequest содержит данные для мягкого удаления записи
 type DeleteItemRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// id содержит идентификатор удаляемой записи
-	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	// expected_version содержит версию записи, которую клиент ожидает удалить
-	ExpectedVersion int64 `protobuf:"varint,2,opt,name=expected_version,json=expectedVersion,proto3" json:"expected_version,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state                      protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Id              string                 `protobuf:"bytes,1,opt,name=id,proto3"`
+	xxx_hidden_ExpectedVersion int64                  `protobuf:"varint,2,opt,name=expected_version,json=expectedVersion,proto3"`
+	unknownFields              protoimpl.UnknownFields
+	sizeCache                  protoimpl.SizeCache
 }
 
 func (x *DeleteItemRequest) Reset() {
@@ -899,30 +1411,50 @@ func (x *DeleteItemRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use DeleteItemRequest.ProtoReflect.Descriptor instead.
-func (*DeleteItemRequest) Descriptor() ([]byte, []int) {
-	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{10}
-}
-
 func (x *DeleteItemRequest) GetId() string {
 	if x != nil {
-		return x.Id
+		return x.xxx_hidden_Id
 	}
 	return ""
 }
 
 func (x *DeleteItemRequest) GetExpectedVersion() int64 {
 	if x != nil {
-		return x.ExpectedVersion
+		return x.xxx_hidden_ExpectedVersion
 	}
 	return 0
 }
 
+func (x *DeleteItemRequest) SetId(v string) {
+	x.xxx_hidden_Id = v
+}
+
+func (x *DeleteItemRequest) SetExpectedVersion(v int64) {
+	x.xxx_hidden_ExpectedVersion = v
+}
+
+type DeleteItemRequest_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	// id содержит идентификатор удаляемой записи
+	Id string
+	// expected_version содержит версию записи, которую клиент ожидает удалить
+	ExpectedVersion int64
+}
+
+func (b0 DeleteItemRequest_builder) Build() *DeleteItemRequest {
+	m0 := &DeleteItemRequest{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_Id = b.Id
+	x.xxx_hidden_ExpectedVersion = b.ExpectedVersion
+	return m0
+}
+
 // GetItemRequest содержит данные для получения одной записи
 type GetItemRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// id содержит идентификатор запрашиваемой записи
-	Id            string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	state         protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Id string                 `protobuf:"bytes,1,opt,name=id,proto3"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -952,29 +1484,40 @@ func (x *GetItemRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetItemRequest.ProtoReflect.Descriptor instead.
-func (*GetItemRequest) Descriptor() ([]byte, []int) {
-	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{11}
-}
-
 func (x *GetItemRequest) GetId() string {
 	if x != nil {
-		return x.Id
+		return x.xxx_hidden_Id
 	}
 	return ""
 }
 
+func (x *GetItemRequest) SetId(v string) {
+	x.xxx_hidden_Id = v
+}
+
+type GetItemRequest_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	// id содержит идентификатор запрашиваемой записи
+	Id string
+}
+
+func (b0 GetItemRequest_builder) Build() *GetItemRequest {
+	m0 := &GetItemRequest{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_Id = b.Id
+	return m0
+}
+
 // ListItemsRequest содержит параметры постраничного получения записей
 type ListItemsRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// page_size задает максимальное количество записей в ответе
-	PageSize int32 `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	// page_token содержит токен следующей страницы
-	PageToken string `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
-	// include_deleted указывает, нужно ли возвращать мягко удаленные записи
-	IncludeDeleted bool `protobuf:"varint,3,opt,name=include_deleted,json=includeDeleted,proto3" json:"include_deleted,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state                     protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_PageSize       int32                  `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3"`
+	xxx_hidden_PageToken      string                 `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3"`
+	xxx_hidden_IncludeDeleted bool                   `protobuf:"varint,3,opt,name=include_deleted,json=includeDeleted,proto3"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
 }
 
 func (x *ListItemsRequest) Reset() {
@@ -1002,41 +1545,67 @@ func (x *ListItemsRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ListItemsRequest.ProtoReflect.Descriptor instead.
-func (*ListItemsRequest) Descriptor() ([]byte, []int) {
-	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{12}
-}
-
 func (x *ListItemsRequest) GetPageSize() int32 {
 	if x != nil {
-		return x.PageSize
+		return x.xxx_hidden_PageSize
 	}
 	return 0
 }
 
 func (x *ListItemsRequest) GetPageToken() string {
 	if x != nil {
-		return x.PageToken
+		return x.xxx_hidden_PageToken
 	}
 	return ""
 }
 
 func (x *ListItemsRequest) GetIncludeDeleted() bool {
 	if x != nil {
-		return x.IncludeDeleted
+		return x.xxx_hidden_IncludeDeleted
 	}
 	return false
 }
 
+func (x *ListItemsRequest) SetPageSize(v int32) {
+	x.xxx_hidden_PageSize = v
+}
+
+func (x *ListItemsRequest) SetPageToken(v string) {
+	x.xxx_hidden_PageToken = v
+}
+
+func (x *ListItemsRequest) SetIncludeDeleted(v bool) {
+	x.xxx_hidden_IncludeDeleted = v
+}
+
+type ListItemsRequest_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	// page_size задает максимальное количество записей в ответе
+	PageSize int32
+	// page_token содержит токен следующей страницы
+	PageToken string
+	// include_deleted указывает, нужно ли возвращать мягко удаленные записи
+	IncludeDeleted bool
+}
+
+func (b0 ListItemsRequest_builder) Build() *ListItemsRequest {
+	m0 := &ListItemsRequest{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_PageSize = b.PageSize
+	x.xxx_hidden_PageToken = b.PageToken
+	x.xxx_hidden_IncludeDeleted = b.IncludeDeleted
+	return m0
+}
+
 // ListItemsResponse содержит страницу записей хранилища
 type ListItemsResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// items содержит записи текущей страницы
-	Items []*VaultItem `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
-	// next_page_token содержит токен следующей страницы
-	NextPageToken string `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                    protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Items         *[]*VaultItem          `protobuf:"bytes,1,rep,name=items,proto3"`
+	xxx_hidden_NextPageToken string                 `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
 }
 
 func (x *ListItemsResponse) Reset() {
@@ -1064,32 +1633,54 @@ func (x *ListItemsResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ListItemsResponse.ProtoReflect.Descriptor instead.
-func (*ListItemsResponse) Descriptor() ([]byte, []int) {
-	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{13}
-}
-
 func (x *ListItemsResponse) GetItems() []*VaultItem {
 	if x != nil {
-		return x.Items
+		if x.xxx_hidden_Items != nil {
+			return *x.xxx_hidden_Items
+		}
 	}
 	return nil
 }
 
 func (x *ListItemsResponse) GetNextPageToken() string {
 	if x != nil {
-		return x.NextPageToken
+		return x.xxx_hidden_NextPageToken
 	}
 	return ""
 }
 
+func (x *ListItemsResponse) SetItems(v []*VaultItem) {
+	x.xxx_hidden_Items = &v
+}
+
+func (x *ListItemsResponse) SetNextPageToken(v string) {
+	x.xxx_hidden_NextPageToken = v
+}
+
+type ListItemsResponse_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	// items содержит записи текущей страницы
+	Items []*VaultItem
+	// next_page_token содержит токен следующей страницы
+	NextPageToken string
+}
+
+func (b0 ListItemsResponse_builder) Build() *ListItemsResponse {
+	m0 := &ListItemsResponse{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_Items = &b.Items
+	x.xxx_hidden_NextPageToken = b.NextPageToken
+	return m0
+}
+
 // CreateItemResponse содержит созданную запись хранилища
 type CreateItemResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// item содержит созданную запись с серверными полями
-	Item          *VaultItem `protobuf:"bytes,1,opt,name=item,proto3" json:"item,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Item *VaultItem             `protobuf:"bytes,1,opt,name=item,proto3"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *CreateItemResponse) Reset() {
@@ -1117,25 +1708,49 @@ func (x *CreateItemResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CreateItemResponse.ProtoReflect.Descriptor instead.
-func (*CreateItemResponse) Descriptor() ([]byte, []int) {
-	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{14}
-}
-
 func (x *CreateItemResponse) GetItem() *VaultItem {
 	if x != nil {
-		return x.Item
+		return x.xxx_hidden_Item
 	}
 	return nil
 }
 
+func (x *CreateItemResponse) SetItem(v *VaultItem) {
+	x.xxx_hidden_Item = v
+}
+
+func (x *CreateItemResponse) HasItem() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_Item != nil
+}
+
+func (x *CreateItemResponse) ClearItem() {
+	x.xxx_hidden_Item = nil
+}
+
+type CreateItemResponse_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	// item содержит созданную запись с серверными полями
+	Item *VaultItem
+}
+
+func (b0 CreateItemResponse_builder) Build() *CreateItemResponse {
+	m0 := &CreateItemResponse{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_Item = b.Item
+	return m0
+}
+
 // GetItemResponse содержит найденную запись хранилища
 type GetItemResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// item содержит найденную запись
-	Item          *VaultItem `protobuf:"bytes,1,opt,name=item,proto3" json:"item,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Item *VaultItem             `protobuf:"bytes,1,opt,name=item,proto3"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *GetItemResponse) Reset() {
@@ -1163,25 +1778,49 @@ func (x *GetItemResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetItemResponse.ProtoReflect.Descriptor instead.
-func (*GetItemResponse) Descriptor() ([]byte, []int) {
-	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{15}
-}
-
 func (x *GetItemResponse) GetItem() *VaultItem {
 	if x != nil {
-		return x.Item
+		return x.xxx_hidden_Item
 	}
 	return nil
 }
 
+func (x *GetItemResponse) SetItem(v *VaultItem) {
+	x.xxx_hidden_Item = v
+}
+
+func (x *GetItemResponse) HasItem() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_Item != nil
+}
+
+func (x *GetItemResponse) ClearItem() {
+	x.xxx_hidden_Item = nil
+}
+
+type GetItemResponse_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	// item содержит найденную запись
+	Item *VaultItem
+}
+
+func (b0 GetItemResponse_builder) Build() *GetItemResponse {
+	m0 := &GetItemResponse{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_Item = b.Item
+	return m0
+}
+
 // UpdateItemResponse содержит обновленную запись хранилища
 type UpdateItemResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// item содержит обновленную запись с новой версией
-	Item          *VaultItem `protobuf:"bytes,1,opt,name=item,proto3" json:"item,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Item *VaultItem             `protobuf:"bytes,1,opt,name=item,proto3"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *UpdateItemResponse) Reset() {
@@ -1209,29 +1848,51 @@ func (x *UpdateItemResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use UpdateItemResponse.ProtoReflect.Descriptor instead.
-func (*UpdateItemResponse) Descriptor() ([]byte, []int) {
-	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{16}
-}
-
 func (x *UpdateItemResponse) GetItem() *VaultItem {
 	if x != nil {
-		return x.Item
+		return x.xxx_hidden_Item
 	}
 	return nil
 }
 
+func (x *UpdateItemResponse) SetItem(v *VaultItem) {
+	x.xxx_hidden_Item = v
+}
+
+func (x *UpdateItemResponse) HasItem() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_Item != nil
+}
+
+func (x *UpdateItemResponse) ClearItem() {
+	x.xxx_hidden_Item = nil
+}
+
+type UpdateItemResponse_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	// item содержит обновленную запись с новой версией
+	Item *VaultItem
+}
+
+func (b0 UpdateItemResponse_builder) Build() *UpdateItemResponse {
+	m0 := &UpdateItemResponse{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_Item = b.Item
+	return m0
+}
+
 // DeleteItemResponse содержит результат мягкого удаления записи
 type DeleteItemResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// id содержит идентификатор удаленной записи
-	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	// version содержит новую версию удаленной записи
-	Version int64 `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"`
-	// deleted_at содержит момент мягкого удаления записи
-	DeletedAt     *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=deleted_at,json=deletedAt,proto3" json:"deleted_at,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Id        string                 `protobuf:"bytes,1,opt,name=id,proto3"`
+	xxx_hidden_Version   int64                  `protobuf:"varint,2,opt,name=version,proto3"`
+	xxx_hidden_DeletedAt *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=deleted_at,json=deletedAt,proto3"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *DeleteItemResponse) Reset() {
@@ -1259,43 +1920,79 @@ func (x *DeleteItemResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use DeleteItemResponse.ProtoReflect.Descriptor instead.
-func (*DeleteItemResponse) Descriptor() ([]byte, []int) {
-	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{17}
-}
-
 func (x *DeleteItemResponse) GetId() string {
 	if x != nil {
-		return x.Id
+		return x.xxx_hidden_Id
 	}
 	return ""
 }
 
 func (x *DeleteItemResponse) GetVersion() int64 {
 	if x != nil {
-		return x.Version
+		return x.xxx_hidden_Version
 	}
 	return 0
 }
 
 func (x *DeleteItemResponse) GetDeletedAt() *timestamppb.Timestamp {
 	if x != nil {
-		return x.DeletedAt
+		return x.xxx_hidden_DeletedAt
 	}
 	return nil
 }
 
+func (x *DeleteItemResponse) SetId(v string) {
+	x.xxx_hidden_Id = v
+}
+
+func (x *DeleteItemResponse) SetVersion(v int64) {
+	x.xxx_hidden_Version = v
+}
+
+func (x *DeleteItemResponse) SetDeletedAt(v *timestamppb.Timestamp) {
+	x.xxx_hidden_DeletedAt = v
+}
+
+func (x *DeleteItemResponse) HasDeletedAt() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_DeletedAt != nil
+}
+
+func (x *DeleteItemResponse) ClearDeletedAt() {
+	x.xxx_hidden_DeletedAt = nil
+}
+
+type DeleteItemResponse_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	// id содержит идентификатор удаленной записи
+	Id string
+	// version содержит новую версию удаленной записи
+	Version int64
+	// deleted_at содержит момент мягкого удаления записи
+	DeletedAt *timestamppb.Timestamp
+}
+
+func (b0 DeleteItemResponse_builder) Build() *DeleteItemResponse {
+	m0 := &DeleteItemResponse{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_Id = b.Id
+	x.xxx_hidden_Version = b.Version
+	x.xxx_hidden_DeletedAt = b.DeletedAt
+	return m0
+}
+
 // SyncRequest содержит параметры синхронизации клиентского хранилища
 type SyncRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// changed_after задает нижнюю границу времени изменения записей
-	ChangedAfter *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=changed_after,json=changedAfter,proto3" json:"changed_after,omitempty"`
-	// page_size задает максимальное количество изменений в ответе
-	PageSize int32 `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	// page_token содержит токен следующей страницы изменений
-	PageToken     string `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                   protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_ChangedAfter *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=changed_after,json=changedAfter,proto3"`
+	xxx_hidden_PageSize     int32                  `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3"`
+	xxx_hidden_PageToken    string                 `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *SyncRequest) Reset() {
@@ -1323,43 +2020,79 @@ func (x *SyncRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use SyncRequest.ProtoReflect.Descriptor instead.
-func (*SyncRequest) Descriptor() ([]byte, []int) {
-	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{18}
-}
-
 func (x *SyncRequest) GetChangedAfter() *timestamppb.Timestamp {
 	if x != nil {
-		return x.ChangedAfter
+		return x.xxx_hidden_ChangedAfter
 	}
 	return nil
 }
 
 func (x *SyncRequest) GetPageSize() int32 {
 	if x != nil {
-		return x.PageSize
+		return x.xxx_hidden_PageSize
 	}
 	return 0
 }
 
 func (x *SyncRequest) GetPageToken() string {
 	if x != nil {
-		return x.PageToken
+		return x.xxx_hidden_PageToken
 	}
 	return ""
 }
 
+func (x *SyncRequest) SetChangedAfter(v *timestamppb.Timestamp) {
+	x.xxx_hidden_ChangedAfter = v
+}
+
+func (x *SyncRequest) SetPageSize(v int32) {
+	x.xxx_hidden_PageSize = v
+}
+
+func (x *SyncRequest) SetPageToken(v string) {
+	x.xxx_hidden_PageToken = v
+}
+
+func (x *SyncRequest) HasChangedAfter() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_ChangedAfter != nil
+}
+
+func (x *SyncRequest) ClearChangedAfter() {
+	x.xxx_hidden_ChangedAfter = nil
+}
+
+type SyncRequest_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	// changed_after задает нижнюю границу времени изменения записей
+	ChangedAfter *timestamppb.Timestamp
+	// page_size задает максимальное количество изменений в ответе
+	PageSize int32
+	// page_token содержит токен следующей страницы изменений
+	PageToken string
+}
+
+func (b0 SyncRequest_builder) Build() *SyncRequest {
+	m0 := &SyncRequest{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_ChangedAfter = b.ChangedAfter
+	x.xxx_hidden_PageSize = b.PageSize
+	x.xxx_hidden_PageToken = b.PageToken
+	return m0
+}
+
 // SyncResponse содержит страницу изменений для синхронизации клиента
 type SyncResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// items содержит измененные записи, включая мягко удаленные
-	Items []*VaultItem `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
-	// next_changed_after содержит новую границу времени для следующей синхронизации
-	NextChangedAfter *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=next_changed_after,json=nextChangedAfter,proto3" json:"next_changed_after,omitempty"`
-	// next_page_token содержит токен следующей страницы изменений
-	NextPageToken string `protobuf:"bytes,3,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                       protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Items            *[]*VaultItem          `protobuf:"bytes,1,rep,name=items,proto3"`
+	xxx_hidden_NextChangedAfter *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=next_changed_after,json=nextChangedAfter,proto3"`
+	xxx_hidden_NextPageToken    string                 `protobuf:"bytes,3,opt,name=next_page_token,json=nextPageToken,proto3"`
+	unknownFields               protoimpl.UnknownFields
+	sizeCache                   protoimpl.SizeCache
 }
 
 func (x *SyncResponse) Reset() {
@@ -1387,45 +2120,82 @@ func (x *SyncResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use SyncResponse.ProtoReflect.Descriptor instead.
-func (*SyncResponse) Descriptor() ([]byte, []int) {
-	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{19}
-}
-
 func (x *SyncResponse) GetItems() []*VaultItem {
 	if x != nil {
-		return x.Items
+		if x.xxx_hidden_Items != nil {
+			return *x.xxx_hidden_Items
+		}
 	}
 	return nil
 }
 
 func (x *SyncResponse) GetNextChangedAfter() *timestamppb.Timestamp {
 	if x != nil {
-		return x.NextChangedAfter
+		return x.xxx_hidden_NextChangedAfter
 	}
 	return nil
 }
 
 func (x *SyncResponse) GetNextPageToken() string {
 	if x != nil {
-		return x.NextPageToken
+		return x.xxx_hidden_NextPageToken
 	}
 	return ""
 }
 
+func (x *SyncResponse) SetItems(v []*VaultItem) {
+	x.xxx_hidden_Items = &v
+}
+
+func (x *SyncResponse) SetNextChangedAfter(v *timestamppb.Timestamp) {
+	x.xxx_hidden_NextChangedAfter = v
+}
+
+func (x *SyncResponse) SetNextPageToken(v string) {
+	x.xxx_hidden_NextPageToken = v
+}
+
+func (x *SyncResponse) HasNextChangedAfter() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_NextChangedAfter != nil
+}
+
+func (x *SyncResponse) ClearNextChangedAfter() {
+	x.xxx_hidden_NextChangedAfter = nil
+}
+
+type SyncResponse_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	// items содержит измененные записи, включая мягко удаленные
+	Items []*VaultItem
+	// next_changed_after содержит новую границу времени для следующей синхронизации
+	NextChangedAfter *timestamppb.Timestamp
+	// next_page_token содержит токен следующей страницы изменений
+	NextPageToken string
+}
+
+func (b0 SyncResponse_builder) Build() *SyncResponse {
+	m0 := &SyncResponse{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_Items = &b.Items
+	x.xxx_hidden_NextChangedAfter = b.NextChangedAfter
+	x.xxx_hidden_NextPageToken = b.NextPageToken
+	return m0
+}
+
 // CreateBlobUploadRequest содержит параметры новой upload session
 type CreateBlobUploadRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// expected_size содержит ожидаемый размер encrypted binary объекта
-	ExpectedSize int64 `protobuf:"varint,1,opt,name=expected_size,json=expectedSize,proto3" json:"expected_size,omitempty"`
-	// chunk_size содержит размер encrypted chunk
-	ChunkSize int64 `protobuf:"varint,2,opt,name=chunk_size,json=chunkSize,proto3" json:"chunk_size,omitempty"`
-	// expected_chunks содержит ожидаемое количество chunks
-	ExpectedChunks int32 `protobuf:"varint,3,opt,name=expected_chunks,json=expectedChunks,proto3" json:"expected_chunks,omitempty"`
-	// checksum_sha256 содержит SHA256 checksum encrypted binary объекта
-	ChecksumSha256 string `protobuf:"bytes,4,opt,name=checksum_sha256,json=checksumSha256,proto3" json:"checksum_sha256,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state                     protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_ExpectedSize   int64                  `protobuf:"varint,1,opt,name=expected_size,json=expectedSize,proto3"`
+	xxx_hidden_ChunkSize      int64                  `protobuf:"varint,2,opt,name=chunk_size,json=chunkSize,proto3"`
+	xxx_hidden_ExpectedChunks int32                  `protobuf:"varint,3,opt,name=expected_chunks,json=expectedChunks,proto3"`
+	xxx_hidden_ChecksumSha256 string                 `protobuf:"bytes,4,opt,name=checksum_sha256,json=checksumSha256,proto3"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
 }
 
 func (x *CreateBlobUploadRequest) Reset() {
@@ -1453,50 +2223,82 @@ func (x *CreateBlobUploadRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CreateBlobUploadRequest.ProtoReflect.Descriptor instead.
-func (*CreateBlobUploadRequest) Descriptor() ([]byte, []int) {
-	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{20}
-}
-
 func (x *CreateBlobUploadRequest) GetExpectedSize() int64 {
 	if x != nil {
-		return x.ExpectedSize
+		return x.xxx_hidden_ExpectedSize
 	}
 	return 0
 }
 
 func (x *CreateBlobUploadRequest) GetChunkSize() int64 {
 	if x != nil {
-		return x.ChunkSize
+		return x.xxx_hidden_ChunkSize
 	}
 	return 0
 }
 
 func (x *CreateBlobUploadRequest) GetExpectedChunks() int32 {
 	if x != nil {
-		return x.ExpectedChunks
+		return x.xxx_hidden_ExpectedChunks
 	}
 	return 0
 }
 
 func (x *CreateBlobUploadRequest) GetChecksumSha256() string {
 	if x != nil {
-		return x.ChecksumSha256
+		return x.xxx_hidden_ChecksumSha256
 	}
 	return ""
 }
 
+func (x *CreateBlobUploadRequest) SetExpectedSize(v int64) {
+	x.xxx_hidden_ExpectedSize = v
+}
+
+func (x *CreateBlobUploadRequest) SetChunkSize(v int64) {
+	x.xxx_hidden_ChunkSize = v
+}
+
+func (x *CreateBlobUploadRequest) SetExpectedChunks(v int32) {
+	x.xxx_hidden_ExpectedChunks = v
+}
+
+func (x *CreateBlobUploadRequest) SetChecksumSha256(v string) {
+	x.xxx_hidden_ChecksumSha256 = v
+}
+
+type CreateBlobUploadRequest_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	// expected_size содержит ожидаемый размер encrypted binary объекта
+	ExpectedSize int64
+	// chunk_size содержит размер encrypted chunk
+	ChunkSize int64
+	// expected_chunks содержит ожидаемое количество chunks
+	ExpectedChunks int32
+	// checksum_sha256 содержит SHA256 checksum encrypted binary объекта
+	ChecksumSha256 string
+}
+
+func (b0 CreateBlobUploadRequest_builder) Build() *CreateBlobUploadRequest {
+	m0 := &CreateBlobUploadRequest{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_ExpectedSize = b.ExpectedSize
+	x.xxx_hidden_ChunkSize = b.ChunkSize
+	x.xxx_hidden_ExpectedChunks = b.ExpectedChunks
+	x.xxx_hidden_ChecksumSha256 = b.ChecksumSha256
+	return m0
+}
+
 // CreateBlobUploadResponse содержит созданную upload session
 type CreateBlobUploadResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// upload_id содержит идентификатор upload session
-	UploadId string `protobuf:"bytes,1,opt,name=upload_id,json=uploadId,proto3" json:"upload_id,omitempty"`
-	// expires_at содержит момент истечения upload session
-	ExpiresAt *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
-	// chunk_size содержит согласованный размер encrypted chunk
-	ChunkSize     int64 `protobuf:"varint,3,opt,name=chunk_size,json=chunkSize,proto3" json:"chunk_size,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_UploadId  string                 `protobuf:"bytes,1,opt,name=upload_id,json=uploadId,proto3"`
+	xxx_hidden_ExpiresAt *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=expires_at,json=expiresAt,proto3"`
+	xxx_hidden_ChunkSize int64                  `protobuf:"varint,3,opt,name=chunk_size,json=chunkSize,proto3"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *CreateBlobUploadResponse) Reset() {
@@ -1524,45 +2326,80 @@ func (x *CreateBlobUploadResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CreateBlobUploadResponse.ProtoReflect.Descriptor instead.
-func (*CreateBlobUploadResponse) Descriptor() ([]byte, []int) {
-	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{21}
-}
-
 func (x *CreateBlobUploadResponse) GetUploadId() string {
 	if x != nil {
-		return x.UploadId
+		return x.xxx_hidden_UploadId
 	}
 	return ""
 }
 
 func (x *CreateBlobUploadResponse) GetExpiresAt() *timestamppb.Timestamp {
 	if x != nil {
-		return x.ExpiresAt
+		return x.xxx_hidden_ExpiresAt
 	}
 	return nil
 }
 
 func (x *CreateBlobUploadResponse) GetChunkSize() int64 {
 	if x != nil {
-		return x.ChunkSize
+		return x.xxx_hidden_ChunkSize
 	}
 	return 0
 }
 
+func (x *CreateBlobUploadResponse) SetUploadId(v string) {
+	x.xxx_hidden_UploadId = v
+}
+
+func (x *CreateBlobUploadResponse) SetExpiresAt(v *timestamppb.Timestamp) {
+	x.xxx_hidden_ExpiresAt = v
+}
+
+func (x *CreateBlobUploadResponse) SetChunkSize(v int64) {
+	x.xxx_hidden_ChunkSize = v
+}
+
+func (x *CreateBlobUploadResponse) HasExpiresAt() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_ExpiresAt != nil
+}
+
+func (x *CreateBlobUploadResponse) ClearExpiresAt() {
+	x.xxx_hidden_ExpiresAt = nil
+}
+
+type CreateBlobUploadResponse_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	// upload_id содержит идентификатор upload session
+	UploadId string
+	// expires_at содержит момент истечения upload session
+	ExpiresAt *timestamppb.Timestamp
+	// chunk_size содержит согласованный размер encrypted chunk
+	ChunkSize int64
+}
+
+func (b0 CreateBlobUploadResponse_builder) Build() *CreateBlobUploadResponse {
+	m0 := &CreateBlobUploadResponse{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_UploadId = b.UploadId
+	x.xxx_hidden_ExpiresAt = b.ExpiresAt
+	x.xxx_hidden_ChunkSize = b.ChunkSize
+	return m0
+}
+
 // UploadBlobChunkRequest содержит один encrypted chunk
 type UploadBlobChunkRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// upload_id содержит идентификатор upload session
-	UploadId string `protobuf:"bytes,1,opt,name=upload_id,json=uploadId,proto3" json:"upload_id,omitempty"`
-	// chunk_index содержит порядковый номер chunk
-	ChunkIndex int32 `protobuf:"varint,2,opt,name=chunk_index,json=chunkIndex,proto3" json:"chunk_index,omitempty"`
-	// data содержит encrypted bytes chunk
-	Data []byte `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
-	// checksum_sha256 содержит SHA256 checksum encrypted chunk
-	ChecksumSha256 string `protobuf:"bytes,4,opt,name=checksum_sha256,json=checksumSha256,proto3" json:"checksum_sha256,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state                     protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_UploadId       string                 `protobuf:"bytes,1,opt,name=upload_id,json=uploadId,proto3"`
+	xxx_hidden_ChunkIndex     int32                  `protobuf:"varint,2,opt,name=chunk_index,json=chunkIndex,proto3"`
+	xxx_hidden_Data           []byte                 `protobuf:"bytes,3,opt,name=data,proto3"`
+	xxx_hidden_ChecksumSha256 string                 `protobuf:"bytes,4,opt,name=checksum_sha256,json=checksumSha256,proto3"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
 }
 
 func (x *UploadBlobChunkRequest) Reset() {
@@ -1590,58 +2427,89 @@ func (x *UploadBlobChunkRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use UploadBlobChunkRequest.ProtoReflect.Descriptor instead.
-func (*UploadBlobChunkRequest) Descriptor() ([]byte, []int) {
-	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{22}
-}
-
 func (x *UploadBlobChunkRequest) GetUploadId() string {
 	if x != nil {
-		return x.UploadId
+		return x.xxx_hidden_UploadId
 	}
 	return ""
 }
 
 func (x *UploadBlobChunkRequest) GetChunkIndex() int32 {
 	if x != nil {
-		return x.ChunkIndex
+		return x.xxx_hidden_ChunkIndex
 	}
 	return 0
 }
 
 func (x *UploadBlobChunkRequest) GetData() []byte {
 	if x != nil {
-		return x.Data
+		return x.xxx_hidden_Data
 	}
 	return nil
 }
 
 func (x *UploadBlobChunkRequest) GetChecksumSha256() string {
 	if x != nil {
-		return x.ChecksumSha256
+		return x.xxx_hidden_ChecksumSha256
 	}
 	return ""
 }
 
+func (x *UploadBlobChunkRequest) SetUploadId(v string) {
+	x.xxx_hidden_UploadId = v
+}
+
+func (x *UploadBlobChunkRequest) SetChunkIndex(v int32) {
+	x.xxx_hidden_ChunkIndex = v
+}
+
+func (x *UploadBlobChunkRequest) SetData(v []byte) {
+	if v == nil {
+		v = []byte{}
+	}
+	x.xxx_hidden_Data = v
+}
+
+func (x *UploadBlobChunkRequest) SetChecksumSha256(v string) {
+	x.xxx_hidden_ChecksumSha256 = v
+}
+
+type UploadBlobChunkRequest_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	// upload_id содержит идентификатор upload session
+	UploadId string
+	// chunk_index содержит порядковый номер chunk
+	ChunkIndex int32
+	// data содержит encrypted bytes chunk
+	Data []byte
+	// checksum_sha256 содержит SHA256 checksum encrypted chunk
+	ChecksumSha256 string
+}
+
+func (b0 UploadBlobChunkRequest_builder) Build() *UploadBlobChunkRequest {
+	m0 := &UploadBlobChunkRequest{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_UploadId = b.UploadId
+	x.xxx_hidden_ChunkIndex = b.ChunkIndex
+	x.xxx_hidden_Data = b.Data
+	x.xxx_hidden_ChecksumSha256 = b.ChecksumSha256
+	return m0
+}
+
 // UploadBlobResponse содержит результат загрузки encrypted blob
 type UploadBlobResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// blob_id содержит идентификатор сохраненного blob
-	BlobId string `protobuf:"bytes,1,opt,name=blob_id,json=blobId,proto3" json:"blob_id,omitempty"`
-	// storage_bucket содержит bucket object storage
-	StorageBucket string `protobuf:"bytes,2,opt,name=storage_bucket,json=storageBucket,proto3" json:"storage_bucket,omitempty"`
-	// object_prefix содержит префикс объектов blob
-	ObjectPrefix string `protobuf:"bytes,3,opt,name=object_prefix,json=objectPrefix,proto3" json:"object_prefix,omitempty"`
-	// chunk_size содержит размер chunk
-	ChunkSize int64 `protobuf:"varint,4,opt,name=chunk_size,json=chunkSize,proto3" json:"chunk_size,omitempty"`
-	// chunk_count содержит количество chunks
-	ChunkCount int32 `protobuf:"varint,5,opt,name=chunk_count,json=chunkCount,proto3" json:"chunk_count,omitempty"`
-	// size_bytes содержит полный размер encrypted blob
-	SizeBytes int64 `protobuf:"varint,6,opt,name=size_bytes,json=sizeBytes,proto3" json:"size_bytes,omitempty"`
-	// checksum_sha256 содержит checksum encrypted blob
-	ChecksumSha256 string `protobuf:"bytes,7,opt,name=checksum_sha256,json=checksumSha256,proto3" json:"checksum_sha256,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state                     protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_BlobId         string                 `protobuf:"bytes,1,opt,name=blob_id,json=blobId,proto3"`
+	xxx_hidden_StorageBucket  string                 `protobuf:"bytes,2,opt,name=storage_bucket,json=storageBucket,proto3"`
+	xxx_hidden_ObjectPrefix   string                 `protobuf:"bytes,3,opt,name=object_prefix,json=objectPrefix,proto3"`
+	xxx_hidden_ChunkSize      int64                  `protobuf:"varint,4,opt,name=chunk_size,json=chunkSize,proto3"`
+	xxx_hidden_ChunkCount     int32                  `protobuf:"varint,5,opt,name=chunk_count,json=chunkCount,proto3"`
+	xxx_hidden_SizeBytes      int64                  `protobuf:"varint,6,opt,name=size_bytes,json=sizeBytes,proto3"`
+	xxx_hidden_ChecksumSha256 string                 `protobuf:"bytes,7,opt,name=checksum_sha256,json=checksumSha256,proto3"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
 }
 
 func (x *UploadBlobResponse) Reset() {
@@ -1669,67 +2537,122 @@ func (x *UploadBlobResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use UploadBlobResponse.ProtoReflect.Descriptor instead.
-func (*UploadBlobResponse) Descriptor() ([]byte, []int) {
-	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{23}
-}
-
 func (x *UploadBlobResponse) GetBlobId() string {
 	if x != nil {
-		return x.BlobId
+		return x.xxx_hidden_BlobId
 	}
 	return ""
 }
 
 func (x *UploadBlobResponse) GetStorageBucket() string {
 	if x != nil {
-		return x.StorageBucket
+		return x.xxx_hidden_StorageBucket
 	}
 	return ""
 }
 
 func (x *UploadBlobResponse) GetObjectPrefix() string {
 	if x != nil {
-		return x.ObjectPrefix
+		return x.xxx_hidden_ObjectPrefix
 	}
 	return ""
 }
 
 func (x *UploadBlobResponse) GetChunkSize() int64 {
 	if x != nil {
-		return x.ChunkSize
+		return x.xxx_hidden_ChunkSize
 	}
 	return 0
 }
 
 func (x *UploadBlobResponse) GetChunkCount() int32 {
 	if x != nil {
-		return x.ChunkCount
+		return x.xxx_hidden_ChunkCount
 	}
 	return 0
 }
 
 func (x *UploadBlobResponse) GetSizeBytes() int64 {
 	if x != nil {
-		return x.SizeBytes
+		return x.xxx_hidden_SizeBytes
 	}
 	return 0
 }
 
 func (x *UploadBlobResponse) GetChecksumSha256() string {
 	if x != nil {
-		return x.ChecksumSha256
+		return x.xxx_hidden_ChecksumSha256
 	}
 	return ""
 }
 
+func (x *UploadBlobResponse) SetBlobId(v string) {
+	x.xxx_hidden_BlobId = v
+}
+
+func (x *UploadBlobResponse) SetStorageBucket(v string) {
+	x.xxx_hidden_StorageBucket = v
+}
+
+func (x *UploadBlobResponse) SetObjectPrefix(v string) {
+	x.xxx_hidden_ObjectPrefix = v
+}
+
+func (x *UploadBlobResponse) SetChunkSize(v int64) {
+	x.xxx_hidden_ChunkSize = v
+}
+
+func (x *UploadBlobResponse) SetChunkCount(v int32) {
+	x.xxx_hidden_ChunkCount = v
+}
+
+func (x *UploadBlobResponse) SetSizeBytes(v int64) {
+	x.xxx_hidden_SizeBytes = v
+}
+
+func (x *UploadBlobResponse) SetChecksumSha256(v string) {
+	x.xxx_hidden_ChecksumSha256 = v
+}
+
+type UploadBlobResponse_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	// blob_id содержит идентификатор сохраненного blob
+	BlobId string
+	// storage_bucket содержит bucket object storage
+	StorageBucket string
+	// object_prefix содержит префикс объектов blob
+	ObjectPrefix string
+	// chunk_size содержит размер chunk
+	ChunkSize int64
+	// chunk_count содержит количество chunks
+	ChunkCount int32
+	// size_bytes содержит полный размер encrypted blob
+	SizeBytes int64
+	// checksum_sha256 содержит checksum encrypted blob
+	ChecksumSha256 string
+}
+
+func (b0 UploadBlobResponse_builder) Build() *UploadBlobResponse {
+	m0 := &UploadBlobResponse{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_BlobId = b.BlobId
+	x.xxx_hidden_StorageBucket = b.StorageBucket
+	x.xxx_hidden_ObjectPrefix = b.ObjectPrefix
+	x.xxx_hidden_ChunkSize = b.ChunkSize
+	x.xxx_hidden_ChunkCount = b.ChunkCount
+	x.xxx_hidden_SizeBytes = b.SizeBytes
+	x.xxx_hidden_ChecksumSha256 = b.ChecksumSha256
+	return m0
+}
+
 // DownloadBlobRequest содержит параметры скачивания encrypted blob
 type DownloadBlobRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// blob_id содержит идентификатор blob
-	BlobId        string `protobuf:"bytes,1,opt,name=blob_id,json=blobId,proto3" json:"blob_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_BlobId string                 `protobuf:"bytes,1,opt,name=blob_id,json=blobId,proto3"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *DownloadBlobRequest) Reset() {
@@ -1757,31 +2680,41 @@ func (x *DownloadBlobRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use DownloadBlobRequest.ProtoReflect.Descriptor instead.
-func (*DownloadBlobRequest) Descriptor() ([]byte, []int) {
-	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{24}
-}
-
 func (x *DownloadBlobRequest) GetBlobId() string {
 	if x != nil {
-		return x.BlobId
+		return x.xxx_hidden_BlobId
 	}
 	return ""
 }
 
+func (x *DownloadBlobRequest) SetBlobId(v string) {
+	x.xxx_hidden_BlobId = v
+}
+
+type DownloadBlobRequest_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	// blob_id содержит идентификатор blob
+	BlobId string
+}
+
+func (b0 DownloadBlobRequest_builder) Build() *DownloadBlobRequest {
+	m0 := &DownloadBlobRequest{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_BlobId = b.BlobId
+	return m0
+}
+
 // DownloadBlobChunk содержит один encrypted chunk при скачивании
 type DownloadBlobChunk struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// blob_id содержит идентификатор blob
-	BlobId string `protobuf:"bytes,1,opt,name=blob_id,json=blobId,proto3" json:"blob_id,omitempty"`
-	// chunk_index содержит порядковый номер chunk
-	ChunkIndex int32 `protobuf:"varint,2,opt,name=chunk_index,json=chunkIndex,proto3" json:"chunk_index,omitempty"`
-	// data содержит encrypted bytes chunk
-	Data []byte `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
-	// checksum_sha256 содержит SHA256 checksum encrypted chunk
-	ChecksumSha256 string `protobuf:"bytes,4,opt,name=checksum_sha256,json=checksumSha256,proto3" json:"checksum_sha256,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state                     protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_BlobId         string                 `protobuf:"bytes,1,opt,name=blob_id,json=blobId,proto3"`
+	xxx_hidden_ChunkIndex     int32                  `protobuf:"varint,2,opt,name=chunk_index,json=chunkIndex,proto3"`
+	xxx_hidden_Data           []byte                 `protobuf:"bytes,3,opt,name=data,proto3"`
+	xxx_hidden_ChecksumSha256 string                 `protobuf:"bytes,4,opt,name=checksum_sha256,json=checksumSha256,proto3"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
 }
 
 func (x *DownloadBlobChunk) Reset() {
@@ -1809,46 +2742,83 @@ func (x *DownloadBlobChunk) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use DownloadBlobChunk.ProtoReflect.Descriptor instead.
-func (*DownloadBlobChunk) Descriptor() ([]byte, []int) {
-	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{25}
-}
-
 func (x *DownloadBlobChunk) GetBlobId() string {
 	if x != nil {
-		return x.BlobId
+		return x.xxx_hidden_BlobId
 	}
 	return ""
 }
 
 func (x *DownloadBlobChunk) GetChunkIndex() int32 {
 	if x != nil {
-		return x.ChunkIndex
+		return x.xxx_hidden_ChunkIndex
 	}
 	return 0
 }
 
 func (x *DownloadBlobChunk) GetData() []byte {
 	if x != nil {
-		return x.Data
+		return x.xxx_hidden_Data
 	}
 	return nil
 }
 
 func (x *DownloadBlobChunk) GetChecksumSha256() string {
 	if x != nil {
-		return x.ChecksumSha256
+		return x.xxx_hidden_ChecksumSha256
 	}
 	return ""
 }
 
+func (x *DownloadBlobChunk) SetBlobId(v string) {
+	x.xxx_hidden_BlobId = v
+}
+
+func (x *DownloadBlobChunk) SetChunkIndex(v int32) {
+	x.xxx_hidden_ChunkIndex = v
+}
+
+func (x *DownloadBlobChunk) SetData(v []byte) {
+	if v == nil {
+		v = []byte{}
+	}
+	x.xxx_hidden_Data = v
+}
+
+func (x *DownloadBlobChunk) SetChecksumSha256(v string) {
+	x.xxx_hidden_ChecksumSha256 = v
+}
+
+type DownloadBlobChunk_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	// blob_id содержит идентификатор blob
+	BlobId string
+	// chunk_index содержит порядковый номер chunk
+	ChunkIndex int32
+	// data содержит encrypted bytes chunk
+	Data []byte
+	// checksum_sha256 содержит SHA256 checksum encrypted chunk
+	ChecksumSha256 string
+}
+
+func (b0 DownloadBlobChunk_builder) Build() *DownloadBlobChunk {
+	m0 := &DownloadBlobChunk{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_BlobId = b.BlobId
+	x.xxx_hidden_ChunkIndex = b.ChunkIndex
+	x.xxx_hidden_Data = b.Data
+	x.xxx_hidden_ChecksumSha256 = b.ChecksumSha256
+	return m0
+}
+
 // AbortBlobUploadRequest содержит параметры отмены upload session
 type AbortBlobUploadRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// upload_id содержит идентификатор upload session
-	UploadId      string `protobuf:"bytes,1,opt,name=upload_id,json=uploadId,proto3" json:"upload_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state               protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_UploadId string                 `protobuf:"bytes,1,opt,name=upload_id,json=uploadId,proto3"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *AbortBlobUploadRequest) Reset() {
@@ -1876,25 +2846,38 @@ func (x *AbortBlobUploadRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use AbortBlobUploadRequest.ProtoReflect.Descriptor instead.
-func (*AbortBlobUploadRequest) Descriptor() ([]byte, []int) {
-	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{26}
-}
-
 func (x *AbortBlobUploadRequest) GetUploadId() string {
 	if x != nil {
-		return x.UploadId
+		return x.xxx_hidden_UploadId
 	}
 	return ""
 }
 
+func (x *AbortBlobUploadRequest) SetUploadId(v string) {
+	x.xxx_hidden_UploadId = v
+}
+
+type AbortBlobUploadRequest_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	// upload_id содержит идентификатор upload session
+	UploadId string
+}
+
+func (b0 AbortBlobUploadRequest_builder) Build() *AbortBlobUploadRequest {
+	m0 := &AbortBlobUploadRequest{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_UploadId = b.UploadId
+	return m0
+}
+
 // AbortBlobUploadResponse содержит результат отмены upload session
 type AbortBlobUploadResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// upload_id содержит идентификатор upload session
-	UploadId      string `protobuf:"bytes,1,opt,name=upload_id,json=uploadId,proto3" json:"upload_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state               protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_UploadId string                 `protobuf:"bytes,1,opt,name=upload_id,json=uploadId,proto3"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *AbortBlobUploadResponse) Reset() {
@@ -1922,16 +2905,30 @@ func (x *AbortBlobUploadResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use AbortBlobUploadResponse.ProtoReflect.Descriptor instead.
-func (*AbortBlobUploadResponse) Descriptor() ([]byte, []int) {
-	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP(), []int{27}
-}
-
 func (x *AbortBlobUploadResponse) GetUploadId() string {
 	if x != nil {
-		return x.UploadId
+		return x.xxx_hidden_UploadId
 	}
 	return ""
+}
+
+func (x *AbortBlobUploadResponse) SetUploadId(v string) {
+	x.xxx_hidden_UploadId = v
+}
+
+type AbortBlobUploadResponse_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	// upload_id содержит идентификатор upload session
+	UploadId string
+}
+
+func (b0 AbortBlobUploadResponse_builder) Build() *AbortBlobUploadResponse {
+	m0 := &AbortBlobUploadResponse{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_UploadId = b.UploadId
+	return m0
 }
 
 var File_api_proto_gophkeeper_v1_gophkeeper_proto protoreflect.FileDescriptor
@@ -2103,18 +3100,6 @@ const file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDesc = "" +
 	"UploadBlob\x12%.gophkeeper.v1.UploadBlobChunkRequest\x1a!.gophkeeper.v1.UploadBlobResponse(\x01\x12V\n" +
 	"\fDownloadBlob\x12\".gophkeeper.v1.DownloadBlobRequest\x1a .gophkeeper.v1.DownloadBlobChunk0\x01\x12`\n" +
 	"\x0fAbortBlobUpload\x12%.gophkeeper.v1.AbortBlobUploadRequest\x1a&.gophkeeper.v1.AbortBlobUploadResponseBfZdgithub.com/squaredbusinessman/gophkeeper-authenticator/internal/gen/proto/gophkeeper/v1;gophkeeperv1b\x06proto3"
-
-var (
-	file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescOnce sync.Once
-	file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescData []byte
-)
-
-func file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescGZIP() []byte {
-	file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescOnce.Do(func() {
-		file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDesc), len(file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDesc)))
-	})
-	return file_api_proto_gophkeeper_v1_gophkeeper_proto_rawDescData
-}
 
 var file_api_proto_gophkeeper_v1_gophkeeper_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_api_proto_gophkeeper_v1_gophkeeper_proto_msgTypes = make([]protoimpl.MessageInfo, 28)

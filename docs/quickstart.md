@@ -11,6 +11,7 @@ cp deploy/.env.example deploy/.env
 ## 2. Запустить PostgreSQL и MinIO
 
 ```bash
+make certs
 docker compose -f deploy/docker-compose.yml up -d
 ```
 

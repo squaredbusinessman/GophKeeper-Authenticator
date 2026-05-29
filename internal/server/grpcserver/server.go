@@ -42,14 +42,11 @@ func New(cfg *config.Config, logger *zap.Logger, db *sql.DB, blobStore serverblo
 		),
 	}
 
-	if cfg.GRPCTLSEnabled {
-		creds, err := credentials.NewServerTLSFromFile(cfg.GRPCTLSCertFile, cfg.GRPCTLSKeyFile)
-		if err != nil {
-			return nil, fmt.Errorf("load grpc TLS credentials: %w", err)
-		}
-
-		serverOptions = append(serverOptions, grpc.Creds(creds))
+	creds, err := credentials.NewServerTLSFromFile(cfg.GRPCTLSCertFile, cfg.GRPCTLSKeyFile)
+	if err != nil {
+		return nil, fmt.Errorf("load grpc TLS credentials: %w", err)
 	}
+	serverOptions = append(serverOptions, grpc.Creds(creds))
 
 	listener, err := net.Listen("tcp", cfg.GRPCAddress)
 	if err != nil {
@@ -98,7 +95,7 @@ func New(cfg *config.Config, logger *zap.Logger, db *sql.DB, blobStore serverblo
 		listener:   listener,
 		logger:     logger,
 		address:    cfg.GRPCAddress,
-		tlsEnabled: cfg.GRPCTLSEnabled,
+		tlsEnabled: true,
 	}, nil
 }
 

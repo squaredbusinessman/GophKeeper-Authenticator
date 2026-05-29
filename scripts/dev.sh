@@ -11,6 +11,8 @@ ACCESS_TOKEN_SECRET="${GOPHKEEPER_ACCESS_TOKEN_SECRET:-local-dev-access-token-se
 LOG_MODE="${GOPHKEEPER_LOG_MODE:-dev}"
 GRPC_ADDRESS="${GOPHKEEPER_GRPC_ADDRESS:-:9090}"
 CLIENT_SERVER_ADDRESS="${GOPHKEEPER_SERVER_ADDRESS:-localhost:9090}"
+TLS_CERT_FILE="${GOPHKEEPER_GRPC_TLS_CERT_FILE:-${ROOT_DIR}/certs/server.crt}"
+TLS_KEY_FILE="${GOPHKEEPER_GRPC_TLS_KEY_FILE:-${ROOT_DIR}/certs/server.key}"
 
 print_usage() {
   cat <<USAGE
@@ -56,6 +58,8 @@ run_server() {
   GOPHKEEPER_ACCESS_TOKEN_SECRET="${ACCESS_TOKEN_SECRET}" \
   GOPHKEEPER_LOG_MODE="${LOG_MODE}" \
   GOPHKEEPER_GRPC_ADDRESS="${GRPC_ADDRESS}" \
+  GOPHKEEPER_GRPC_TLS_CERT_FILE="${TLS_CERT_FILE}" \
+  GOPHKEEPER_GRPC_TLS_KEY_FILE="${TLS_KEY_FILE}" \
   go run ./cmd/gophkeeper-server
 }
 
@@ -63,6 +67,7 @@ run_cli() {
   cd "${ROOT_DIR}"
 
   GOPHKEEPER_SERVER_ADDRESS="${CLIENT_SERVER_ADDRESS}" \
+  GOPHKEEPER_SERVER_TLS_CERT_FILE="${TLS_CERT_FILE}" \
   go run ./cmd/gophkeeper-cli "$@"
 }
 
@@ -78,6 +83,7 @@ case "${command}" in
     start_db
     ;;
   server)
+    "${ROOT_DIR}/scripts/generate_local_tls.sh"
     run_server
     ;;
   cli)

@@ -21,8 +21,12 @@ func TestLoadReturnsServerConfigWithDefaults(t *testing.T) {
 		t.Fatalf("GRPCAddress = %q, want %q", cfg.GRPCAddress, ":9090")
 	}
 
-	if cfg.GRPCTLSEnabled {
-		t.Fatalf("GRPCTLSEnabled = true, want false")
+	if cfg.GRPCTLSCertFile != "certs/server.crt" {
+		t.Fatalf("GRPCTLSCertFile = %q, want default cert path", cfg.GRPCTLSCertFile)
+	}
+
+	if cfg.GRPCTLSKeyFile != "certs/server.key" {
+		t.Fatalf("GRPCTLSKeyFile = %q, want default key path", cfg.GRPCTLSKeyFile)
 	}
 
 	if cfg.AccessTokenTTL != 5*time.Minute {
@@ -44,7 +48,6 @@ func TestLoadReturnsServerConfigWithDefaults(t *testing.T) {
 
 func TestLoadReturnsServerConfigFromEnv(t *testing.T) {
 	t.Setenv("GOPHKEEPER_GRPC_ADDRESS", ":8080")
-	t.Setenv("GOPHKEEPER_GRPC_TLS_ENABLED", "true")
 	t.Setenv("GOPHKEEPER_GRPC_TLS_CERT_FILE", "/tmp/server.crt")
 	t.Setenv("GOPHKEEPER_GRPC_TLS_KEY_FILE", "/tmp/server.key")
 	t.Setenv("GOPHKEEPER_DATABASE_DSN", "postgres://custom")
@@ -67,10 +70,6 @@ func TestLoadReturnsServerConfigFromEnv(t *testing.T) {
 
 	if cfg.GRPCAddress != ":8080" {
 		t.Fatalf("GRPCAddress = %q, want %q", cfg.GRPCAddress, ":8080")
-	}
-
-	if !cfg.GRPCTLSEnabled {
-		t.Fatalf("GRPCTLSEnabled = false, want true")
 	}
 
 	if cfg.GRPCTLSCertFile != "/tmp/server.crt" {
@@ -161,7 +160,7 @@ func TestLoadReturnsErrorWhenAccessTokenSecretTooShort(t *testing.T) {
 func TestLoadReturnsErrorWhenTLSCertFileMissing(t *testing.T) {
 	t.Setenv("GOPHKEEPER_DATABASE_DSN", "postgres://custom")
 	t.Setenv("GOPHKEEPER_ACCESS_TOKEN_SECRET", testAccessTokenSecret)
-	t.Setenv("GOPHKEEPER_GRPC_TLS_ENABLED", "true")
+	t.Setenv("GOPHKEEPER_GRPC_TLS_CERT_FILE", " ")
 	t.Setenv("GOPHKEEPER_GRPC_TLS_KEY_FILE", "/tmp/server.key")
 
 	_, err := Load()
@@ -177,8 +176,8 @@ func TestLoadReturnsErrorWhenTLSCertFileMissing(t *testing.T) {
 func TestLoadReturnsErrorWhenTLSKeyFileMissing(t *testing.T) {
 	t.Setenv("GOPHKEEPER_DATABASE_DSN", "postgres://custom")
 	t.Setenv("GOPHKEEPER_ACCESS_TOKEN_SECRET", testAccessTokenSecret)
-	t.Setenv("GOPHKEEPER_GRPC_TLS_ENABLED", "true")
 	t.Setenv("GOPHKEEPER_GRPC_TLS_CERT_FILE", "/tmp/server.crt")
+	t.Setenv("GOPHKEEPER_GRPC_TLS_KEY_FILE", " ")
 
 	_, err := Load()
 	if err == nil {
@@ -187,21 +186,6 @@ func TestLoadReturnsErrorWhenTLSKeyFileMissing(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "key file") {
 		t.Fatalf("Load() error = %q, want mention key file", err.Error())
-	}
-}
-
-func TestLoadReturnsErrorWhenBoolInvalid(t *testing.T) {
-	t.Setenv("GOPHKEEPER_DATABASE_DSN", "postgres://custom")
-	t.Setenv("GOPHKEEPER_ACCESS_TOKEN_SECRET", testAccessTokenSecret)
-	t.Setenv("GOPHKEEPER_GRPC_TLS_ENABLED", "not-bool")
-
-	_, err := Load()
-	if err == nil {
-		t.Fatalf("Load() error = nil, want error")
-	}
-
-	if !strings.Contains(err.Error(), "GOPHKEEPER_GRPC_TLS_ENABLED") {
-		t.Fatalf("Load() error = %q, want mention GOPHKEEPER_GRPC_TLS_ENABLED", err.Error())
 	}
 }
 
@@ -255,6 +239,8 @@ func TestLoadReturnsErrorWhenBlobStorageEnabledWithoutMinIOEndpoint(t *testing.T
 func TestValidateReturnsErrorWhenBlobMaxSizeBelowChunkSize(t *testing.T) {
 	cfg := Config{
 		GRPCAddress:        ":9090",
+		GRPCTLSCertFile:    "/tmp/server.crt",
+		GRPCTLSKeyFile:     "/tmp/server.key",
 		DatabaseDSN:        "postgres://custom",
 		AccessTokenSecret:  testAccessTokenSecret,
 		AccessTokenTTL:     5 * time.Minute,
@@ -282,6 +268,8 @@ func TestValidateReturnsErrorWhenBlobMaxSizeBelowChunkSize(t *testing.T) {
 func TestValidateReturnsErrorWhenGRPCAddressEmpty(t *testing.T) {
 	cfg := Config{
 		GRPCAddress:       " ",
+		GRPCTLSCertFile:   "/tmp/server.crt",
+		GRPCTLSKeyFile:    "/tmp/server.key",
 		DatabaseDSN:       "postgres://custom",
 		AccessTokenSecret: testAccessTokenSecret,
 		AccessTokenTTL:    5 * time.Minute,
@@ -300,6 +288,8 @@ func TestValidateReturnsErrorWhenGRPCAddressEmpty(t *testing.T) {
 func TestValidateReturnsErrorWhenAccessTokenTTLNotPositive(t *testing.T) {
 	cfg := Config{
 		GRPCAddress:       ":9090",
+		GRPCTLSCertFile:   "/tmp/server.crt",
+		GRPCTLSKeyFile:    "/tmp/server.key",
 		DatabaseDSN:       "postgres://custom",
 		AccessTokenSecret: testAccessTokenSecret,
 		AccessTokenTTL:    0,

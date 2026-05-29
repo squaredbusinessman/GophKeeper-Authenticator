@@ -147,13 +147,13 @@ func (s *VaultService) CreateSecret(ctx context.Context, session Session, input 
 
 	ctx = contextWithAccessToken(ctx, session.AccessToken)
 
-	response, err := s.vaultClient.CreateItem(ctx, &gophkeeperv1.CreateItemRequest{
+	response, err := s.vaultClient.CreateItem(ctx, gophkeeperv1.CreateItemRequest_builder{
 		Type:                 secretTypeToProto(input.Type),
 		Metadata:             encryptedDataToProto(encryptedMetadata),
 		Payload:              encryptedDataToProto(encryptedPayload),
 		EncryptionAlg:        payload.EncryptionAlgorithm,
 		PayloadSchemaVersion: input.PayloadSchemaVersion,
-	})
+	}.Build())
 	if err != nil {
 		return Secret{}, fmt.Errorf("create secret: %w", err)
 	}
@@ -177,9 +177,9 @@ func (s *VaultService) GetSecret(ctx context.Context, session Session, input Get
 
 	ctx = contextWithAccessToken(ctx, session.AccessToken)
 
-	response, err := s.vaultClient.GetItem(ctx, &gophkeeperv1.GetItemRequest{
+	response, err := s.vaultClient.GetItem(ctx, gophkeeperv1.GetItemRequest_builder{
 		Id: strings.TrimSpace(input.ID),
-	})
+	}.Build())
 	if err != nil {
 		return Secret{}, fmt.Errorf("get secret: %w", err)
 	}
@@ -264,10 +264,10 @@ func secretFromProto(vaultKey []byte, item *gophkeeperv1.VaultItem) (Secret, err
 }
 
 func encryptedDataToProto(data payload.EncryptedPayload) *gophkeeperv1.EncryptedData {
-	return &gophkeeperv1.EncryptedData{
+	return gophkeeperv1.EncryptedData_builder{
 		Ciphertext: data.Ciphertext,
 		Nonce:      data.Nonce,
-	}
+	}.Build()
 }
 
 func encryptedDataFromProto(data *gophkeeperv1.EncryptedData) payload.EncryptedPayload {
@@ -344,9 +344,9 @@ func (s *VaultService) ListSecrets(ctx context.Context, session Session, input L
 
 	ctx = contextWithAccessToken(ctx, session.AccessToken)
 
-	response, err := s.vaultClient.ListItems(ctx, &gophkeeperv1.ListItemsRequest{
+	response, err := s.vaultClient.ListItems(ctx, gophkeeperv1.ListItemsRequest_builder{
 		IncludeDeleted: input.IncludeDeleted,
-	})
+	}.Build())
 	if err != nil {
 		return nil, fmt.Errorf("list secrets: %w", err)
 	}
@@ -395,7 +395,7 @@ func (s *VaultService) UpdateSecret(ctx context.Context, session Session, input 
 
 	ctx = contextWithAccessToken(ctx, session.AccessToken)
 
-	response, err := s.vaultClient.UpdateItem(ctx, &gophkeeperv1.UpdateItemRequest{
+	response, err := s.vaultClient.UpdateItem(ctx, gophkeeperv1.UpdateItemRequest_builder{
 		Id:                   strings.TrimSpace(input.ID),
 		ExpectedVersion:      input.ExpectedVersion,
 		Type:                 secretTypeToProto(input.Type),
@@ -403,7 +403,7 @@ func (s *VaultService) UpdateSecret(ctx context.Context, session Session, input 
 		Payload:              encryptedDataToProto(encryptedPayload),
 		EncryptionAlg:        payload.EncryptionAlgorithm,
 		PayloadSchemaVersion: input.PayloadSchemaVersion,
-	})
+	}.Build())
 	if err != nil {
 		return Secret{}, fmt.Errorf("update secret: %w", err)
 	}
@@ -427,10 +427,10 @@ func (s *VaultService) DeleteSecret(ctx context.Context, session Session, input 
 
 	ctx = contextWithAccessToken(ctx, session.AccessToken)
 
-	response, err := s.vaultClient.DeleteItem(ctx, &gophkeeperv1.DeleteItemRequest{
+	response, err := s.vaultClient.DeleteItem(ctx, gophkeeperv1.DeleteItemRequest_builder{
 		Id:              strings.TrimSpace(input.ID),
 		ExpectedVersion: input.ExpectedVersion,
-	})
+	}.Build())
 	if err != nil {
 		return DeleteSecretResult{}, fmt.Errorf("delete secret: %w", err)
 	}
@@ -498,9 +498,9 @@ func (s *VaultService) SyncSecrets(ctx context.Context, session Session, input S
 
 	ctx = contextWithAccessToken(ctx, session.AccessToken)
 
-	request := &gophkeeperv1.SyncRequest{}
+	request := gophkeeperv1.SyncRequest_builder{}.Build()
 	if !input.ChangedAfter.IsZero() {
-		request.ChangedAfter = timestamppb.New(input.ChangedAfter)
+		request.SetChangedAfter(timestamppb.New(input.ChangedAfter))
 	}
 
 	response, err := s.vaultClient.Sync(ctx, request)

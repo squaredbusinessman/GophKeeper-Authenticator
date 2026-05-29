@@ -44,30 +44,30 @@ func (u *fakeLoginUseCase) Login(ctx context.Context, input login.Input) (login.
 }
 
 func validRegisterRequest() *gophkeeperv1.RegisterRequest {
-	return &gophkeeperv1.RegisterRequest{
+	return gophkeeperv1.RegisterRequest_builder{
 		Login:         "user@example.com",
 		LoginPassword: "login-password",
-		VaultKey: &gophkeeperv1.VaultKeyEnvelope{
+		VaultKey: gophkeeperv1.VaultKeyEnvelope_builder{
 			EncryptedVaultKey: []byte("encrypted-vault-key"),
 			Nonce:             []byte("vault-key-nonce"),
 			EncryptionAlg:     "xchacha20poly1305",
-			KdfParams: &gophkeeperv1.KDFParams{
+			KdfParams: gophkeeperv1.KDFParams_builder{
 				Algorithm:   "argon2id",
 				Salt:        []byte("kdf-salt"),
 				TimeCost:    3,
 				MemoryKib:   64 * 1024,
 				Parallelism: 4,
 				KeyLength:   32,
-			},
-		},
-	}
+			}.Build(),
+		}.Build(),
+	}.Build()
 }
 
 func validLoginRequest() *gophkeeperv1.LoginRequest {
-	return &gophkeeperv1.LoginRequest{
+	return gophkeeperv1.LoginRequest_builder{
 		Login:         "user@example.com",
 		LoginPassword: "login-password",
-	}
+	}.Build()
 }
 
 func validRegisterResult() register.Result {
@@ -127,24 +127,24 @@ func TestAuthHandlerRegisterCallsUseCaseAndReturnsTokenWithVaultKey(t *testing.T
 		t.Fatalf("Register() response = nil")
 	}
 
-	if response.AccessToken != "access-token" {
-		t.Fatalf("AccessToken = %q, want %q", response.AccessToken, "access-token")
+	if response.GetAccessToken() != "access-token" {
+		t.Fatalf("AccessToken = %q, want %q", response.GetAccessToken(), "access-token")
 	}
 
-	if response.AccessTokenExpiresAt == nil {
+	if response.GetAccessTokenExpiresAt() == nil {
 		t.Fatalf("AccessTokenExpiresAt = nil")
 	}
 
-	if !response.AccessTokenExpiresAt.AsTime().Equal(validRegisterResult().AccessTokenExpiresAt) {
-		t.Fatalf("AccessTokenExpiresAt = %s, want %s", response.AccessTokenExpiresAt.AsTime(), validRegisterResult().AccessTokenExpiresAt)
+	if !response.GetAccessTokenExpiresAt().AsTime().Equal(validRegisterResult().AccessTokenExpiresAt) {
+		t.Fatalf("AccessTokenExpiresAt = %s, want %s", response.GetAccessTokenExpiresAt().AsTime(), validRegisterResult().AccessTokenExpiresAt)
 	}
 
-	if response.VaultKey == nil {
+	if response.GetVaultKey() == nil {
 		t.Fatalf("Register() VaultKey = nil")
 	}
 
-	if string(response.VaultKey.EncryptedVaultKey) != "encrypted-vault-key" {
-		t.Fatalf("EncryptedVaultKey = %q, want original encrypted vault key", string(response.VaultKey.EncryptedVaultKey))
+	if string(response.GetVaultKey().GetEncryptedVaultKey()) != "encrypted-vault-key" {
+		t.Fatalf("EncryptedVaultKey = %q, want original encrypted vault key", string(response.GetVaultKey().GetEncryptedVaultKey()))
 	}
 
 	if len(useCase.calls) != 1 {
@@ -183,7 +183,7 @@ func TestAuthHandlerRegisterReturnsInvalidArgumentForInvalidRequest(t *testing.T
 			name: "empty login",
 			request: func() *gophkeeperv1.RegisterRequest {
 				request := validRegisterRequest()
-				request.Login = " "
+				request.SetLogin(" ")
 				return request
 			}(),
 		},
@@ -191,7 +191,7 @@ func TestAuthHandlerRegisterReturnsInvalidArgumentForInvalidRequest(t *testing.T
 			name: "empty login password",
 			request: func() *gophkeeperv1.RegisterRequest {
 				request := validRegisterRequest()
-				request.LoginPassword = ""
+				request.SetLoginPassword("")
 				return request
 			}(),
 		},
@@ -199,7 +199,7 @@ func TestAuthHandlerRegisterReturnsInvalidArgumentForInvalidRequest(t *testing.T
 			name: "nil vault key",
 			request: func() *gophkeeperv1.RegisterRequest {
 				request := validRegisterRequest()
-				request.VaultKey = nil
+				request.SetVaultKey(nil)
 				return request
 			}(),
 		},
@@ -207,7 +207,7 @@ func TestAuthHandlerRegisterReturnsInvalidArgumentForInvalidRequest(t *testing.T
 			name: "nil kdf params",
 			request: func() *gophkeeperv1.RegisterRequest {
 				request := validRegisterRequest()
-				request.VaultKey.KdfParams = nil
+				request.GetVaultKey().SetKdfParams(nil)
 				return request
 			}(),
 		},
@@ -215,7 +215,7 @@ func TestAuthHandlerRegisterReturnsInvalidArgumentForInvalidRequest(t *testing.T
 			name: "empty encrypted vault key",
 			request: func() *gophkeeperv1.RegisterRequest {
 				request := validRegisterRequest()
-				request.VaultKey.EncryptedVaultKey = nil
+				request.GetVaultKey().SetEncryptedVaultKey(nil)
 				return request
 			}(),
 		},
@@ -287,28 +287,28 @@ func TestAuthHandlerLoginCallsUseCaseAndReturnsTokenWithVaultKey(t *testing.T) {
 		t.Fatalf("Login() response = nil")
 	}
 
-	if response.AccessToken != "access-token" {
-		t.Fatalf("AccessToken = %q, want %q", response.AccessToken, "access-token")
+	if response.GetAccessToken() != "access-token" {
+		t.Fatalf("AccessToken = %q, want %q", response.GetAccessToken(), "access-token")
 	}
 
-	if response.AccessTokenExpiresAt == nil {
+	if response.GetAccessTokenExpiresAt() == nil {
 		t.Fatalf("AccessTokenExpiresAt = nil")
 	}
 
-	if !response.AccessTokenExpiresAt.AsTime().Equal(validLoginResult().AccessTokenExpiresAt) {
-		t.Fatalf("AccessTokenExpiresAt = %s, want %s", response.AccessTokenExpiresAt.AsTime(), validLoginResult().AccessTokenExpiresAt)
+	if !response.GetAccessTokenExpiresAt().AsTime().Equal(validLoginResult().AccessTokenExpiresAt) {
+		t.Fatalf("AccessTokenExpiresAt = %s, want %s", response.GetAccessTokenExpiresAt().AsTime(), validLoginResult().AccessTokenExpiresAt)
 	}
 
-	if response.VaultKey == nil {
+	if response.GetVaultKey() == nil {
 		t.Fatalf("VaultKey = nil")
 	}
 
-	if string(response.VaultKey.EncryptedVaultKey) != "encrypted-vault-key" {
-		t.Fatalf("EncryptedVaultKey = %q, want original encrypted vault key", string(response.VaultKey.EncryptedVaultKey))
+	if string(response.GetVaultKey().GetEncryptedVaultKey()) != "encrypted-vault-key" {
+		t.Fatalf("EncryptedVaultKey = %q, want original encrypted vault key", string(response.GetVaultKey().GetEncryptedVaultKey()))
 	}
 
-	if response.VaultKey.KdfParams.GetMemoryKib() != 64*1024 {
-		t.Fatalf("KDF memory = %d, want %d", response.VaultKey.KdfParams.GetMemoryKib(), 64*1024)
+	if response.GetVaultKey().GetKdfParams().GetMemoryKib() != 64*1024 {
+		t.Fatalf("KDF memory = %d, want %d", response.GetVaultKey().GetKdfParams().GetMemoryKib(), 64*1024)
 	}
 
 	if len(useCase.calls) != 1 {
@@ -339,7 +339,7 @@ func TestAuthHandlerLoginReturnsInvalidArgumentForInvalidRequest(t *testing.T) {
 			name: "empty login",
 			request: func() *gophkeeperv1.LoginRequest {
 				request := validLoginRequest()
-				request.Login = " "
+				request.SetLogin(" ")
 				return request
 			}(),
 		},
@@ -347,7 +347,7 @@ func TestAuthHandlerLoginReturnsInvalidArgumentForInvalidRequest(t *testing.T) {
 			name: "empty login password",
 			request: func() *gophkeeperv1.LoginRequest {
 				request := validLoginRequest()
-				request.LoginPassword = ""
+				request.SetLoginPassword("")
 				return request
 			}(),
 		},

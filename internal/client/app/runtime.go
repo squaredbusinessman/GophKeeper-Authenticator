@@ -9,7 +9,6 @@ import (
 	gophkeeperv1 "github.com/squaredbusinessman/gophkeeper-authenticator/internal/gen/proto/gophkeeper/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 // Runtime содержит общие клиентские зависимости приложения
@@ -29,7 +28,7 @@ type Runtime struct {
 func LoadRuntime() (*Runtime, error) {
 	cfg, err := config.Load()
 	if err != nil {
-		return nil, fmt.Errorf("error loading config: %w", err)
+		return nil, fmt.Errorf("%w: %w", ErrClientConfig, err)
 	}
 
 	return NewRuntime(cfg)
@@ -38,11 +37,11 @@ func LoadRuntime() (*Runtime, error) {
 // NewRuntime создает клиентские зависимости из готового config
 func NewRuntime(cfg *config.Config) (*Runtime, error) {
 	if cfg == nil {
-		return nil, fmt.Errorf("client config is required")
+		return nil, ErrClientConfig
 	}
 
 	if err := cfg.Validate(); err != nil {
-		return nil, fmt.Errorf("validate client config: %w", err)
+		return nil, fmt.Errorf("%w: %w", ErrClientConfig, err)
 	}
 
 	transportCredentials, err := transportCredentialsFromConfig(cfg)
@@ -86,13 +85,9 @@ func (r *Runtime) Close() error {
 }
 
 func transportCredentialsFromConfig(cfg *config.Config) (credentials.TransportCredentials, error) {
-	if !cfg.ServerTLSEnabled {
-		return insecure.NewCredentials(), nil
-	}
-
 	tlsCredentials, err := credentials.NewClientTLSFromFile(cfg.ServerTLSCertFile, "")
 	if err != nil {
-		return nil, fmt.Errorf("load server TLS credentials: %w", err)
+		return nil, fmt.Errorf("%w: %w", ErrServerTLSCredentials, err)
 	}
 
 	return tlsCredentials, nil

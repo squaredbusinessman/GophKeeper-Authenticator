@@ -12,7 +12,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
@@ -304,8 +304,11 @@ func TestAuthUnaryInterceptorAddsUserIDToContextForProtectedMethod(t *testing.T)
 }
 
 func TestNewProtectsVaultServiceWithAuthInterceptor(t *testing.T) {
+	certFile, keyFile := writeTestCertificate(t)
 	cfg := &config.Config{
 		GRPCAddress:       "127.0.0.1:0",
+		GRPCTLSCertFile:   certFile,
+		GRPCTLSKeyFile:    keyFile,
 		AccessTokenSecret: "test-access-token-secret-32-bytes",
 		AccessTokenTTL:    time.Minute,
 	}
@@ -327,9 +330,14 @@ func TestNewProtectsVaultServiceWithAuthInterceptor(t *testing.T) {
 		}
 	})
 
+	creds, err := credentials.NewClientTLSFromFile(certFile, "")
+	if err != nil {
+		t.Fatalf("NewClientTLSFromFile() error = %v", err)
+	}
+
 	conn, err := grpc.NewClient(
 		server.listener.Addr().String(),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithTransportCredentials(creds),
 	)
 	if err != nil {
 		t.Fatalf("grpc.NewClient() error = %v", err)
@@ -340,7 +348,7 @@ func TestNewProtectsVaultServiceWithAuthInterceptor(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	_, err = client.ListItems(ctx, &gophkeeperv1.ListItemsRequest{})
+	_, err = client.ListItems(ctx, gophkeeperv1.ListItemsRequest_builder{}.Build())
 	if status.Code(err) != codes.Unauthenticated {
 		t.Fatalf("code = %s, want %s, err = %v", status.Code(err), codes.Unauthenticated, err)
 	}

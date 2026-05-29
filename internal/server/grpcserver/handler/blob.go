@@ -59,11 +59,11 @@ func (h *BlobHandler) CreateBlobUpload(ctx context.Context, req *gophkeeperv1.Cr
 		return nil, blobStatusError(err)
 	}
 
-	return &gophkeeperv1.CreateBlobUploadResponse{
+	return gophkeeperv1.CreateBlobUploadResponse_builder{
 		UploadId:  upload.ID,
 		ExpiresAt: timestamppb.New(upload.ExpiresAt),
 		ChunkSize: upload.ChunkSize,
-	}, nil
+	}.Build(), nil
 }
 
 // UploadBlob принимает encrypted chunks и завершает upload session
@@ -160,12 +160,12 @@ func (h *BlobHandler) DownloadBlob(req *gophkeeperv1.DownloadBlobRequest, stream
 			return blobStatusError(closeErr)
 		}
 
-		if err = stream.Send(&gophkeeperv1.DownloadBlobChunk{
+		if err = stream.Send(gophkeeperv1.DownloadBlobChunk_builder{
 			BlobId:         result.Blob.ID,
 			ChunkIndex:     part.ChunkIndex,
 			Data:           data,
 			ChecksumSha256: part.ChecksumSHA256,
-		}); err != nil {
+		}.Build()); err != nil {
 			return blobStatusError(err)
 		}
 	}
@@ -191,13 +191,13 @@ func (h *BlobHandler) AbortBlobUpload(ctx context.Context, req *gophkeeperv1.Abo
 		return nil, blobStatusError(err)
 	}
 
-	return &gophkeeperv1.AbortBlobUploadResponse{
+	return gophkeeperv1.AbortBlobUploadResponse_builder{
 		UploadId: req.GetUploadId(),
-	}, nil
+	}.Build(), nil
 }
 
 func blobToUploadResponse(blobItem blob.Blob) *gophkeeperv1.UploadBlobResponse {
-	return &gophkeeperv1.UploadBlobResponse{
+	return gophkeeperv1.UploadBlobResponse_builder{
 		BlobId:         blobItem.ID,
 		StorageBucket:  blobItem.StorageBucket,
 		ObjectPrefix:   blobItem.ObjectPrefix,
@@ -205,7 +205,7 @@ func blobToUploadResponse(blobItem blob.Blob) *gophkeeperv1.UploadBlobResponse {
 		ChunkCount:     blobItem.ChunkCount,
 		SizeBytes:      blobItem.SizeBytes,
 		ChecksumSha256: blobItem.ChecksumSHA256,
-	}
+	}.Build()
 }
 
 func blobStatusError(err error) error {

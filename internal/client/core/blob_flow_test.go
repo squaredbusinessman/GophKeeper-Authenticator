@@ -126,11 +126,11 @@ func TestBlobServiceCreateUploadSendsAccessToken(t *testing.T) {
 				t.Fatalf("checksum = %q, want blob-checksum", req.GetChecksumSha256())
 			}
 
-			return &gophkeeperv1.CreateBlobUploadResponse{
+			return gophkeeperv1.CreateBlobUploadResponse_builder{
 				UploadId:  "upload-id",
 				ExpiresAt: timestamppb.New(expiresAt),
 				ChunkSize: 6,
-			}, nil
+			}.Build(), nil
 		},
 	}
 	service := NewBlobService(blobClient)
@@ -163,7 +163,7 @@ func TestBlobServiceCreateUploadSendsAccessToken(t *testing.T) {
 func TestBlobServiceUploadSendsChunks(t *testing.T) {
 	session := testSession()
 	stream := &fakeBlobUploadStream{
-		response: &gophkeeperv1.UploadBlobResponse{
+		response: gophkeeperv1.UploadBlobResponse_builder{
 			BlobId:         "blob-id",
 			StorageBucket:  "bucket",
 			ObjectPrefix:   "prefix",
@@ -171,7 +171,7 @@ func TestBlobServiceUploadSendsChunks(t *testing.T) {
 			ChunkCount:     2,
 			SizeBytes:      12,
 			ChecksumSha256: "blob-checksum",
-		},
+		}.Build(),
 	}
 	blobClient := &fakeBlobClient{
 		uploadBlobFunc: func(ctx context.Context, _ ...grpc.CallOption) (grpc.ClientStreamingClient[gophkeeperv1.UploadBlobChunkRequest, gophkeeperv1.UploadBlobResponse], error) {
@@ -213,8 +213,8 @@ func TestBlobServiceDownloadReceivesChunks(t *testing.T) {
 	session := testSession()
 	stream := &fakeBlobDownloadStream{
 		chunks: []*gophkeeperv1.DownloadBlobChunk{
-			{BlobId: "blob-id", ChunkIndex: 0, Data: []byte("first"), ChecksumSha256: "chunk-0"},
-			{BlobId: "blob-id", ChunkIndex: 1, Data: []byte("second"), ChecksumSha256: "chunk-1"},
+			gophkeeperv1.DownloadBlobChunk_builder{BlobId: "blob-id", ChunkIndex: 0, Data: []byte("first"), ChecksumSha256: "chunk-0"}.Build(),
+			gophkeeperv1.DownloadBlobChunk_builder{BlobId: "blob-id", ChunkIndex: 1, Data: []byte("second"), ChecksumSha256: "chunk-1"}.Build(),
 		},
 	}
 	blobClient := &fakeBlobClient{
@@ -256,7 +256,7 @@ func TestBlobServiceAbortUploadSendsAccessToken(t *testing.T) {
 				t.Fatalf("upload id = %q, want upload-id", req.GetUploadId())
 			}
 
-			return &gophkeeperv1.AbortBlobUploadResponse{}, nil
+			return gophkeeperv1.AbortBlobUploadResponse_builder{}.Build(), nil
 		},
 	}
 	service := NewBlobService(blobClient)

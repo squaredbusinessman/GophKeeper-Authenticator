@@ -47,19 +47,17 @@ Plaintext checksum хранится внутри encrypted `BinaryPayload` и н
 
 ## TLS
 
-Локальный dev-запуск может работать без TLS. Для production-like запуска gRPC TLS включается переменными:
+gRPC всегда работает через TLS. Для локального запуска используется самоподписанный сертификат из `make certs`:
 
 ```env
-GOPHKEEPER_GRPC_TLS_ENABLED=true
-GOPHKEEPER_GRPC_TLS_CERT_FILE=/path/to/server.crt
-GOPHKEEPER_GRPC_TLS_KEY_FILE=/path/to/server.key
+GOPHKEEPER_GRPC_TLS_CERT_FILE=certs/server.crt
+GOPHKEEPER_GRPC_TLS_KEY_FILE=certs/server.key
 ```
 
 Клиентский TLS:
 
 ```env
-GOPHKEEPER_SERVER_TLS_ENABLED=true
-GOPHKEEPER_SERVER_TLS_CERT_FILE=/path/to/server.crt
+GOPHKEEPER_SERVER_TLS_CERT_FILE=certs/server.crt
 ```
 
 ## Логи

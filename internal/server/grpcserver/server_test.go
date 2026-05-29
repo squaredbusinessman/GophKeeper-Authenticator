@@ -27,7 +27,6 @@ func TestNewStartsServerWithTLSCredentials(t *testing.T) {
 	certFile, keyFile := writeTestCertificate(t)
 	cfg := &config.Config{
 		GRPCAddress:       "127.0.0.1:0",
-		GRPCTLSEnabled:    true,
 		GRPCTLSCertFile:   certFile,
 		GRPCTLSKeyFile:    keyFile,
 		AccessTokenSecret: "test-access-token-secret-32-bytes",
@@ -69,7 +68,7 @@ func TestNewStartsServerWithTLSCredentials(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	_, err = client.ListItems(ctx, &gophkeeperv1.ListItemsRequest{})
+	_, err = client.ListItems(ctx, gophkeeperv1.ListItemsRequest_builder{}.Build())
 	if status.Code(err) != codes.Unauthenticated {
 		t.Fatalf("code = %s, want %s, err = %v", status.Code(err), codes.Unauthenticated, err)
 	}

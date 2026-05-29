@@ -27,9 +27,11 @@ import (
 )
 
 func TestNewRuntimeBuildsSharedClientDependencies(t *testing.T) {
+	certFile, _ := writeRuntimeTestCertificate(t)
 	runtime, err := NewRuntime(&config.Config{
-		ServerAddress: "localhost:9090",
-		TokenFile:     filepath.Join(t.TempDir(), "token.json"),
+		ServerAddress:     "localhost:9090",
+		ServerTLSCertFile: certFile,
+		TokenFile:         filepath.Join(t.TempDir(), "token.json"),
 	})
 	if err != nil {
 		t.Fatalf("NewRuntime() error = %v", err)
@@ -64,7 +66,6 @@ func TestNewRuntimeBuildsSharedClientDependencies(t *testing.T) {
 func TestNewRuntimeReturnsTLSCredentialError(t *testing.T) {
 	_, err := NewRuntime(&config.Config{
 		ServerAddress:     "localhost:9090",
-		ServerTLSEnabled:  true,
 		ServerTLSCertFile: filepath.Join(t.TempDir(), "missing.crt"),
 		TokenFile:         filepath.Join(t.TempDir(), "token.json"),
 	})
@@ -72,7 +73,7 @@ func TestNewRuntimeReturnsTLSCredentialError(t *testing.T) {
 		t.Fatalf("NewRuntime() error = nil, want error")
 	}
 
-	if !strings.Contains(err.Error(), "load server TLS credentials") {
+	if !errors.Is(err, ErrServerTLSCredentials) {
 		t.Fatalf("NewRuntime() error = %q, want TLS credentials", err.Error())
 	}
 }
@@ -82,7 +83,6 @@ func TestNewRuntimeConnectsToTLSServer(t *testing.T) {
 	address := runtimeFreeTCPAddress(t)
 	server, err := grpcserver.New(&serverconfig.Config{
 		GRPCAddress:       address,
-		GRPCTLSEnabled:    true,
 		GRPCTLSCertFile:   certFile,
 		GRPCTLSKeyFile:    keyFile,
 		AccessTokenSecret: "test-access-token-secret-32-bytes",
@@ -105,7 +105,6 @@ func TestNewRuntimeConnectsToTLSServer(t *testing.T) {
 
 	runtime, err := NewRuntime(&config.Config{
 		ServerAddress:     address,
-		ServerTLSEnabled:  true,
 		ServerTLSCertFile: certFile,
 		TokenFile:         filepath.Join(t.TempDir(), "token.json"),
 	})
@@ -117,16 +116,17 @@ func TestNewRuntimeConnectsToTLSServer(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	_, err = runtime.VaultClient.ListItems(ctx, &gophkeeperv1.ListItemsRequest{})
+	_, err = runtime.VaultClient.ListItems(ctx, gophkeeperv1.ListItemsRequest_builder{}.Build())
 	if status.Code(err) != codes.Unauthenticated {
 		t.Fatalf("code = %s, want %s, err = %v", status.Code(err), codes.Unauthenticated, err)
 	}
 }
 
 func TestLoadRuntimeLoadsConfigFromEnv(t *testing.T) {
+	certFile, _ := writeRuntimeTestCertificate(t)
 	tokenFile := filepath.Join(t.TempDir(), "token.json")
 	t.Setenv("GOPHKEEPER_SERVER_ADDRESS", "localhost:9090")
-	t.Setenv("GOPHKEEPER_SERVER_TLS_ENABLED", "false")
+	t.Setenv("GOPHKEEPER_SERVER_TLS_CERT_FILE", certFile)
 	t.Setenv("GOPHKEEPER_TOKEN_FILE", tokenFile)
 
 	runtime, err := LoadRuntime()
@@ -149,7 +149,7 @@ func TestLoadRuntimeWrapsConfigError(t *testing.T) {
 		t.Fatalf("LoadRuntime() error = nil, want error")
 	}
 
-	if !strings.Contains(err.Error(), "error loading config") {
+	if !errors.Is(err, ErrClientConfig) {
 		t.Fatalf("LoadRuntime() error = %q, want error loading config", err.Error())
 	}
 }
@@ -177,14 +177,15 @@ func TestNewRuntimeValidatesConfig(t *testing.T) {
 		t.Fatalf("NewRuntime() error = nil, want error")
 	}
 
-	if !strings.Contains(err.Error(), "validate client config") {
+	if !errors.Is(err, ErrClientConfig) {
 		t.Fatalf("NewRuntime() error = %q, want validate client config", err.Error())
 	}
 }
 
 func TestLoadRuntimeUsesDefaultTokenFile(t *testing.T) {
+	certFile, _ := writeRuntimeTestCertificate(t)
 	t.Setenv("GOPHKEEPER_SERVER_ADDRESS", "localhost:9090")
-	t.Setenv("GOPHKEEPER_SERVER_TLS_ENABLED", "false")
+	t.Setenv("GOPHKEEPER_SERVER_TLS_CERT_FILE", certFile)
 	t.Setenv("GOPHKEEPER_TOKEN_FILE", "")
 
 	runtime, err := LoadRuntime()

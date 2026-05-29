@@ -98,11 +98,11 @@ func TestBlobHandlerCreateBlobUpload(t *testing.T) {
 	handler := NewBlobHandler(useCase)
 	ctx := authcontext.ContextWithUserID(context.Background(), "user-id")
 
-	response, err := handler.CreateBlobUpload(ctx, &gophkeeperv1.CreateBlobUploadRequest{
+	response, err := handler.CreateBlobUpload(ctx, gophkeeperv1.CreateBlobUploadRequest_builder{
 		ExpectedSize:   12,
 		ExpectedChunks: 2,
 		ChecksumSha256: "blob-checksum",
-	})
+	}.Build())
 	if err != nil {
 		t.Fatalf("CreateBlobUpload() error = %v", err)
 	}
@@ -134,9 +134,9 @@ func TestBlobHandlerAbortBlobUploadMapsError(t *testing.T) {
 	handler := NewBlobHandler(useCase)
 	ctx := authcontext.ContextWithUserID(context.Background(), "user-id")
 
-	_, err := handler.AbortBlobUpload(ctx, &gophkeeperv1.AbortBlobUploadRequest{
+	_, err := handler.AbortBlobUpload(ctx, gophkeeperv1.AbortBlobUploadRequest_builder{
 		UploadId: "upload-id",
-	})
+	}.Build())
 	if status.Code(err) != codes.NotFound {
 		t.Fatalf("code = %s, want NotFound", status.Code(err))
 	}

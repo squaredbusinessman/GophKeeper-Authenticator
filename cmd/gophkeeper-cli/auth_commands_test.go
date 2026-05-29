@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
 
+	clientapp "github.com/squaredbusinessman/gophkeeper-authenticator/internal/client/app"
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/client/core"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -159,33 +161,33 @@ func TestUserFacingErrorMapsCommonCLIProblems(t *testing.T) {
 	}{
 		{
 			name: "connection_refused",
-			err:  errors.New(`login: rpc error: code = Unavailable desc = connection error: dial tcp 127.0.0.1:9090: connect: connection refused`),
+			err:  fmt.Errorf("login: %w", status.Error(codes.Unavailable, "connection refused")),
 			want: "не удалось подключиться к серверу",
 		},
 		{
 			name: "version_conflict",
-			err:  errors.New("update text secret: rpc error: code = FailedPrecondition desc = version conflict"),
+			err:  fmt.Errorf("update text secret: %w", status.Error(codes.FailedPrecondition, "version conflict")),
 			want: "актуальной version",
 		},
 		{
 			name: "wrong_master_password",
-			err:  errors.New("open vault: login: could not decrypt vault key: cipher: message authentication failed"),
+			err:  fmt.Errorf("open vault: %w", core.ErrInvalidMasterPassword),
 			want: "неверный мастер-пароль",
 		},
 		{
 			name: "invalid_credentials",
-			err:  errors.New("open vault: login: could not login: rpc error: code = Unauthenticated desc = invalid credentials"),
+			err:  fmt.Errorf("open vault: login: %w", status.Error(codes.Unauthenticated, "invalid credentials")),
 			want: "неверный login или пароль входа",
 		},
 		{
 			name: "login_already_exists",
-			err:  errors.New("register: could not register user: rpc error: code = AlreadyExists desc = login already exists"),
+			err:  fmt.Errorf("register: %w", status.Error(codes.AlreadyExists, "login already exists")),
 			want: "пользователь с таким login уже существует",
 		},
 		{
-			name: "invalid_utf8",
-			err:  errors.New("register: could not register user: rpc error: code = Internal desc = grpc: error while marshaling: string field contains invalid UTF-8"),
-			want: "недопустимые символы",
+			name: "internal_status_wrapped",
+			err:  fmt.Errorf("register: %w", status.Error(codes.Internal, "grpc marshal failed")),
+			want: "внутренняя ошибка сервера",
 		},
 		{
 			name: "not_found_status",
@@ -199,8 +201,13 @@ func TestUserFacingErrorMapsCommonCLIProblems(t *testing.T) {
 		},
 		{
 			name: "binary_output_exists",
-			err:  errors.New("output file already exists: /tmp/secret.bin"),
+			err:  fmt.Errorf("%w: /tmp/secret.bin", clientapp.ErrOutputFileExists),
 			want: "файл для сохранения binary-секрета уже существует",
+		},
+		{
+			name: "master_passwords_mismatch",
+			err:  clientapp.ErrMasterPasswordsMismatch,
+			want: "мастер-пароли не совпадают",
 		},
 	}
 

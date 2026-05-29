@@ -30,15 +30,14 @@ authorization: Bearer <access-token>
 
 ## TLS
 
-Локально сервер может работать без TLS. Для TLS нужно передать:
+Сервер всегда использует TLS. Для локального запуска выполните `make certs` и передайте:
 
 ```env
-GOPHKEEPER_GRPC_TLS_ENABLED=true
-GOPHKEEPER_GRPC_TLS_CERT_FILE=/path/to/server.crt
-GOPHKEEPER_GRPC_TLS_KEY_FILE=/path/to/server.key
+GOPHKEEPER_GRPC_TLS_CERT_FILE=certs/server.crt
+GOPHKEEPER_GRPC_TLS_KEY_FILE=certs/server.key
 ```
 
-При включенном TLS `grpc.NewServer` получает `grpc.Creds`.
+`grpc.NewServer` всегда получает `grpc.Creds`.
 
 ## Логирование
 

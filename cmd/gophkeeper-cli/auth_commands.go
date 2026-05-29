@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 
+	clientapp "github.com/squaredbusinessman/gophkeeper-authenticator/internal/client/app"
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/client/core"
 )
 
@@ -65,7 +66,7 @@ func runRegister(ctx context.Context, authService CLIAuthService, prompter Promp
 	}
 
 	if masterPassword != masterPasswordRepeat {
-		return fmt.Errorf("master passwords do not match")
+		return clientapp.ErrMasterPasswordsMismatch
 	}
 
 	_, err = authService.Register(ctx, core.RegisterInput{

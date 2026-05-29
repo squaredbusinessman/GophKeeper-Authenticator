@@ -8,11 +8,13 @@
 
 ```bash
 cp deploy/.env.example deploy/.env
+make certs
 ```
 
 Запуск локального окружения:
 
 ```bash
+make certs
 docker compose -f deploy/docker-compose.yml up -d
 ```
 

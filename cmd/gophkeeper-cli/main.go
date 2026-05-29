@@ -5,13 +5,18 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
+	"syscall"
 
 	clientapp "github.com/squaredbusinessman/gophkeeper-authenticator/internal/client/app"
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/shared/version"
 )
 
 func main() {
-	if err := run(context.Background(), os.Args[1:], os.Stdout, os.Stderr); err != nil {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	if err := run(ctx, os.Args[1:], os.Stdout, os.Stderr); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %s\n", userFacingError(err))
 		os.Exit(1)
 	}

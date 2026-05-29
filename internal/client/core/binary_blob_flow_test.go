@@ -18,7 +18,7 @@ import (
 func TestBlobServiceUploadBinaryStoresEncryptedChunksAndReturnsMetadata(t *testing.T) {
 	session := testSession()
 	stream := &fakeBlobUploadStream{
-		response: &gophkeeperv1.UploadBlobResponse{
+		response: gophkeeperv1.UploadBlobResponse_builder{
 			BlobId:         "blob-id",
 			StorageBucket:  "bucket",
 			ObjectPrefix:   "prefix",
@@ -26,7 +26,7 @@ func TestBlobServiceUploadBinaryStoresEncryptedChunksAndReturnsMetadata(t *testi
 			ChunkCount:     1,
 			SizeBytes:      128,
 			ChecksumSha256: "encrypted-checksum",
-		},
+		}.Build(),
 	}
 	blobClient := &fakeBlobClient{
 		createBlobUploadFunc: func(ctx context.Context, req *gophkeeperv1.CreateBlobUploadRequest, _ ...grpc.CallOption) (*gophkeeperv1.CreateBlobUploadResponse, error) {
@@ -41,11 +41,11 @@ func TestBlobServiceUploadBinaryStoresEncryptedChunksAndReturnsMetadata(t *testi
 				t.Fatalf("encrypted checksum is empty")
 			}
 
-			return &gophkeeperv1.CreateBlobUploadResponse{
+			return gophkeeperv1.CreateBlobUploadResponse_builder{
 				UploadId:  "upload-id",
 				ExpiresAt: timestamppb.New(time.Now().Add(time.Hour)),
 				ChunkSize: req.GetChunkSize(),
-			}, nil
+			}.Build(), nil
 		},
 		uploadBlobFunc: func(ctx context.Context, _ ...grpc.CallOption) (grpc.ClientStreamingClient[gophkeeperv1.UploadBlobChunkRequest, gophkeeperv1.UploadBlobResponse], error) {
 			assertOutgoingBearerToken(ctx, t, session.AccessToken)
@@ -91,8 +91,8 @@ func TestBlobServiceDownloadBinaryDecryptsSortedChunks(t *testing.T) {
 	checksum := sha256.Sum256(plaintext)
 	stream := &fakeBlobDownloadStream{
 		chunks: []*gophkeeperv1.DownloadBlobChunk{
-			{BlobId: "blob-id", ChunkIndex: chunks[1].Index, Data: chunks[1].Data, ChecksumSha256: chunks[1].ChecksumSHA256},
-			{BlobId: "blob-id", ChunkIndex: chunks[0].Index, Data: chunks[0].Data, ChecksumSha256: chunks[0].ChecksumSHA256},
+			downloadBlobChunk("blob-id", chunks[1]),
+			downloadBlobChunk("blob-id", chunks[0]),
 		},
 	}
 	blobClient := &fakeBlobClient{
@@ -129,11 +129,11 @@ func TestBlobServiceUploadBinaryAbortsUploadWhenStreamFails(t *testing.T) {
 	}
 	blobClient := &fakeBlobClient{
 		createBlobUploadFunc: func(context.Context, *gophkeeperv1.CreateBlobUploadRequest, ...grpc.CallOption) (*gophkeeperv1.CreateBlobUploadResponse, error) {
-			return &gophkeeperv1.CreateBlobUploadResponse{
+			return gophkeeperv1.CreateBlobUploadResponse_builder{
 				UploadId:  "upload-id",
 				ExpiresAt: timestamppb.New(time.Now().Add(time.Hour)),
 				ChunkSize: 1024,
-			}, nil
+			}.Build(), nil
 		},
 		uploadBlobFunc: func(context.Context, ...grpc.CallOption) (grpc.ClientStreamingClient[gophkeeperv1.UploadBlobChunkRequest, gophkeeperv1.UploadBlobResponse], error) {
 			return stream, nil
@@ -142,7 +142,7 @@ func TestBlobServiceUploadBinaryAbortsUploadWhenStreamFails(t *testing.T) {
 			if req.GetUploadId() != "upload-id" {
 				t.Fatalf("abort upload id = %q, want upload-id", req.GetUploadId())
 			}
-			return &gophkeeperv1.AbortBlobUploadResponse{}, nil
+			return gophkeeperv1.AbortBlobUploadResponse_builder{}.Build(), nil
 		},
 	}
 	service := NewBlobService(blobClient)
@@ -167,7 +167,7 @@ func TestBlobServiceDownloadBinaryRejectsChecksumMismatch(t *testing.T) {
 	}
 	stream := &fakeBlobDownloadStream{
 		chunks: []*gophkeeperv1.DownloadBlobChunk{
-			{BlobId: "blob-id", ChunkIndex: chunks[0].Index, Data: chunks[0].Data, ChecksumSha256: chunks[0].ChecksumSHA256},
+			downloadBlobChunk("blob-id", chunks[0]),
 		},
 	}
 	blobClient := &fakeBlobClient{
@@ -188,4 +188,13 @@ func TestBlobServiceDownloadBinaryRejectsChecksumMismatch(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "binary checksum mismatch") {
 		t.Fatalf("DownloadBinary() error = %v, want checksum mismatch", err)
 	}
+}
+
+func downloadBlobChunk(blobID string, chunk BlobChunk) *gophkeeperv1.DownloadBlobChunk {
+	return gophkeeperv1.DownloadBlobChunk_builder{
+		BlobId:         blobID,
+		ChunkIndex:     chunk.Index,
+		Data:           chunk.Data,
+		ChecksumSha256: chunk.ChecksumSHA256,
+	}.Build()
 }

@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
 	tea "github.com/charmbracelet/bubbletea"
 	clientapp "github.com/squaredbusinessman/gophkeeper-authenticator/internal/client/app"
@@ -24,7 +26,10 @@ func main() {
 		sessionState: clientapp.NewSessionState(),
 	}
 
-	program := tea.NewProgram(newModel(context.Background(), deps), tea.WithAltScreen())
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	program := tea.NewProgram(newProgramModel(ctx, deps), tea.WithAltScreen(), tea.WithContext(ctx))
 	if _, err = program.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %s\n", clientapp.UserFacingError(err))
 		os.Exit(1)

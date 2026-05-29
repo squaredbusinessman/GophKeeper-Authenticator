@@ -2,9 +2,12 @@ package app
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
+	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/client/config"
+	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/client/core"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -17,17 +20,17 @@ func TestUserFacingErrorMapsCommonClientProblems(t *testing.T) {
 	}{
 		{
 			name: "connection refused",
-			err:  errors.New(`login: rpc error: code = Unavailable desc = connection error: dial tcp 127.0.0.1:9090: connect: connection refused`),
+			err:  fmt.Errorf("login: %w", status.Error(codes.Unavailable, "connection refused")),
 			want: "не удалось подключиться к серверу",
 		},
 		{
 			name: "tls config error",
-			err:  errors.New("load server TLS credentials: open missing.crt: no such file or directory"),
+			err:  fmt.Errorf("%w: %w", ErrServerTLSCredentials, errors.New("open missing.crt")),
 			want: "не удалось загрузить TLS-сертификат сервера",
 		},
 		{
 			name: "config error",
-			err:  errors.New("error loading config: validate client config: server address is required"),
+			err:  fmt.Errorf("%w: %w", ErrClientConfig, config.ErrServerAddressRequired),
 			want: "не удалось загрузить конфигурацию клиента",
 		},
 		{
@@ -42,8 +45,18 @@ func TestUserFacingErrorMapsCommonClientProblems(t *testing.T) {
 		},
 		{
 			name: "wrong master password",
-			err:  errors.New("open vault: login: could not decrypt vault key: cipher: message authentication failed"),
+			err:  fmt.Errorf("open vault: %w", core.ErrInvalidMasterPassword),
 			want: "неверный мастер-пароль",
+		},
+		{
+			name: "master passwords mismatch",
+			err:  ErrMasterPasswordsMismatch,
+			want: "мастер-пароли не совпадают",
+		},
+		{
+			name: "fallback",
+			err:  errors.New("third party english error"),
+			want: "не удалось выполнить действие",
 		},
 	}
 

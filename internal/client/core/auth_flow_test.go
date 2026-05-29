@@ -58,11 +58,11 @@ func TestAuthServiceRegisterCreatesEncryptedVaultKeyAndStoresToken(t *testing.T)
 
 	authClient := &fakeAuthClient{
 		registerFunc: func(_ context.Context, req *gophkeeperv1.RegisterRequest, _ ...grpc.CallOption) (*gophkeeperv1.RegisterResponse, error) {
-			return &gophkeeperv1.RegisterResponse{
+			return gophkeeperv1.RegisterResponse_builder{
 				AccessToken:          "access-token",
 				AccessTokenExpiresAt: timestamppb.New(expiresAt),
 				VaultKey:             req.GetVaultKey(),
-			}, nil
+			}.Build(), nil
 		},
 	}
 	tokenStore := &fakeTokenStore{}
@@ -146,11 +146,11 @@ func TestAuthServiceLoginDecryptsVaultKeyAndStoresToken(t *testing.T) {
 
 	authClient := &fakeAuthClient{
 		loginFunc: func(_ context.Context, req *gophkeeperv1.LoginRequest, _ ...grpc.CallOption) (*gophkeeperv1.LoginResponse, error) {
-			return &gophkeeperv1.LoginResponse{
+			return gophkeeperv1.LoginResponse_builder{
 				AccessToken:          "access-token",
 				AccessTokenExpiresAt: timestamppb.New(expiresAt),
 				VaultKey:             vaultKeyEnvelopeToProto(envelope),
-			}, nil
+			}.Build(), nil
 		},
 	}
 	tokenStore := &fakeTokenStore{}
@@ -200,11 +200,11 @@ func TestAuthServiceLoginReturnsErrorForWrongMasterPasswordAndDoesNotStoreToken(
 
 	authClient := &fakeAuthClient{
 		loginFunc: func(_ context.Context, _ *gophkeeperv1.LoginRequest, _ ...grpc.CallOption) (*gophkeeperv1.LoginResponse, error) {
-			return &gophkeeperv1.LoginResponse{
+			return gophkeeperv1.LoginResponse_builder{
 				AccessToken:          "access-token",
 				AccessTokenExpiresAt: timestamppb.New(time.Now().Add(time.Hour)),
 				VaultKey:             vaultKeyEnvelopeToProto(envelope),
-			}, nil
+			}.Build(), nil
 		},
 	}
 	tokenStore := &fakeTokenStore{}
@@ -227,10 +227,10 @@ func TestAuthServiceLoginReturnsErrorForWrongMasterPasswordAndDoesNotStoreToken(
 func TestAuthServiceRegisterReturnsErrorWhenAccessTokenIsMissing(t *testing.T) {
 	authClient := &fakeAuthClient{
 		registerFunc: func(_ context.Context, req *gophkeeperv1.RegisterRequest, _ ...grpc.CallOption) (*gophkeeperv1.RegisterResponse, error) {
-			return &gophkeeperv1.RegisterResponse{
+			return gophkeeperv1.RegisterResponse_builder{
 				AccessTokenExpiresAt: timestamppb.New(time.Now().Add(time.Hour)),
 				VaultKey:             req.GetVaultKey(),
-			}, nil
+			}.Build(), nil
 		},
 	}
 	tokenStore := &fakeTokenStore{}
@@ -404,11 +404,11 @@ func TestAuthServiceReturnsErrorWhenTokenStoreSaveFails(t *testing.T) {
 	saveErr := errors.New("save failed")
 	authClient := &fakeAuthClient{
 		registerFunc: func(_ context.Context, req *gophkeeperv1.RegisterRequest, _ ...grpc.CallOption) (*gophkeeperv1.RegisterResponse, error) {
-			return &gophkeeperv1.RegisterResponse{
+			return gophkeeperv1.RegisterResponse_builder{
 				AccessToken:          "access-token",
 				AccessTokenExpiresAt: timestamppb.New(expiresAt),
 				VaultKey:             req.GetVaultKey(),
-			}, nil
+			}.Build(), nil
 		},
 	}
 	tokenStore := &fakeTokenStore{
@@ -435,10 +435,10 @@ func TestAuthServiceReturnsErrorWhenTokenStoreSaveFails(t *testing.T) {
 func TestAuthServiceLoginReturnsErrorWhenVaultKeyIsMissing(t *testing.T) {
 	authClient := &fakeAuthClient{
 		loginFunc: func(_ context.Context, _ *gophkeeperv1.LoginRequest, _ ...grpc.CallOption) (*gophkeeperv1.LoginResponse, error) {
-			return &gophkeeperv1.LoginResponse{
+			return gophkeeperv1.LoginResponse_builder{
 				AccessToken:          "access-token",
 				AccessTokenExpiresAt: timestamppb.New(time.Now().Add(time.Hour)),
-			}, nil
+			}.Build(), nil
 		},
 	}
 	tokenStore := &fakeTokenStore{}

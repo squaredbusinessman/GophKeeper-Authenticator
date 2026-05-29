@@ -5,10 +5,16 @@ package smoke
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"database/sql"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"net"
 	"os"
 	"path/filepath"
@@ -28,7 +34,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/status"
 )
 
@@ -48,9 +54,9 @@ func TestSmokeAuthVaultAndSyncFlow(t *testing.T) {
 	}
 
 	address := freeTCPAddress(t)
-	startSmokeServer(t, db, dsn, address)
+	certFile := startSmokeServer(t, db, dsn, address)
 
-	conn := connectSmokeClient(t, ctx, address)
+	conn := connectSmokeClient(t, ctx, address, certFile)
 	defer conn.Close()
 
 	authService := core.NewAuthService(
@@ -594,11 +600,14 @@ func openSmokeDatabase(t *testing.T, ctx context.Context, dsn string) *sql.DB {
 	return db
 }
 
-func startSmokeServer(t *testing.T, db *sql.DB, dsn string, address string) *grpcserver.Server {
+func startSmokeServer(t *testing.T, db *sql.DB, dsn string, address string) string {
 	t.Helper()
 
+	certFile, keyFile := writeSmokeCertificate(t)
 	server, err := grpcserver.New(&config.Config{
 		GRPCAddress:        address,
+		GRPCTLSCertFile:    certFile,
+		GRPCTLSKeyFile:     keyFile,
 		DatabaseDSN:        dsn,
 		DatabasePingTTL:    5 * time.Second,
 		AccessTokenSecret:  "smoke-local-secret-32-bytes-value",
@@ -626,7 +635,7 @@ func startSmokeServer(t *testing.T, db *sql.DB, dsn string, address string) *grp
 		}
 	})
 
-	return server
+	return certFile
 }
 
 type smokeObjectStore struct {
@@ -689,10 +698,15 @@ func (s *smokeObjectStore) RemoveObject(_ context.Context, key string) error {
 	return nil
 }
 
-func connectSmokeClient(t *testing.T, ctx context.Context, address string) *grpc.ClientConn {
+func connectSmokeClient(t *testing.T, ctx context.Context, address string, certFile string) *grpc.ClientConn {
 	t.Helper()
 
-	conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	creds, err := credentials.NewClientTLSFromFile(certFile, "")
+	if err != nil {
+		t.Fatalf("load client TLS credentials: %v", err)
+	}
+
+	conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(creds))
 	if err != nil {
 		t.Fatalf("create grpc client: %v", err)
 	}
@@ -700,10 +714,10 @@ func connectSmokeClient(t *testing.T, ctx context.Context, address string) *grpc
 	authClient := gophkeeperv1.NewAuthServiceClient(conn)
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
-		_, err = authClient.Login(ctx, &gophkeeperv1.LoginRequest{
+		_, err = authClient.Login(ctx, gophkeeperv1.LoginRequest_builder{
 			Login:         "smoke-healthcheck@example.com",
 			LoginPassword: "wrong-password",
-		})
+		}.Build())
 		if status.Code(err) == codes.Unauthenticated {
 			return conn
 		}
@@ -713,6 +727,51 @@ func connectSmokeClient(t *testing.T, ctx context.Context, address string) *grpc
 
 	t.Fatalf("grpc server did not become ready")
 	return nil
+}
+
+func writeSmokeCertificate(t *testing.T) (string, string) {
+	t.Helper()
+
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("GenerateKey() error = %v", err)
+	}
+
+	template := x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			CommonName: "localhost",
+		},
+		NotBefore:             time.Now().Add(-time.Minute),
+		NotAfter:              time.Now().Add(time.Hour),
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+		DNSNames:              []string{"localhost"},
+		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
+	}
+
+	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &key.PublicKey, key)
+	if err != nil {
+		t.Fatalf("CreateCertificate() error = %v", err)
+	}
+
+	dir := t.TempDir()
+	certFile := filepath.Join(dir, "server.crt")
+	keyFile := filepath.Join(dir, "server.key")
+
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
+	if err = os.WriteFile(certFile, certPEM, 0o600); err != nil {
+		t.Fatalf("WriteFile() cert error = %v", err)
+	}
+
+	keyDER := x509.MarshalPKCS1PrivateKey(key)
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: keyDER})
+	if err = os.WriteFile(keyFile, keyPEM, 0o600); err != nil {
+		t.Fatalf("WriteFile() key error = %v", err)
+	}
+
+	return certFile, keyFile
 }
 
 func freeTCPAddress(t *testing.T) string {

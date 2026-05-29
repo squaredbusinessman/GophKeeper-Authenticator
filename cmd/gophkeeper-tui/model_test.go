@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -39,12 +40,13 @@ func (s *fakeAuthService) Login(_ context.Context, input core.LoginInput) (core.
 }
 
 type fakeVaultService struct {
-	createCalls []core.CreateSecretInput
-	updateCalls []core.UpdateSecretInput
-	deleteCalls []core.DeleteSecretInput
-	syncCalls   []core.SyncSecretsInput
-	listSecrets []core.Secret
-	err         error
+	createCalls  []core.CreateSecretInput
+	updateCalls  []core.UpdateSecretInput
+	deleteCalls  []core.DeleteSecretInput
+	syncCalls    []core.SyncSecretsInput
+	listSecrets  []core.Secret
+	listContexts []context.Context
+	err          error
 }
 
 func (s *fakeVaultService) CreateSecret(_ context.Context, _ core.Session, input core.CreateSecretInput) (core.Secret, error) {
@@ -67,7 +69,8 @@ func (s *fakeVaultService) GetSecret(_ context.Context, _ core.Session, input co
 	return core.Secret{}, nil
 }
 
-func (s *fakeVaultService) ListSecrets(context.Context, core.Session, core.ListSecretsInput) ([]core.Secret, error) {
+func (s *fakeVaultService) ListSecrets(ctx context.Context, _ core.Session, _ core.ListSecretsInput) ([]core.Secret, error) {
+	s.listContexts = append(s.listContexts, ctx)
 	if s.err != nil {
 		return nil, s.err
 	}
@@ -128,7 +131,7 @@ func (s *fakeBlobService) DownloadBinary(ctx context.Context, session core.Sessi
 }
 
 func TestWelcomeScreenShowsBannerAndCommands(t *testing.T) {
-	m := newModel(context.Background(), appDeps{})
+	m := newModel(appDeps{})
 
 	if m.screen != screenWelcome {
 		t.Fatalf("screen = %v, want screenWelcome", m.screen)
@@ -141,8 +144,8 @@ func TestWelcomeScreenShowsBannerAndCommands(t *testing.T) {
 		}
 	}
 
-	updated, cmd := m.Update(keyEnter())
-	m = updated.(model)
+	updated, cmd := m.update(context.Background(), keyEnter())
+	m = updated
 	if cmd != nil {
 		t.Fatalf("welcome enter command = %v, want nil", cmd)
 	}
@@ -157,14 +160,14 @@ func TestAuthDoneOpensVaultAndLoadsList(t *testing.T) {
 		listSecrets: []core.Secret{testTextSecret(t)},
 	}
 	state := clientapp.NewSessionState()
-	m := newModel(context.Background(), appDeps{
+	m := newModel(appDeps{
 		authService:  &fakeAuthService{session: session},
 		vaultService: vaultService,
 		sessionState: state,
 	})
 
-	updated, cmd := m.Update(authDoneMsg{session: session})
-	m = updated.(model)
+	updated, cmd := m.update(context.Background(), authDoneMsg{session: session})
+	m = updated
 	if cmd == nil {
 		t.Fatalf("authDoneMsg command = nil, want list command")
 	}
@@ -178,8 +181,8 @@ func TestAuthDoneOpensVaultAndLoadsList(t *testing.T) {
 	}
 
 	msg := cmd()
-	updated, _ = m.Update(msg)
-	m = updated.(model)
+	updated, _ = m.update(context.Background(), msg)
+	m = updated
 
 	if len(m.secrets) != 1 {
 		t.Fatalf("secrets length = %d, want 1", len(m.secrets))
@@ -187,9 +190,9 @@ func TestAuthDoneOpensVaultAndLoadsList(t *testing.T) {
 }
 
 func TestOTPFormBuildsCreateSecretInput(t *testing.T) {
-	m := newModel(context.Background(), appDeps{})
+	m := newModel(appDeps{})
 	updated, _ := m.startCreateForm(secretKindOTP)
-	m = updated.(model)
+	m = updated
 	m.inputs[0].SetValue("Example OTP")
 	m.inputs[1].SetValue("Example")
 	m.inputs[2].SetValue("user@example.com")
@@ -199,7 +202,7 @@ func TestOTPFormBuildsCreateSecretInput(t *testing.T) {
 	m.inputs[6].SetValue("sha1")
 	m.inputs[7].SetValue("work")
 
-	input, err := m.secretInputFromForm()
+	input, err := m.secretInputFromForm(context.Background())
 	if err != nil {
 		t.Fatalf("secretInputFromForm() error = %v", err)
 	}
@@ -223,7 +226,7 @@ func TestTUIAuthFlowThroughModelUpdate(t *testing.T) {
 	authService := &fakeAuthService{session: session}
 	vaultService := &fakeVaultService{listSecrets: []core.Secret{testTextSecret(t)}}
 	state := clientapp.NewSessionState()
-	m := newModel(context.Background(), appDeps{
+	m := newModel(appDeps{
 		authService:  authService,
 		vaultService: vaultService,
 		sessionState: state,
@@ -235,8 +238,8 @@ func TestTUIAuthFlowThroughModelUpdate(t *testing.T) {
 	m.inputs[2].SetValue("master-password")
 	m.focus = 2
 
-	updated, cmd := m.Update(keyEnter())
-	m = updated.(model)
+	updated, cmd := m.update(context.Background(), keyEnter())
+	m = updated
 	if cmd == nil {
 		t.Fatalf("login enter command = nil")
 	}
@@ -245,8 +248,8 @@ func TestTUIAuthFlowThroughModelUpdate(t *testing.T) {
 	}
 
 	msg := cmd()
-	updated, cmd = m.Update(msg)
-	m = updated.(model)
+	updated, cmd = m.update(context.Background(), msg)
+	m = updated
 	if cmd == nil {
 		t.Fatalf("authDone command = nil, want list command")
 	}
@@ -257,8 +260,8 @@ func TestTUIAuthFlowThroughModelUpdate(t *testing.T) {
 		t.Fatalf("login = %q, want trimmed login", authService.loginCalls[0].Login)
 	}
 
-	updated, _ = m.Update(cmd())
-	m = updated.(model)
+	updated, _ = m.update(context.Background(), cmd())
+	m = updated
 	if m.screen != screenList {
 		t.Fatalf("screen = %v, want screenList", m.screen)
 	}
@@ -274,20 +277,20 @@ func TestTUIFunctionalCreateOTPAndRenderCurrentCode(t *testing.T) {
 		t.Fatalf("SetSession() error = %v", err)
 	}
 	vaultService := &fakeVaultService{}
-	m := newModel(context.Background(), appDeps{
+	m := newModel(appDeps{
 		vaultService: vaultService,
 		sessionState: state,
 	})
 	m.screen = screenList
 
-	updated, _ := m.Update(keyRune('n'))
-	m = updated.(model)
+	updated, _ := m.update(context.Background(), keyRune('n'))
+	m = updated
 	if m.screen != screenTypeSelect {
 		t.Fatalf("screen = %v, want screenTypeSelect", m.screen)
 	}
 
-	updated, _ = m.Update(keyRune('o'))
-	m = updated.(model)
+	updated, _ = m.update(context.Background(), keyRune('o'))
+	m = updated
 	if m.screen != screenForm || m.formKind != secretKindOTP {
 		t.Fatalf("screen/kind = %v/%s, want otp form", m.screen, m.formKind)
 	}
@@ -302,15 +305,15 @@ func TestTUIFunctionalCreateOTPAndRenderCurrentCode(t *testing.T) {
 	m.inputs[7].SetValue("work")
 	m.focus = 7
 
-	updated, cmd := m.Update(keyEnter())
-	m = updated.(model)
+	updated, cmd := m.update(context.Background(), keyEnter())
+	m = updated
 	if cmd == nil {
 		t.Fatalf("create otp command = nil")
 	}
 
 	createdMsg := cmd()
-	updated, cmd = m.Update(createdMsg)
-	m = updated.(model)
+	updated, cmd = m.update(context.Background(), createdMsg)
+	m = updated
 	if cmd == nil {
 		t.Fatalf("secretDone command = nil, want list reload")
 	}
@@ -356,12 +359,12 @@ func TestOTPTickRefreshesDetailAndSchedulesNextTick(t *testing.T) {
 		PayloadSchemaVersion: version,
 		Version:              1,
 	}
-	m := newModel(context.Background(), appDeps{})
+	m := newModel(appDeps{})
 	m.screen = screenDetail
 	m.current = &secret
 
-	updated, cmd := m.Update(otpTickMsg(time.Now()))
-	m = updated.(model)
+	updated, cmd := m.update(context.Background(), otpTickMsg(time.Now()))
+	m = updated
 	if cmd == nil {
 		t.Fatalf("otp tick command = nil, want next tick")
 	}
@@ -379,21 +382,21 @@ func TestTUISyncAfterDeleteFlow(t *testing.T) {
 	}
 	secret := testTextSecret(t)
 	vaultService := &fakeVaultService{listSecrets: []core.Secret{secret}}
-	m := newModel(context.Background(), appDeps{
+	m := newModel(appDeps{
 		vaultService: vaultService,
 		sessionState: state,
 	})
 	m.screen = screenList
 	m.secrets = []core.Secret{secret}
 
-	updated, _ := m.Update(keyRune('d'))
-	m = updated.(model)
+	updated, _ := m.update(context.Background(), keyRune('d'))
+	m = updated
 	if m.screen != screenDelete {
 		t.Fatalf("screen = %v, want screenDelete", m.screen)
 	}
 
-	updated, cmd := m.Update(keyRune('y'))
-	m = updated.(model)
+	updated, cmd := m.update(context.Background(), keyRune('y'))
+	m = updated
 	if cmd == nil {
 		t.Fatalf("delete command = nil")
 	}
@@ -401,8 +404,8 @@ func TestTUISyncAfterDeleteFlow(t *testing.T) {
 		t.Fatalf("busy = false, want true while delete is running")
 	}
 
-	updated, cmd = m.Update(cmd())
-	m = updated.(model)
+	updated, cmd = m.update(context.Background(), cmd())
+	m = updated
 	if cmd == nil {
 		t.Fatalf("deleteDone command = nil, want list reload")
 	}
@@ -410,16 +413,16 @@ func TestTUISyncAfterDeleteFlow(t *testing.T) {
 		t.Fatalf("delete calls = %d, want 1", len(vaultService.deleteCalls))
 	}
 
-	updated, _ = m.Update(cmd())
-	m = updated.(model)
-	updated, cmd = m.Update(keyRune('s'))
-	m = updated.(model)
+	updated, _ = m.update(context.Background(), cmd())
+	m = updated
+	updated, cmd = m.update(context.Background(), keyRune('s'))
+	m = updated
 	if cmd == nil {
 		t.Fatalf("sync command = nil")
 	}
 
-	updated, cmd = m.Update(cmd())
-	m = updated.(model)
+	updated, cmd = m.update(context.Background(), cmd())
+	m = updated
 	if cmd == nil {
 		t.Fatalf("syncDone command = nil, want list reload")
 	}
@@ -433,14 +436,14 @@ func TestListQuitReturnsToWelcomeAndClearsSession(t *testing.T) {
 	if err := state.SetSession(testSession()); err != nil {
 		t.Fatalf("SetSession() error = %v", err)
 	}
-	m := newModel(context.Background(), appDeps{sessionState: state})
+	m := newModel(appDeps{sessionState: state})
 	m.screen = screenList
 	m.secrets = []core.Secret{testTextSecret(t)}
 	m.current = &m.secrets[0]
 	m.statusOK("vault открыт")
 
-	updated, cmd := m.Update(keyRune('q'))
-	m = updated.(model)
+	updated, cmd := m.update(context.Background(), keyRune('q'))
+	m = updated
 	if cmd != nil {
 		t.Fatalf("quit command = %v, want nil", cmd)
 	}
@@ -518,12 +521,12 @@ func TestTUIFormValidationReturnsErrors(t *testing.T) {
 				deps.blobService = &fakeBlobService{}
 				deps.sessionState = state
 			}
-			m := newModel(context.Background(), deps)
+			m := newModel(deps)
 			updated, _ := m.startCreateForm(tt.kind)
-			m = updated.(model)
+			m = updated
 			tt.fill(m.inputs)
 
-			_, err := m.secretInputFromForm()
+			_, err := m.secretInputFromForm(context.Background())
 			if err == nil {
 				t.Fatalf("secretInputFromForm() error = nil, want validation error")
 			}
@@ -550,12 +553,12 @@ func TestSaveBinaryCommandWritesFile(t *testing.T) {
 		t.Fatalf("SetSession() error = %v", err)
 	}
 	blobService := &fakeBlobService{}
-	m := newModel(context.Background(), appDeps{
+	m := newModel(appDeps{
 		blobService:  blobService,
 		sessionState: state,
 	})
 	outputDir := filepath.Join(t.TempDir(), "output")
-	cmd := m.saveBinaryCmd(core.Secret{
+	cmd := m.saveBinaryCmd(context.Background(), core.Secret{
 		Type:                 core.SecretTypeBinary,
 		Payload:              payload,
 		PayloadSchemaVersion: version,
@@ -599,12 +602,12 @@ func TestSaveBinaryCommandWritesFileInsideExistingDirectory(t *testing.T) {
 	if err := state.SetSession(testSession()); err != nil {
 		t.Fatalf("SetSession() error = %v", err)
 	}
-	m := newModel(context.Background(), appDeps{
+	m := newModel(appDeps{
 		blobService:  &fakeBlobService{},
 		sessionState: state,
 	})
 	outputDir := t.TempDir()
-	cmd := m.saveBinaryCmd(core.Secret{
+	cmd := m.saveBinaryCmd(context.Background(), core.Secret{
 		Type:                 core.SecretTypeBinary,
 		Payload:              payload,
 		PayloadSchemaVersion: version,
@@ -649,7 +652,7 @@ func TestStartUpdateOTPFormPrepopulatesFields(t *testing.T) {
 		t.Fatalf("encodeTextSecretMetadata() error = %v", err)
 	}
 
-	m := newModel(context.Background(), appDeps{})
+	m := newModel(appDeps{})
 	updated, _ := m.startUpdateForm(core.Secret{
 		ID:                   "otp-id",
 		Type:                 core.SecretTypeOTP,
@@ -658,7 +661,7 @@ func TestStartUpdateOTPFormPrepopulatesFields(t *testing.T) {
 		PayloadSchemaVersion: version,
 		Version:              3,
 	})
-	m = updated.(model)
+	m = updated
 
 	if m.formMode != formModeUpdate {
 		t.Fatalf("formMode = %v, want update", m.formMode)
@@ -679,7 +682,7 @@ func TestDetailActionsUpdateDeleteSaveBinaryAndBack(t *testing.T) {
 	if err := state.SetSession(testSession()); err != nil {
 		t.Fatalf("SetSession() error = %v", err)
 	}
-	m := newModel(context.Background(), appDeps{
+	m := newModel(appDeps{
 		blobService:  &fakeBlobService{},
 		sessionState: state,
 	})
@@ -687,8 +690,8 @@ func TestDetailActionsUpdateDeleteSaveBinaryAndBack(t *testing.T) {
 	m.current = &secret
 	m.detail.SetContent(m.renderSecretDetail(secret))
 
-	updated, _ := m.Update(keyRune('s'))
-	m = updated.(model)
+	updated, _ := m.update(context.Background(), keyRune('s'))
+	m = updated
 	if m.screen != screenSaveBinary {
 		t.Fatalf("screen = %v, want screenSaveBinary", m.screen)
 	}
@@ -698,13 +701,13 @@ func TestDetailActionsUpdateDeleteSaveBinaryAndBack(t *testing.T) {
 
 	outputPath := filepath.Join(t.TempDir(), "nested", "secret.bin")
 	m.inputs[0].SetValue(outputPath)
-	updated, cmd := m.Update(keyEnter())
-	m = updated.(model)
+	updated, cmd := m.update(context.Background(), keyEnter())
+	m = updated
 	if cmd == nil {
 		t.Fatalf("save enter command = nil")
 	}
-	updated, _ = m.Update(cmd())
-	m = updated.(model)
+	updated, _ = m.update(context.Background(), cmd())
+	m = updated
 	if m.screen != screenDetail {
 		t.Fatalf("screen = %v, want screenDetail after save", m.screen)
 	}
@@ -712,23 +715,23 @@ func TestDetailActionsUpdateDeleteSaveBinaryAndBack(t *testing.T) {
 		t.Fatalf("status = %q, want save status", m.status)
 	}
 
-	updated, _ = m.Update(keyRune('u'))
-	m = updated.(model)
+	updated, _ = m.update(context.Background(), keyRune('u'))
+	m = updated
 	if m.screen != screenForm || m.formMode != formModeUpdate || m.formKind != secretKindBinary {
 		t.Fatalf("update state = screen %v mode %v kind %s, want binary update form", m.screen, m.formMode, m.formKind)
 	}
 
 	m.screen = screenDetail
 	m.current = &secret
-	updated, _ = m.Update(keyRune('d'))
-	m = updated.(model)
+	updated, _ = m.update(context.Background(), keyRune('d'))
+	m = updated
 	if m.screen != screenDelete {
 		t.Fatalf("screen = %v, want screenDelete", m.screen)
 	}
 
 	m.screen = screenDetail
-	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
-	m = updated.(model)
+	updated, _ = m.update(context.Background(), tea.KeyMsg{Type: tea.KeyEsc})
+	m = updated
 	if m.screen != screenList {
 		t.Fatalf("screen = %v, want screenList after esc", m.screen)
 	}
@@ -736,31 +739,57 @@ func TestDetailActionsUpdateDeleteSaveBinaryAndBack(t *testing.T) {
 
 func TestCommandErrorsWithoutOpenSession(t *testing.T) {
 	state := clientapp.NewSessionState()
-	m := newModel(context.Background(), appDeps{sessionState: state})
+	m := newModel(appDeps{sessionState: state})
 
-	if msg := m.loadSecretsCmd(false)().(listDoneMsg); msg.err == nil || !strings.Contains(msg.err.Error(), "vault session is not open") {
+	if msg := m.loadSecretsCmd(context.Background(), false)().(listDoneMsg); !errors.Is(msg.err, clientapp.ErrVaultSessionClosed) {
 		t.Fatalf("loadSecretsCmd() err = %v, want session error", msg.err)
 	}
-	if msg := m.getSecretCmd("id")().(secretDoneMsg); msg.err == nil || !strings.Contains(msg.err.Error(), "vault session is not open") {
+	if msg := m.getSecretCmd(context.Background(), "id")().(secretDoneMsg); !errors.Is(msg.err, clientapp.ErrVaultSessionClosed) {
 		t.Fatalf("getSecretCmd() err = %v, want session error", msg.err)
 	}
-	if msg := m.syncCmd()().(syncDoneMsg); msg.err == nil || !strings.Contains(msg.err.Error(), "vault session is not open") {
+	if msg := m.syncCmd(context.Background())().(syncDoneMsg); !errors.Is(msg.err, clientapp.ErrVaultSessionClosed) {
 		t.Fatalf("syncCmd() err = %v, want session error", msg.err)
 	}
-	if msg := m.deleteCmd(testTextSecret(t))().(deleteDoneMsg); msg.err == nil || !strings.Contains(msg.err.Error(), "vault session is not open") {
+	if msg := m.deleteCmd(context.Background(), testTextSecret(t))().(deleteDoneMsg); !errors.Is(msg.err, clientapp.ErrVaultSessionClosed) {
 		t.Fatalf("deleteCmd() err = %v, want session error", msg.err)
 	}
-	if msg := m.submitFormCmd()().(secretDoneMsg); msg.err == nil || !strings.Contains(msg.err.Error(), "vault session is not open") {
+	if msg := m.submitFormCmd(context.Background())().(secretDoneMsg); !errors.Is(msg.err, clientapp.ErrVaultSessionClosed) {
 		t.Fatalf("submitFormCmd() err = %v, want session error", msg.err)
 	}
 }
 
+func TestCommandUsesProvidedContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	state := clientapp.NewSessionState()
+	if err := state.SetSession(testSession()); err != nil {
+		t.Fatalf("SetSession() error = %v", err)
+	}
+	vaultService := &fakeVaultService{}
+	m := newModel(appDeps{
+		vaultService: vaultService,
+		sessionState: state,
+	})
+
+	msg := m.loadSecretsCmd(ctx, false)().(listDoneMsg)
+	if msg.err != nil {
+		t.Fatalf("loadSecretsCmd() error = %v", msg.err)
+	}
+	if len(vaultService.listContexts) != 1 {
+		t.Fatalf("list contexts = %d, want 1", len(vaultService.listContexts))
+	}
+	if !errors.Is(vaultService.listContexts[0].Err(), context.Canceled) {
+		t.Fatalf("list context error = %v, want context.Canceled", vaultService.listContexts[0].Err())
+	}
+}
+
 func TestAuthModeSwitchRegisterMismatchAndFocusNavigation(t *testing.T) {
-	m := newModel(context.Background(), appDeps{})
+	m := newModel(appDeps{})
 	m.screen = screenAuth
 
-	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlR})
-	m = updated.(model)
+	updated, cmd := m.update(context.Background(), tea.KeyMsg{Type: tea.KeyCtrlR})
+	m = updated
 	if cmd != nil {
 		t.Fatalf("ctrl+r command = %v, want nil", cmd)
 	}
@@ -768,8 +797,8 @@ func TestAuthModeSwitchRegisterMismatchAndFocusNavigation(t *testing.T) {
 		t.Fatalf("auth state = mode %v inputs %d, want register with 4 inputs", m.authMode, len(m.inputs))
 	}
 
-	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
-	m = updated.(model)
+	updated, _ = m.update(context.Background(), tea.KeyMsg{Type: tea.KeyShiftTab})
+	m = updated
 	if m.focus != len(m.inputs)-1 {
 		t.Fatalf("focus = %d, want last input", m.focus)
 	}
@@ -779,20 +808,20 @@ func TestAuthModeSwitchRegisterMismatchAndFocusNavigation(t *testing.T) {
 	m.inputs[2].SetValue("master-password")
 	m.inputs[3].SetValue("other-master-password")
 	m.focus = len(m.inputs) - 1
-	updated, cmd = m.Update(keyEnter())
-	m = updated.(model)
+	updated, cmd = m.update(context.Background(), keyEnter())
+	m = updated
 	if cmd == nil {
 		t.Fatalf("register submit command = nil")
 	}
 	msg := cmd().(authDoneMsg)
-	if msg.err == nil || !strings.Contains(msg.err.Error(), "master passwords do not match") {
+	if !errors.Is(msg.err, clientapp.ErrMasterPasswordsMismatch) {
 		t.Fatalf("auth error = %v, want master password mismatch", msg.err)
 	}
-	updated, _ = m.Update(msg)
-	m = updated.(model)
+	updated, _ = m.update(context.Background(), msg)
+	m = updated
 
-	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlL})
-	m = updated.(model)
+	updated, _ = m.update(context.Background(), tea.KeyMsg{Type: tea.KeyCtrlL})
+	m = updated
 	if m.authMode != authModeLogin || len(m.inputs) != 3 {
 		t.Fatalf("auth state = mode %v inputs %d, want login with 3 inputs", m.authMode, len(m.inputs))
 	}
@@ -807,47 +836,47 @@ func TestListNavigationAndCommands(t *testing.T) {
 	first := testTextSecret(t)
 	second := testLoginPasswordSecret(t)
 	vaultService := &fakeVaultService{listSecrets: []core.Secret{first, second}}
-	m := newModel(context.Background(), appDeps{
+	m := newModel(appDeps{
 		vaultService: vaultService,
 		sessionState: state,
 	})
 	m.screen = screenList
 	m.secrets = []core.Secret{first, second}
 
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
-	m = updated.(model)
+	updated, _ := m.update(context.Background(), tea.KeyMsg{Type: tea.KeyDown})
+	m = updated
 	if m.selected != 1 {
 		t.Fatalf("selected = %d, want 1", m.selected)
 	}
-	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
-	m = updated.(model)
+	updated, _ = m.update(context.Background(), tea.KeyMsg{Type: tea.KeyUp})
+	m = updated
 	if m.selected != 0 {
 		t.Fatalf("selected = %d, want 0", m.selected)
 	}
 
-	updated, cmd := m.Update(keyEnter())
-	m = updated.(model)
+	updated, cmd := m.update(context.Background(), keyEnter())
+	m = updated
 	if cmd == nil {
 		t.Fatalf("enter command = nil, want get secret command")
 	}
-	updated, cmd = m.Update(cmd())
-	m = updated.(model)
+	updated, cmd = m.update(context.Background(), cmd())
+	m = updated
 	if m.screen != screenDetail || m.current == nil || m.current.ID != first.ID {
 		t.Fatalf("detail state = screen %v current %+v, want first secret", m.screen, m.current)
 	}
 	if cmd != nil {
-		updated, _ = m.Update(cmd())
-		m = updated.(model)
+		updated, _ = m.update(context.Background(), cmd())
+		m = updated
 	}
 
 	m.screen = screenList
-	updated, cmd = m.Update(keyRune('r'))
-	m = updated.(model)
+	updated, cmd = m.update(context.Background(), keyRune('r'))
+	m = updated
 	if cmd == nil {
 		t.Fatalf("refresh command = nil")
 	}
-	updated, _ = m.Update(cmd())
-	m = updated.(model)
+	updated, _ = m.update(context.Background(), cmd())
+	m = updated
 	if len(m.secrets) != 2 {
 		t.Fatalf("secrets length = %d, want 2", len(m.secrets))
 	}
@@ -923,12 +952,12 @@ func TestSecretInputFromFormBuildsAllNonOTPTypes(t *testing.T) {
 				deps.blobService = &fakeBlobService{}
 				deps.sessionState = state
 			}
-			m := newModel(context.Background(), deps)
+			m := newModel(deps)
 			updated, _ := m.startCreateForm(tt.kind)
-			m = updated.(model)
+			m = updated
 			tt.fill(m.inputs)
 
-			input, err := m.secretInputFromForm()
+			input, err := m.secretInputFromForm(context.Background())
 			if err != nil {
 				t.Fatalf("secretInputFromForm() error = %v", err)
 			}
@@ -944,7 +973,7 @@ func TestSecretInputFromFormBuildsAllNonOTPTypes(t *testing.T) {
 
 func TestViewsRenderExpectedScreensAndStatuses(t *testing.T) {
 	otpSecret := testOTPSecret(t)
-	m := newModel(context.Background(), appDeps{})
+	m := newModel(appDeps{})
 	m.screen = screenList
 	m.secrets = []core.Secret{otpSecret}
 	if view := m.View(); !strings.Contains(view, "Vault") || !strings.Contains(view, "otp") || !strings.Contains(view, "стартовый экран") {
@@ -957,7 +986,7 @@ func TestViewsRenderExpectedScreensAndStatuses(t *testing.T) {
 	}
 
 	updated, _ := m.startCreateForm(secretKindLoginPassword)
-	m = updated.(model)
+	m = updated
 	if view := m.View(); !strings.Contains(view, "Обновление:") && !strings.Contains(view, "Создание: логин и пароль") {
 		t.Fatalf("form view = %q, want login password form", view)
 	}
@@ -980,7 +1009,7 @@ func TestViewsRenderExpectedScreensAndStatuses(t *testing.T) {
 	}
 	m.busy = false
 	m.setError(os.ErrNotExist)
-	if view := m.View(); !strings.Contains(view, "file does not exist") {
+	if view := m.View(); !strings.Contains(view, "не удалось выполнить действие") {
 		t.Fatalf("error view = %q, want user facing error", view)
 	}
 }
@@ -1019,12 +1048,12 @@ func TestSaveBinaryCommandValidationErrors(t *testing.T) {
 	if err := state.SetSession(testSession()); err != nil {
 		t.Fatalf("SetSession() error = %v", err)
 	}
-	m := newModel(context.Background(), appDeps{
+	m := newModel(appDeps{
 		blobService:  &fakeBlobService{},
 		sessionState: state,
 	})
 
-	if msg := m.saveBinaryCmd(secret, " ")().(saveDoneMsg); msg.err == nil || !strings.Contains(msg.err.Error(), "output directory is required") {
+	if msg := m.saveBinaryCmd(context.Background(), secret, " ")().(saveDoneMsg); !errors.Is(msg.err, clientapp.ErrOutputDirectoryRequired) {
 		t.Fatalf("empty output path err = %v, want required error", msg.err)
 	}
 
@@ -1032,7 +1061,7 @@ func TestSaveBinaryCommandValidationErrors(t *testing.T) {
 	if err := os.WriteFile(existingPath, []byte("exists"), 0o600); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
-	if msg := m.saveBinaryCmd(secret, existingPath)().(saveDoneMsg); msg.err == nil || !strings.Contains(msg.err.Error(), "output directory is not a directory") {
+	if msg := m.saveBinaryCmd(context.Background(), secret, existingPath)().(saveDoneMsg); !errors.Is(msg.err, clientapp.ErrOutputDirectoryNotDirectory) {
 		t.Fatalf("existing path err = %v, want directory error", msg.err)
 	}
 
@@ -1041,13 +1070,13 @@ func TestSaveBinaryCommandValidationErrors(t *testing.T) {
 	if err := os.WriteFile(existingFileInDir, []byte("exists"), 0o600); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
-	if msg := m.saveBinaryCmd(secret, existingDir)().(saveDoneMsg); msg.err == nil || !strings.Contains(msg.err.Error(), "output file already exists") {
+	if msg := m.saveBinaryCmd(context.Background(), secret, existingDir)().(saveDoneMsg); !errors.Is(msg.err, clientapp.ErrOutputFileExists) {
 		t.Fatalf("existing file in directory err = %v, want exists error", msg.err)
 	}
 
 	broken := secret
 	broken.Payload = []byte(`{`)
-	if msg := m.saveBinaryCmd(broken, filepath.Join(t.TempDir(), "broken.bin"))().(saveDoneMsg); msg.err == nil || !strings.Contains(msg.err.Error(), "decode binary payload") {
+	if msg := m.saveBinaryCmd(context.Background(), broken, filepath.Join(t.TempDir(), "broken.bin"))().(saveDoneMsg); msg.err == nil || !strings.Contains(msg.err.Error(), "decode binary payload") {
 		t.Fatalf("broken payload err = %v, want decode error", msg.err)
 	}
 }

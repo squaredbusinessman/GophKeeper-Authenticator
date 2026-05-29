@@ -16,7 +16,6 @@ import (
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/server/config"
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/server/grpcserver"
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/server/logger"
-	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/server/shutdown"
 )
 
 // Run запускает серверное приложение
@@ -86,9 +85,6 @@ func Run(parent context.Context) error {
 		return fmt.Errorf("create grpc server: %w", err)
 	}
 
-	ctx, stop := shutdown.Context(parent)
-	defer stop()
-
 	errCh := make(chan error, 1)
 
 	go func() {
@@ -96,7 +92,7 @@ func Run(parent context.Context) error {
 	}()
 
 	select {
-	case <-ctx.Done():
+	case <-parent.Done():
 		server.Stop()
 		return nil
 
