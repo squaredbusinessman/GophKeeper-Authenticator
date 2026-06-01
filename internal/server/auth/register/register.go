@@ -92,9 +92,5 @@ func (e *VaultKeyEnvelope) Validate() error {
 		return fmt.Errorf("%w: vault key encryption algorithm is required", ErrInvalidInput)
 	}
 
-	if err := e.KDFParams.Validate(); err != nil {
-		return err
-	}
-
-	return nil
+	return e.KDFParams.Validate()
 }

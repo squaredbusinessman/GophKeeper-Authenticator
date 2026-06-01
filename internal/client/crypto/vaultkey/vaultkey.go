@@ -108,11 +108,7 @@ func (e *Envelope) Validate() error {
 		return fmt.Errorf("unsupported encryption algorithm: %s", e.EncryptionAlg)
 	}
 
-	if err := e.KDFParams.Validate(); err != nil {
-		return err
-	}
-
-	return nil
+	return e.KDFParams.Validate()
 }
 
 // Generate создает новый криптостойкий vault key

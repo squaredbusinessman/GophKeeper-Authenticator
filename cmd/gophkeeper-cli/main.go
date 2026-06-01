@@ -68,7 +68,9 @@ func run(ctx context.Context, args []string, stdout io.Writer, stderr io.Writer)
 	if err != nil {
 		return err
 	}
-	defer runtime.Close()
+	defer func() {
+		_ = runtime.Close()
+	}()
 
 	prompter := newTerminalPrompter(os.Stdin, stdout, int(os.Stdin.Fd()))
 

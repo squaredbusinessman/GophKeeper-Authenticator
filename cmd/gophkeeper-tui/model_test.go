@@ -421,8 +421,7 @@ func TestTUISyncAfterDeleteFlow(t *testing.T) {
 		t.Fatalf("sync command = nil")
 	}
 
-	updated, cmd = m.update(context.Background(), cmd())
-	m = updated
+	_, cmd = m.update(context.Background(), cmd())
 	if cmd == nil {
 		t.Fatalf("syncDone command = nil, want list reload")
 	}

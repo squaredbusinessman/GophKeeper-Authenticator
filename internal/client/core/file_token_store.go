@@ -51,7 +51,9 @@ func (s *FileTokenStore) Save(ctx context.Context, state TokenState) error {
 	}
 
 	tempPath := tempFile.Name()
-	defer os.Remove(tempPath)
+	defer func() {
+		_ = os.Remove(tempPath)
+	}()
 
 	encoder := json.NewEncoder(tempFile)
 	encoder.SetIndent("", "  ")

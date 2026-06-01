@@ -17,7 +17,9 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Error: %s\n", clientapp.UserFacingError(err))
 		os.Exit(1)
 	}
-	defer runtime.Close()
+	defer func() {
+		_ = runtime.Close()
+	}()
 
 	deps := appDeps{
 		authService:  runtime.AuthService,

@@ -54,13 +54,7 @@ func (r *fakeBlobRepository) AddUploadPart(_ context.Context, params AddUploadPa
 		return ErrUploadNotFound
 	}
 
-	part := UploadPart{
-		UploadID:       params.UploadID,
-		ChunkIndex:     params.ChunkIndex,
-		ObjectKey:      params.ObjectKey,
-		SizeBytes:      params.SizeBytes,
-		ChecksumSHA256: params.ChecksumSHA256,
-	}
+	part := UploadPart(params)
 
 	parts := r.parts[params.UploadID]
 	replaced := false

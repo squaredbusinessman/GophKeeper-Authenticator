@@ -36,7 +36,9 @@ func TestNewRuntimeBuildsSharedClientDependencies(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewRuntime() error = %v", err)
 	}
-	defer runtime.Close()
+	defer func() {
+		_ = runtime.Close()
+	}()
 
 	if runtime.Conn == nil {
 		t.Fatalf("Conn = nil")
@@ -111,7 +113,9 @@ func TestNewRuntimeConnectsToTLSServer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewRuntime() error = %v", err)
 	}
-	defer runtime.Close()
+	defer func() {
+		_ = runtime.Close()
+	}()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -133,7 +137,9 @@ func TestLoadRuntimeLoadsConfigFromEnv(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadRuntime() error = %v", err)
 	}
-	defer runtime.Close()
+	defer func() {
+		_ = runtime.Close()
+	}()
 
 	if runtime.Config.TokenFile != tokenFile {
 		t.Fatalf("TokenFile = %q, want %q", runtime.Config.TokenFile, tokenFile)
@@ -192,7 +198,9 @@ func TestLoadRuntimeUsesDefaultTokenFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadRuntime() error = %v", err)
 	}
-	defer runtime.Close()
+	defer func() {
+		_ = runtime.Close()
+	}()
 
 	if strings.TrimSpace(runtime.Config.TokenFile) == "" {
 		t.Fatalf("TokenFile is empty")
@@ -251,11 +259,14 @@ func writeRuntimeTestCertificate(t *testing.T) (string, string) {
 func runtimeFreeTCPAddress(t *testing.T) string {
 	t.Helper()
 
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	var listenConfig net.ListenConfig
+	listener, err := listenConfig.Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("Listen() error = %v", err)
 	}
-	defer listener.Close()
+	defer func() {
+		_ = listener.Close()
+	}()
 
 	return listener.Addr().String()
 }

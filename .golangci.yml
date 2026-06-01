@@ -3,16 +3,86 @@ version: "2"
 run:
   timeout: 5m
   tests: true
+  modules-download-mode: readonly
+  relative-path-mode: gomod
 
 linters:
   default: none
   enable:
+    - bodyclose
+    - copyloopvar
+    - errcheck
+    - errorlint
     - govet
     - ineffassign
+    - loggercheck
+    - misspell
+    - nilerr
+    - nilnil
+    - noctx
+    - nolintlint
+    - protogetter
+    - revive
+    - rowserrcheck
+    - sqlclosecheck
     - staticcheck
+    - unconvert
     - unused
+    - wastedassign
+
+  settings:
+    errcheck:
+      check-type-assertions: false
+      check-blank: false
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - (*go.uber.org/zap.Logger).Sync
+        - (*database/sql.DB).Close
+        - (*database/sql.Rows).Close
+        - (*google.golang.org/grpc.ClientConn).Close
+        - (*net.TCPListener).Close
+    misspell:
+      locale: US
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+    revive:
+      severity: warning
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        - name: error-naming
+        - name: error-return
+        - name: error-strings
+        - name: errorf
+        - name: exported
+          disabled: true
+        - name: if-return
+        - name: increment-decrement
+        - name: indent-error-flow
+        - name: package-comments
+          disabled: true
+        - name: range
+        - name: receiver-naming
+        - name: time-naming
+        - name: unexported-return
+        - name: var-declaration
+        - name: var-naming
+
+  exclusions:
+    generated: lax
 
 formatters:
   enable:
     - gofmt
     - goimports
+  exclusions:
+    generated: lax
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

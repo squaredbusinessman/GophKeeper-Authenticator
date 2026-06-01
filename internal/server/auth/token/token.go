@@ -130,7 +130,7 @@ func (i *Issuer) Validate(rawToken string) (Claims, error) {
 			return Claims{}, ErrExpiredToken
 		}
 
-		return Claims{}, fmt.Errorf("%w: %v", ErrInvalidToken, err)
+		return Claims{}, fmt.Errorf("%w: %w", ErrInvalidToken, err)
 	}
 
 	if !parsedToken.Valid {

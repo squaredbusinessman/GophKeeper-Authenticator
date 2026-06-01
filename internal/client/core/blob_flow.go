@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -201,7 +202,7 @@ func (s *BlobService) Download(ctx context.Context, session Session, input Downl
 			continue
 		}
 
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 

@@ -2,6 +2,7 @@
 package grpcserver
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"net"
@@ -48,7 +49,8 @@ func New(cfg *config.Config, logger *zap.Logger, db *sql.DB, blobStore serverblo
 	}
 	serverOptions = append(serverOptions, grpc.Creds(creds))
 
-	listener, err := net.Listen("tcp", cfg.GRPCAddress)
+	var listenConfig net.ListenConfig
+	listener, err := listenConfig.Listen(context.Background(), "tcp", cfg.GRPCAddress)
 	if err != nil {
 		return nil, err
 	}
