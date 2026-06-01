@@ -29,6 +29,48 @@ type fakeCLIVaultService struct {
 	syncSecretsCalls  []syncSecretsCall
 }
 
+type fakeCLIBlobService struct {
+	uploadBinaryFunc   func(context.Context, core.Session, core.UploadBinaryInput) (core.BinaryPayload, error)
+	downloadBinaryFunc func(context.Context, core.Session, core.DownloadBinaryInput) ([]byte, error)
+
+	uploadBinaryCalls   []uploadBinaryCall
+	downloadBinaryCalls []downloadBinaryCall
+}
+
+type uploadBinaryCall struct {
+	session core.Session
+	input   core.UploadBinaryInput
+}
+
+type downloadBinaryCall struct {
+	session core.Session
+	input   core.DownloadBinaryInput
+}
+
+func (s *fakeCLIBlobService) UploadBinary(ctx context.Context, session core.Session, input core.UploadBinaryInput) (core.BinaryPayload, error) {
+	s.uploadBinaryCalls = append(s.uploadBinaryCalls, uploadBinaryCall{session: session, input: input})
+	if s.uploadBinaryFunc != nil {
+		return s.uploadBinaryFunc(ctx, session, input)
+	}
+
+	return core.BinaryPayload{
+		FileName:       input.FileName,
+		ContentType:    input.ContentType,
+		SizeBytes:      int64(len(input.Data)),
+		ChecksumSHA256: "plaintext-checksum",
+		BlobID:         "blob-id",
+	}, nil
+}
+
+func (s *fakeCLIBlobService) DownloadBinary(ctx context.Context, session core.Session, input core.DownloadBinaryInput) ([]byte, error) {
+	s.downloadBinaryCalls = append(s.downloadBinaryCalls, downloadBinaryCall{session: session, input: input})
+	if s.downloadBinaryFunc != nil {
+		return s.downloadBinaryFunc(ctx, session, input)
+	}
+
+	return []byte("binary data"), nil
+}
+
 type createSecretCall struct {
 	session core.Session
 	input   core.CreateSecretInput
@@ -453,8 +495,9 @@ func TestCreateBinarySecretCommandReadsFileAndCallsVaultService(t *testing.T) {
 		},
 	}
 	var stdout bytes.Buffer
+	blobService := &fakeCLIBlobService{}
 
-	err := runCLI(context.Background(), []string{"create", "binary"}, authService, vaultService, prompter, &stdout, &bytes.Buffer{})
+	err := runCLIWithBlob(context.Background(), []string{"create", "binary"}, authService, vaultService, blobService, prompter, &stdout, &bytes.Buffer{})
 	if err != nil {
 		t.Fatalf("runCLI() error = %v", err)
 	}
@@ -485,8 +528,11 @@ func TestCreateBinarySecretCommandReadsFileAndCallsVaultService(t *testing.T) {
 		t.Fatalf("content type = %q, want application/octet-stream", binaryPayload.ContentType)
 	}
 
-	if !bytes.Equal(binaryPayload.Data, inputData) {
-		t.Fatalf("binary data = %v, want %v", binaryPayload.Data, inputData)
+	if len(blobService.uploadBinaryCalls) != 1 {
+		t.Fatalf("UploadBinary() calls = %d, want 1", len(blobService.uploadBinaryCalls))
+	}
+	if !bytes.Equal(blobService.uploadBinaryCalls[0].input.Data, inputData) {
+		t.Fatalf("uploaded binary data = %v, want %v", blobService.uploadBinaryCalls[0].input.Data, inputData)
 	}
 
 	if binaryPayload.SizeBytes != int64(len(inputData)) {
@@ -495,6 +541,9 @@ func TestCreateBinarySecretCommandReadsFileAndCallsVaultService(t *testing.T) {
 
 	if binaryPayload.ChecksumSHA256 == "" {
 		t.Fatalf("checksum is empty")
+	}
+	if binaryPayload.BlobID != "blob-id" {
+		t.Fatalf("blob id = %q, want blob-id", binaryPayload.BlobID)
 	}
 
 	if call.input.PayloadSchemaVersion != core.BinaryPayloadSchemaVersion {
@@ -576,7 +625,8 @@ func TestGetTextSecretCommandLogsInPromptsIDAndPrintsSecret(t *testing.T) {
 
 func TestGetBinarySecretCommandWritesFileAndPrintsMetadata(t *testing.T) {
 	authService := &fakeCLIAuthService{}
-	outputFile := filepath.Join(t.TempDir(), "restored.bin")
+	outputDir := t.TempDir()
+	outputFile := filepath.Join(outputDir, "private-key.bin")
 	binaryData := []byte{0x05, 0x06, 0x07, 0x08}
 	vaultService := &fakeCLIVaultService{
 		getSecretFunc: func(context.Context, core.Session, core.GetSecretInput) (core.Secret, error) {
@@ -584,7 +634,7 @@ func TestGetBinarySecretCommandWritesFileAndPrintsMetadata(t *testing.T) {
 				ID:                   "binary-secret-id",
 				Type:                 core.SecretTypeBinary,
 				Metadata:             []byte(`{"title":"SSH private key"}`),
-				Payload:              mustEncodeBinaryPayload(core.BinaryPayload{FileName: "private-key.bin", ContentType: "application/octet-stream", Data: binaryData}),
+				Payload:              mustEncodeBinaryPayload(core.BinaryPayload{FileName: "private-key.bin", ContentType: "application/octet-stream", SizeBytes: int64(len(binaryData)), ChecksumSHA256: "checksum", BlobID: "blob-id"}),
 				PayloadSchemaVersion: core.BinaryPayloadSchemaVersion,
 				Version:              6,
 			}, nil
@@ -596,12 +646,17 @@ func TestGetBinarySecretCommandWritesFileAndPrintsMetadata(t *testing.T) {
 			"login-password",
 			"master-password",
 			"binary-secret-id",
-			outputFile,
+			outputDir,
 		},
 	}
 	var stdout bytes.Buffer
+	blobService := &fakeCLIBlobService{
+		downloadBinaryFunc: func(_ context.Context, _ core.Session, _ core.DownloadBinaryInput) ([]byte, error) {
+			return binaryData, nil
+		},
+	}
 
-	err := runCLI(context.Background(), []string{"get"}, authService, vaultService, prompter, &stdout, &bytes.Buffer{})
+	err := runCLIWithBlob(context.Background(), []string{"get"}, authService, vaultService, blobService, prompter, &stdout, &bytes.Buffer{})
 	if err != nil {
 		t.Fatalf("runCLI() error = %v", err)
 	}
@@ -629,7 +684,8 @@ func TestGetBinarySecretCommandWritesFileAndPrintsMetadata(t *testing.T) {
 
 func TestGetBinarySecretCommandDoesNotOverwriteExistingOutputFile(t *testing.T) {
 	authService := &fakeCLIAuthService{}
-	outputFile := filepath.Join(t.TempDir(), "restored.bin")
+	outputDir := t.TempDir()
+	outputFile := filepath.Join(outputDir, "private-key.bin")
 	originalData := []byte("already exists")
 	if err := os.WriteFile(outputFile, originalData, 0o600); err != nil {
 		t.Fatalf("write existing output file: %v", err)
@@ -641,7 +697,7 @@ func TestGetBinarySecretCommandDoesNotOverwriteExistingOutputFile(t *testing.T) 
 				ID:                   "binary-secret-id",
 				Type:                 core.SecretTypeBinary,
 				Metadata:             []byte(`{"title":"SSH private key"}`),
-				Payload:              mustEncodeBinaryPayload(core.BinaryPayload{FileName: "private-key.bin", ContentType: "application/octet-stream", Data: []byte("new data")}),
+				Payload:              mustEncodeBinaryPayload(core.BinaryPayload{FileName: "private-key.bin", ContentType: "application/octet-stream", SizeBytes: 8, ChecksumSHA256: "checksum", BlobID: "blob-id"}),
 				PayloadSchemaVersion: core.BinaryPayloadSchemaVersion,
 				Version:              6,
 			}, nil
@@ -653,11 +709,11 @@ func TestGetBinarySecretCommandDoesNotOverwriteExistingOutputFile(t *testing.T) 
 			"login-password",
 			"master-password",
 			"binary-secret-id",
-			outputFile,
+			outputDir,
 		},
 	}
 
-	err := runCLI(context.Background(), []string{"get"}, authService, vaultService, prompter, &bytes.Buffer{}, &bytes.Buffer{})
+	err := runCLIWithBlob(context.Background(), []string{"get"}, authService, vaultService, &fakeCLIBlobService{}, prompter, &bytes.Buffer{}, &bytes.Buffer{})
 	if err == nil {
 		t.Fatalf("runCLI() error = nil, want error")
 	}
@@ -899,7 +955,7 @@ func TestListSecretsCommandPrintsBinaryItems(t *testing.T) {
 					ID:                   "binary-secret-id",
 					Type:                 core.SecretTypeBinary,
 					Metadata:             []byte(`{"title":"SSH private key"}`),
-					Payload:              mustEncodeBinaryPayload(core.BinaryPayload{FileName: "private-key.bin", ContentType: "application/octet-stream", Data: []byte{0x01}}),
+					Payload:              mustEncodeBinaryPayload(core.BinaryPayload{FileName: "private-key.bin", ContentType: "application/octet-stream", SizeBytes: 1, ChecksumSHA256: "checksum", BlobID: "blob-id"}),
 					PayloadSchemaVersion: core.BinaryPayloadSchemaVersion,
 					Version:              9,
 				},
@@ -1023,8 +1079,9 @@ func TestUpdateBinarySecretCommandPromptsVersionReadsFileAndCallsVaultService(t 
 		},
 	}
 	var stdout bytes.Buffer
+	blobService := &fakeCLIBlobService{}
 
-	err := runCLI(context.Background(), []string{"update", "binary"}, authService, vaultService, prompter, &stdout, &bytes.Buffer{})
+	err := runCLIWithBlob(context.Background(), []string{"update", "binary"}, authService, vaultService, blobService, prompter, &stdout, &bytes.Buffer{})
 	if err != nil {
 		t.Fatalf("runCLI() error = %v", err)
 	}
@@ -1055,8 +1112,11 @@ func TestUpdateBinarySecretCommandPromptsVersionReadsFileAndCallsVaultService(t 
 		t.Fatalf("file name = %q, want updated-key.bin", binaryPayload.FileName)
 	}
 
-	if !bytes.Equal(binaryPayload.Data, inputData) {
-		t.Fatalf("binary data = %v, want %v", binaryPayload.Data, inputData)
+	if len(blobService.uploadBinaryCalls) != 1 {
+		t.Fatalf("UploadBinary() calls = %d, want 1", len(blobService.uploadBinaryCalls))
+	}
+	if !bytes.Equal(blobService.uploadBinaryCalls[0].input.Data, inputData) {
+		t.Fatalf("uploaded binary data = %v, want %v", blobService.uploadBinaryCalls[0].input.Data, inputData)
 	}
 
 	wantHidden := []bool{false, true, true, false, false, false, false, false}

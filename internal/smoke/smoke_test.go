@@ -5,19 +5,28 @@ package smoke
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"database/sql"
+	"encoding/pem"
 	"errors"
 	"fmt"
+	"io"
+	"math/big"
 	"net"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/client/core"
 	gophkeeperv1 "github.com/squaredbusinessman/gophkeeper-authenticator/internal/gen/proto/gophkeeper/v1"
+	serverblob "github.com/squaredbusinessman/gophkeeper-authenticator/internal/server/blob"
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/server/config"
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/server/database"
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/server/grpcserver"
@@ -25,7 +34,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/status"
 )
 
@@ -45,9 +54,9 @@ func TestSmokeAuthVaultAndSyncFlow(t *testing.T) {
 	}
 
 	address := freeTCPAddress(t)
-	startSmokeServer(t, db, dsn, address)
+	certFile := startSmokeServer(t, db, dsn, address)
 
-	conn := connectSmokeClient(t, ctx, address)
+	conn := connectSmokeClient(t, ctx, address, certFile)
 	defer conn.Close()
 
 	authService := core.NewAuthService(
@@ -55,6 +64,7 @@ func TestSmokeAuthVaultAndSyncFlow(t *testing.T) {
 		core.NewFileTokenStore(filepath.Join(t.TempDir(), "token.json")),
 	)
 	vaultService := core.NewVaultService(gophkeeperv1.NewVaultServiceClient(conn))
+	blobService := core.NewBlobService(gophkeeperv1.NewBlobServiceClient(conn))
 
 	login := fmt.Sprintf("smoke-%d@example.com", time.Now().UnixNano())
 	loginPassword := "login-password-123"
@@ -148,23 +158,50 @@ func TestSmokeAuthVaultAndSyncFlow(t *testing.T) {
 		t.Fatalf("create bank card secret: %v", err)
 	}
 
-	binaryPayload, binarySchemaVersion, err := core.EncodeBinaryPayload(core.BinaryPayload{
+	binaryPayload, err := blobService.UploadBinary(ctx, session, core.UploadBinaryInput{
 		FileName:    "smoke.bin",
 		ContentType: "application/octet-stream",
 		Data:        []byte{0x01, 0x02, 0x03},
 	})
 	if err != nil {
-		t.Fatalf("encode binary payload: %v", err)
+		t.Fatalf("upload binary blob: %v", err)
+	}
+	binaryPayloadBytes, binarySchemaVersion, err := core.EncodeBinaryPayload(binaryPayload)
+	if err != nil {
+		t.Fatalf("encode binary payload metadata: %v", err)
 	}
 
 	createdBinary, err := vaultService.CreateSecret(ctx, session, core.CreateSecretInput{
 		Type:                 core.SecretTypeBinary,
 		Metadata:             []byte(`{"title":"smoke binary"}`),
-		Payload:              binaryPayload,
+		Payload:              binaryPayloadBytes,
 		PayloadSchemaVersion: binarySchemaVersion,
 	})
 	if err != nil {
 		t.Fatalf("create binary secret: %v", err)
+	}
+
+	otpPayload, otpSchemaVersion, err := core.EncodeOTPPayload(core.OTPPayload{
+		Issuer:        "Smoke",
+		AccountName:   login,
+		Secret:        "JBSWY3DPEHPK3PXP",
+		Algorithm:     "SHA1",
+		Digits:        6,
+		PeriodSeconds: 30,
+		Notes:         "smoke otp",
+	})
+	if err != nil {
+		t.Fatalf("encode otp payload: %v", err)
+	}
+
+	createdOTP, err := vaultService.CreateSecret(ctx, session, core.CreateSecretInput{
+		Type:                 core.SecretTypeOTP,
+		Metadata:             []byte(`{"title":"smoke otp"}`),
+		Payload:              otpPayload,
+		PayloadSchemaVersion: otpSchemaVersion,
+	})
+	if err != nil {
+		t.Fatalf("create otp secret: %v", err)
 	}
 
 	listed, err := vaultService.ListSecrets(ctx, session, core.ListSecretsInput{})
@@ -172,14 +209,15 @@ func TestSmokeAuthVaultAndSyncFlow(t *testing.T) {
 		t.Fatalf("list secrets: %v", err)
 	}
 
-	if len(listed) != 4 {
-		t.Fatalf("listed secrets = %d, want 4", len(listed))
+	if len(listed) != 5 {
+		t.Fatalf("listed secrets = %d, want 5", len(listed))
 	}
 
 	assertSmokeListContains(t, listed, createdText.ID)
 	assertSmokeListContains(t, listed, createdLoginPassword.ID)
 	assertSmokeListContains(t, listed, createdBankCard.ID)
 	assertSmokeListContains(t, listed, createdBinary.ID)
+	assertSmokeListContains(t, listed, createdOTP.ID)
 
 	gotText, err := vaultService.GetSecret(ctx, session, core.GetSecretInput{ID: createdText.ID})
 	if err != nil {
@@ -233,8 +271,38 @@ func TestSmokeAuthVaultAndSyncFlow(t *testing.T) {
 		t.Fatalf("decode binary payload: %v", err)
 	}
 
-	if decodedBinary.FileName != "smoke.bin" || !bytes.Equal(decodedBinary.Data, []byte{0x01, 0x02, 0x03}) {
-		t.Fatalf("decoded binary = %+v, want smoke binary", decodedBinary)
+	if decodedBinary.FileName != "smoke.bin" || decodedBinary.BlobID == "" {
+		t.Fatalf("decoded binary metadata = %+v, want smoke binary metadata", decodedBinary)
+	}
+	downloadedBinary, err := blobService.DownloadBinary(ctx, session, core.DownloadBinaryInput{Payload: decodedBinary})
+	if err != nil {
+		t.Fatalf("download binary blob: %v", err)
+	}
+	if !bytes.Equal(downloadedBinary, []byte{0x01, 0x02, 0x03}) {
+		t.Fatalf("downloaded binary = %v, want smoke binary bytes", downloadedBinary)
+	}
+
+	gotOTP, err := vaultService.GetSecret(ctx, session, core.GetSecretInput{ID: createdOTP.ID})
+	if err != nil {
+		t.Fatalf("get otp secret: %v", err)
+	}
+
+	decodedOTP, err := core.DecodeOTPPayload(gotOTP.Payload, gotOTP.PayloadSchemaVersion)
+	if err != nil {
+		t.Fatalf("decode otp payload: %v", err)
+	}
+
+	if decodedOTP.Secret != "JBSWY3DPEHPK3PXP" || decodedOTP.AccountName != login {
+		t.Fatalf("decoded otp = %+v, want smoke otp", decodedOTP)
+	}
+
+	otpCode, err := core.CurrentOTPCode(decodedOTP, time.Unix(59, 0))
+	if err != nil {
+		t.Fatalf("calculate otp code: %v", err)
+	}
+
+	if otpCode.Value == "" {
+		t.Fatalf("otp code is empty")
 	}
 
 	updatedTextPayload, updatedTextSchemaVersion, err := core.EncodeTextPayload(core.TextPayload{Text: "updated smoke secret"})
@@ -312,13 +380,17 @@ func TestSmokeAuthVaultAndSyncFlow(t *testing.T) {
 		t.Fatalf("updated bank card version = %d, want %d", updatedBankCard.Version, gotBankCard.Version+1)
 	}
 
-	updatedBinaryPayload, updatedBinarySchemaVersion, err := core.EncodeBinaryPayload(core.BinaryPayload{
+	updatedBinaryPayload, err := blobService.UploadBinary(ctx, session, core.UploadBinaryInput{
 		FileName:    "updated-smoke.bin",
 		ContentType: "application/octet-stream",
 		Data:        []byte{0x04, 0x05, 0x06},
 	})
 	if err != nil {
-		t.Fatalf("encode updated binary payload: %v", err)
+		t.Fatalf("upload updated binary blob: %v", err)
+	}
+	updatedBinaryPayloadBytes, updatedBinarySchemaVersion, err := core.EncodeBinaryPayload(updatedBinaryPayload)
+	if err != nil {
+		t.Fatalf("encode updated binary payload metadata: %v", err)
 	}
 
 	updatedBinary, err := vaultService.UpdateSecret(ctx, session, core.UpdateSecretInput{
@@ -326,7 +398,7 @@ func TestSmokeAuthVaultAndSyncFlow(t *testing.T) {
 		ExpectedVersion:      gotBinary.Version,
 		Type:                 core.SecretTypeBinary,
 		Metadata:             []byte(`{"title":"updated smoke binary"}`),
-		Payload:              updatedBinaryPayload,
+		Payload:              updatedBinaryPayloadBytes,
 		PayloadSchemaVersion: updatedBinarySchemaVersion,
 	})
 	if err != nil {
@@ -389,8 +461,15 @@ func TestSmokeAuthVaultAndSyncFlow(t *testing.T) {
 		t.Fatalf("decode updated binary payload: %v", err)
 	}
 
-	if decodedUpdatedBinary.FileName != "updated-smoke.bin" || !bytes.Equal(decodedUpdatedBinary.Data, []byte{0x04, 0x05, 0x06}) {
-		t.Fatalf("updated binary = %+v, want updated smoke binary", decodedUpdatedBinary)
+	if decodedUpdatedBinary.FileName != "updated-smoke.bin" || decodedUpdatedBinary.BlobID == "" {
+		t.Fatalf("updated binary metadata = %+v, want updated smoke binary metadata", decodedUpdatedBinary)
+	}
+	downloadedUpdatedBinary, err := blobService.DownloadBinary(ctx, session, core.DownloadBinaryInput{Payload: decodedUpdatedBinary})
+	if err != nil {
+		t.Fatalf("download updated binary blob: %v", err)
+	}
+	if !bytes.Equal(downloadedUpdatedBinary, []byte{0x04, 0x05, 0x06}) {
+		t.Fatalf("downloaded updated binary = %v, want updated smoke binary bytes", downloadedUpdatedBinary)
 	}
 
 	deletedText, err := vaultService.DeleteSecret(ctx, session, core.DeleteSecretInput{
@@ -441,6 +520,18 @@ func TestSmokeAuthVaultAndSyncFlow(t *testing.T) {
 		t.Fatalf("deleted binary id = %q, want %q", deletedBinary.ID, createdBinary.ID)
 	}
 
+	deletedOTP, err := vaultService.DeleteSecret(ctx, session, core.DeleteSecretInput{
+		ID:              createdOTP.ID,
+		ExpectedVersion: gotOTP.Version,
+	})
+	if err != nil {
+		t.Fatalf("delete otp secret: %v", err)
+	}
+
+	if deletedOTP.ID != createdOTP.ID {
+		t.Fatalf("deleted otp id = %q, want %q", deletedOTP.ID, createdOTP.ID)
+	}
+
 	activeAfterDelete, err := vaultService.ListSecrets(ctx, session, core.ListSecretsInput{})
 	if err != nil {
 		t.Fatalf("list after delete: %v", err)
@@ -459,6 +550,7 @@ func TestSmokeAuthVaultAndSyncFlow(t *testing.T) {
 	assertSmokeTombstoneContains(t, synced.Secrets, createdLoginPassword.ID)
 	assertSmokeTombstoneContains(t, synced.Secrets, createdBankCard.ID)
 	assertSmokeTombstoneContains(t, synced.Secrets, createdBinary.ID)
+	assertSmokeTombstoneContains(t, synced.Secrets, createdOTP.ID)
 }
 
 func assertSmokeListContains(t *testing.T, secrets []core.Secret, id string) {
@@ -508,17 +600,25 @@ func openSmokeDatabase(t *testing.T, ctx context.Context, dsn string) *sql.DB {
 	return db
 }
 
-func startSmokeServer(t *testing.T, db *sql.DB, dsn string, address string) *grpcserver.Server {
+func startSmokeServer(t *testing.T, db *sql.DB, dsn string, address string) string {
 	t.Helper()
 
+	certFile, keyFile := writeSmokeCertificate(t)
 	server, err := grpcserver.New(&config.Config{
-		GRPCAddress:       address,
-		DatabaseDSN:       dsn,
-		DatabasePingTTL:   5 * time.Second,
-		AccessTokenSecret: "smoke-local-secret-32-bytes-value",
-		AccessTokenTTL:    5 * time.Minute,
-		LogMode:           "prod",
-	}, zap.NewNop(), db)
+		GRPCAddress:        address,
+		GRPCTLSCertFile:    certFile,
+		GRPCTLSKeyFile:     keyFile,
+		DatabaseDSN:        dsn,
+		DatabasePingTTL:    5 * time.Second,
+		AccessTokenSecret:  "smoke-local-secret-32-bytes-value",
+		AccessTokenTTL:     5 * time.Minute,
+		LogMode:            "prod",
+		BlobStorageEnabled: true,
+		MinIOBucket:        "smoke-blobs",
+		BlobUploadTTL:      time.Hour,
+		BlobChunkSize:      4 * 1024 * 1024,
+		BlobMaxSize:        32 * 1024 * 1024,
+	}, zap.NewNop(), db, newSmokeObjectStore())
 	if err != nil {
 		t.Fatalf("create grpc server: %v", err)
 	}
@@ -535,13 +635,78 @@ func startSmokeServer(t *testing.T, db *sql.DB, dsn string, address string) *grp
 		}
 	})
 
-	return server
+	return certFile
 }
 
-func connectSmokeClient(t *testing.T, ctx context.Context, address string) *grpc.ClientConn {
+type smokeObjectStore struct {
+	mu      sync.Mutex
+	objects map[string][]byte
+}
+
+func newSmokeObjectStore() *smokeObjectStore {
+	return &smokeObjectStore{
+		objects: map[string][]byte{},
+	}
+}
+
+func (s *smokeObjectStore) EnsureBucket(context.Context) error {
+	return nil
+}
+
+func (s *smokeObjectStore) PutObject(_ context.Context, input serverblob.PutObjectInput) error {
+	if strings.TrimSpace(input.Key) == "" {
+		return fmt.Errorf("object key is required")
+	}
+	data, err := io.ReadAll(input.Reader)
+	if err != nil {
+		return err
+	}
+	if int64(len(data)) != input.Size {
+		return fmt.Errorf("object size = %d, want %d", len(data), input.Size)
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.objects[input.Key] = append([]byte(nil), data...)
+	return nil
+}
+
+func (s *smokeObjectStore) GetObject(_ context.Context, key string) (io.ReadCloser, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	data, ok := s.objects[key]
+	if !ok {
+		return nil, fmt.Errorf("object not found")
+	}
+	return io.NopCloser(bytes.NewReader(data)), nil
+}
+
+func (s *smokeObjectStore) StatObject(_ context.Context, key string) (serverblob.ObjectInfo, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	data, ok := s.objects[key]
+	if !ok {
+		return serverblob.ObjectInfo{}, fmt.Errorf("object not found")
+	}
+	return serverblob.ObjectInfo{Key: key, Size: int64(len(data))}, nil
+}
+
+func (s *smokeObjectStore) RemoveObject(_ context.Context, key string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.objects, key)
+	return nil
+}
+
+func connectSmokeClient(t *testing.T, ctx context.Context, address string, certFile string) *grpc.ClientConn {
 	t.Helper()
 
-	conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	creds, err := credentials.NewClientTLSFromFile(certFile, "")
+	if err != nil {
+		t.Fatalf("load client TLS credentials: %v", err)
+	}
+
+	conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(creds))
 	if err != nil {
 		t.Fatalf("create grpc client: %v", err)
 	}
@@ -549,10 +714,10 @@ func connectSmokeClient(t *testing.T, ctx context.Context, address string) *grpc
 	authClient := gophkeeperv1.NewAuthServiceClient(conn)
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
-		_, err = authClient.Login(ctx, &gophkeeperv1.LoginRequest{
+		_, err = authClient.Login(ctx, gophkeeperv1.LoginRequest_builder{
 			Login:         "smoke-healthcheck@example.com",
 			LoginPassword: "wrong-password",
-		})
+		}.Build())
 		if status.Code(err) == codes.Unauthenticated {
 			return conn
 		}
@@ -562,6 +727,51 @@ func connectSmokeClient(t *testing.T, ctx context.Context, address string) *grpc
 
 	t.Fatalf("grpc server did not become ready")
 	return nil
+}
+
+func writeSmokeCertificate(t *testing.T) (string, string) {
+	t.Helper()
+
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("GenerateKey() error = %v", err)
+	}
+
+	template := x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			CommonName: "localhost",
+		},
+		NotBefore:             time.Now().Add(-time.Minute),
+		NotAfter:              time.Now().Add(time.Hour),
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+		DNSNames:              []string{"localhost"},
+		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
+	}
+
+	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &key.PublicKey, key)
+	if err != nil {
+		t.Fatalf("CreateCertificate() error = %v", err)
+	}
+
+	dir := t.TempDir()
+	certFile := filepath.Join(dir, "server.crt")
+	keyFile := filepath.Join(dir, "server.key")
+
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
+	if err = os.WriteFile(certFile, certPEM, 0o600); err != nil {
+		t.Fatalf("WriteFile() cert error = %v", err)
+	}
+
+	keyDER := x509.MarshalPKCS1PrivateKey(key)
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: keyDER})
+	if err = os.WriteFile(keyFile, keyPEM, 0o600); err != nil {
+		t.Fatalf("WriteFile() key error = %v", err)
+	}
+
+	return certFile, keyFile
 }
 
 func freeTCPAddress(t *testing.T) string {

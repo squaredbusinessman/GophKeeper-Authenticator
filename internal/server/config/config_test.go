@@ -21,8 +21,12 @@ func TestLoadReturnsServerConfigWithDefaults(t *testing.T) {
 		t.Fatalf("GRPCAddress = %q, want %q", cfg.GRPCAddress, ":9090")
 	}
 
-	if cfg.GRPCTLSEnabled {
-		t.Fatalf("GRPCTLSEnabled = true, want false")
+	if cfg.GRPCTLSCertFile != "certs/server.crt" {
+		t.Fatalf("GRPCTLSCertFile = %q, want default cert path", cfg.GRPCTLSCertFile)
+	}
+
+	if cfg.GRPCTLSKeyFile != "certs/server.key" {
+		t.Fatalf("GRPCTLSKeyFile = %q, want default key path", cfg.GRPCTLSKeyFile)
 	}
 
 	if cfg.AccessTokenTTL != 5*time.Minute {
@@ -44,12 +48,19 @@ func TestLoadReturnsServerConfigWithDefaults(t *testing.T) {
 
 func TestLoadReturnsServerConfigFromEnv(t *testing.T) {
 	t.Setenv("GOPHKEEPER_GRPC_ADDRESS", ":8080")
-	t.Setenv("GOPHKEEPER_GRPC_TLS_ENABLED", "true")
 	t.Setenv("GOPHKEEPER_GRPC_TLS_CERT_FILE", "/tmp/server.crt")
 	t.Setenv("GOPHKEEPER_GRPC_TLS_KEY_FILE", "/tmp/server.key")
 	t.Setenv("GOPHKEEPER_DATABASE_DSN", "postgres://custom")
 	t.Setenv("GOPHKEEPER_ACCESS_TOKEN_SECRET", testAccessTokenSecret)
 	t.Setenv("GOPHKEEPER_ACCESS_TOKEN_TTL", "30m")
+	t.Setenv("GOPHKEEPER_BLOB_STORAGE_ENABLED", "true")
+	t.Setenv("GOPHKEEPER_MINIO_ENDPOINT", "localhost:9000")
+	t.Setenv("GOPHKEEPER_MINIO_ACCESS_KEY", "gophkeeper")
+	t.Setenv("GOPHKEEPER_MINIO_SECRET_KEY", "gophkeeper-minio-password")
+	t.Setenv("GOPHKEEPER_MINIO_BUCKET", "gophkeeper-blobs")
+	t.Setenv("GOPHKEEPER_BLOB_UPLOAD_TTL", "12h")
+	t.Setenv("GOPHKEEPER_BLOB_CHUNK_SIZE", "8388608")
+	t.Setenv("GOPHKEEPER_BLOB_MAX_SIZE", "2147483648")
 	t.Setenv("GOPHKEEPER_LOG_MODE", "prod")
 
 	cfg, err := Load()
@@ -59,10 +70,6 @@ func TestLoadReturnsServerConfigFromEnv(t *testing.T) {
 
 	if cfg.GRPCAddress != ":8080" {
 		t.Fatalf("GRPCAddress = %q, want %q", cfg.GRPCAddress, ":8080")
-	}
-
-	if !cfg.GRPCTLSEnabled {
-		t.Fatalf("GRPCTLSEnabled = false, want true")
 	}
 
 	if cfg.GRPCTLSCertFile != "/tmp/server.crt" {
@@ -83,6 +90,26 @@ func TestLoadReturnsServerConfigFromEnv(t *testing.T) {
 
 	if cfg.AccessTokenTTL != 30*time.Minute {
 		t.Fatalf("AccessTokenTTL = %s, want %s", cfg.AccessTokenTTL, 30*time.Minute)
+	}
+
+	if !cfg.BlobStorageEnabled {
+		t.Fatalf("BlobStorageEnabled = false, want true")
+	}
+
+	if cfg.MinIOEndpoint != "localhost:9000" {
+		t.Fatalf("MinIOEndpoint = %q, want localhost:9000", cfg.MinIOEndpoint)
+	}
+
+	if cfg.BlobUploadTTL != 12*time.Hour {
+		t.Fatalf("BlobUploadTTL = %s, want %s", cfg.BlobUploadTTL, 12*time.Hour)
+	}
+
+	if cfg.BlobChunkSize != 8388608 {
+		t.Fatalf("BlobChunkSize = %d, want 8388608", cfg.BlobChunkSize)
+	}
+
+	if cfg.BlobMaxSize != 2147483648 {
+		t.Fatalf("BlobMaxSize = %d, want 2147483648", cfg.BlobMaxSize)
 	}
 
 	if cfg.LogMode != "prod" {
@@ -133,7 +160,7 @@ func TestLoadReturnsErrorWhenAccessTokenSecretTooShort(t *testing.T) {
 func TestLoadReturnsErrorWhenTLSCertFileMissing(t *testing.T) {
 	t.Setenv("GOPHKEEPER_DATABASE_DSN", "postgres://custom")
 	t.Setenv("GOPHKEEPER_ACCESS_TOKEN_SECRET", testAccessTokenSecret)
-	t.Setenv("GOPHKEEPER_GRPC_TLS_ENABLED", "true")
+	t.Setenv("GOPHKEEPER_GRPC_TLS_CERT_FILE", " ")
 	t.Setenv("GOPHKEEPER_GRPC_TLS_KEY_FILE", "/tmp/server.key")
 
 	_, err := Load()
@@ -149,8 +176,8 @@ func TestLoadReturnsErrorWhenTLSCertFileMissing(t *testing.T) {
 func TestLoadReturnsErrorWhenTLSKeyFileMissing(t *testing.T) {
 	t.Setenv("GOPHKEEPER_DATABASE_DSN", "postgres://custom")
 	t.Setenv("GOPHKEEPER_ACCESS_TOKEN_SECRET", testAccessTokenSecret)
-	t.Setenv("GOPHKEEPER_GRPC_TLS_ENABLED", "true")
 	t.Setenv("GOPHKEEPER_GRPC_TLS_CERT_FILE", "/tmp/server.crt")
+	t.Setenv("GOPHKEEPER_GRPC_TLS_KEY_FILE", " ")
 
 	_, err := Load()
 	if err == nil {
@@ -159,21 +186,6 @@ func TestLoadReturnsErrorWhenTLSKeyFileMissing(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "key file") {
 		t.Fatalf("Load() error = %q, want mention key file", err.Error())
-	}
-}
-
-func TestLoadReturnsErrorWhenBoolInvalid(t *testing.T) {
-	t.Setenv("GOPHKEEPER_DATABASE_DSN", "postgres://custom")
-	t.Setenv("GOPHKEEPER_ACCESS_TOKEN_SECRET", testAccessTokenSecret)
-	t.Setenv("GOPHKEEPER_GRPC_TLS_ENABLED", "not-bool")
-
-	_, err := Load()
-	if err == nil {
-		t.Fatalf("Load() error = nil, want error")
-	}
-
-	if !strings.Contains(err.Error(), "GOPHKEEPER_GRPC_TLS_ENABLED") {
-		t.Fatalf("Load() error = %q, want mention GOPHKEEPER_GRPC_TLS_ENABLED", err.Error())
 	}
 }
 
@@ -207,9 +219,57 @@ func TestLoadReturnsErrorWhenLogModeInvalid(t *testing.T) {
 	}
 }
 
+func TestLoadReturnsErrorWhenBlobStorageEnabledWithoutMinIOEndpoint(t *testing.T) {
+	t.Setenv("GOPHKEEPER_DATABASE_DSN", "postgres://custom")
+	t.Setenv("GOPHKEEPER_ACCESS_TOKEN_SECRET", testAccessTokenSecret)
+	t.Setenv("GOPHKEEPER_BLOB_STORAGE_ENABLED", "true")
+	t.Setenv("GOPHKEEPER_MINIO_ACCESS_KEY", "gophkeeper")
+	t.Setenv("GOPHKEEPER_MINIO_SECRET_KEY", "gophkeeper-minio-password")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatalf("Load() error = nil, want error")
+	}
+
+	if !strings.Contains(err.Error(), "minio endpoint") {
+		t.Fatalf("Load() error = %q, want mention minio endpoint", err.Error())
+	}
+}
+
+func TestValidateReturnsErrorWhenBlobMaxSizeBelowChunkSize(t *testing.T) {
+	cfg := Config{
+		GRPCAddress:        ":9090",
+		GRPCTLSCertFile:    "/tmp/server.crt",
+		GRPCTLSKeyFile:     "/tmp/server.key",
+		DatabaseDSN:        "postgres://custom",
+		AccessTokenSecret:  testAccessTokenSecret,
+		AccessTokenTTL:     5 * time.Minute,
+		BlobStorageEnabled: true,
+		MinIOEndpoint:      "localhost:9000",
+		MinIOAccessKey:     "gophkeeper",
+		MinIOSecretKey:     "gophkeeper-minio-password",
+		MinIOBucket:        "gophkeeper-blobs",
+		BlobUploadTTL:      24 * time.Hour,
+		BlobChunkSize:      1024,
+		BlobMaxSize:        512,
+		LogMode:            "dev",
+	}
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatalf("Validate() error = nil, want error")
+	}
+
+	if !strings.Contains(err.Error(), "blob max size") {
+		t.Fatalf("Validate() error = %q, want mention blob max size", err.Error())
+	}
+}
+
 func TestValidateReturnsErrorWhenGRPCAddressEmpty(t *testing.T) {
 	cfg := Config{
 		GRPCAddress:       " ",
+		GRPCTLSCertFile:   "/tmp/server.crt",
+		GRPCTLSKeyFile:    "/tmp/server.key",
 		DatabaseDSN:       "postgres://custom",
 		AccessTokenSecret: testAccessTokenSecret,
 		AccessTokenTTL:    5 * time.Minute,
@@ -228,6 +288,8 @@ func TestValidateReturnsErrorWhenGRPCAddressEmpty(t *testing.T) {
 func TestValidateReturnsErrorWhenAccessTokenTTLNotPositive(t *testing.T) {
 	cfg := Config{
 		GRPCAddress:       ":9090",
+		GRPCTLSCertFile:   "/tmp/server.crt",
+		GRPCTLSKeyFile:    "/tmp/server.key",
 		DatabaseDSN:       "postgres://custom",
 		AccessTokenSecret: testAccessTokenSecret,
 		AccessTokenTTL:    0,

@@ -60,9 +60,9 @@ func (h *VaultHandler) CreateItem(ctx context.Context, req *gophkeeperv1.CreateI
 		return nil, vaultStatusError(err)
 	}
 
-	return &gophkeeperv1.CreateItemResponse{
+	return gophkeeperv1.CreateItemResponse_builder{
 		Item: vaultItemToProto(item),
-	}, nil
+	}.Build(), nil
 }
 
 // GetItem возвращает encrypted vault item через gRPC API
@@ -86,9 +86,9 @@ func (h *VaultHandler) GetItem(ctx context.Context, req *gophkeeperv1.GetItemReq
 		return nil, vaultStatusError(err)
 	}
 
-	return &gophkeeperv1.GetItemResponse{
+	return gophkeeperv1.GetItemResponse_builder{
 		Item: vaultItemToProto(item),
-	}, nil
+	}.Build(), nil
 }
 
 // ListItems возвращает encrypted vault items через gRPC API
@@ -110,15 +110,14 @@ func (h *VaultHandler) ListItems(ctx context.Context, req *gophkeeperv1.ListItem
 		return nil, vaultStatusError(err)
 	}
 
-	response := &gophkeeperv1.ListItemsResponse{
-		Items: make([]*gophkeeperv1.VaultItem, 0, len(items)),
-	}
-
+	protoItems := make([]*gophkeeperv1.VaultItem, 0, len(items))
 	for _, item := range items {
-		response.Items = append(response.Items, vaultItemToProto(item))
+		protoItems = append(protoItems, vaultItemToProto(item))
 	}
 
-	return response, nil
+	return gophkeeperv1.ListItemsResponse_builder{
+		Items: protoItems,
+	}.Build(), nil
 }
 
 // UpdateItem обновляет encrypted vault item через gRPC API
@@ -142,9 +141,9 @@ func (h *VaultHandler) UpdateItem(ctx context.Context, req *gophkeeperv1.UpdateI
 		return nil, vaultStatusError(err)
 	}
 
-	return &gophkeeperv1.UpdateItemResponse{
+	return gophkeeperv1.UpdateItemResponse_builder{
 		Item: vaultItemToProto(item),
-	}, nil
+	}.Build(), nil
 }
 
 // DeleteItem мягко удаляет vault item через gRPC API
@@ -168,11 +167,11 @@ func (h *VaultHandler) DeleteItem(ctx context.Context, req *gophkeeperv1.DeleteI
 		return nil, vaultStatusError(err)
 	}
 
-	return &gophkeeperv1.DeleteItemResponse{
+	return gophkeeperv1.DeleteItemResponse_builder{
 		Id:        result.ItemID,
 		Version:   result.Version,
 		DeletedAt: timestamppb.New(result.DeletedAt),
-	}, nil
+	}.Build(), nil
 }
 
 // Sync возвращает изменения vault items через gRPC API
@@ -191,16 +190,15 @@ func (h *VaultHandler) Sync(ctx context.Context, req *gophkeeperv1.SyncRequest) 
 		return nil, vaultStatusError(err)
 	}
 
-	response := &gophkeeperv1.SyncResponse{
-		Items:            make([]*gophkeeperv1.VaultItem, 0, len(result.Items)),
-		NextChangedAfter: timestamppb.New(result.NextChangedAfter),
-	}
-
+	protoItems := make([]*gophkeeperv1.VaultItem, 0, len(result.Items))
 	for _, item := range result.Items {
-		response.Items = append(response.Items, vaultItemToProto(item))
+		protoItems = append(protoItems, vaultItemToProto(item))
 	}
 
-	return response, nil
+	return gophkeeperv1.SyncResponse_builder{
+		Items:            protoItems,
+		NextChangedAfter: timestamppb.New(result.NextChangedAfter),
+	}.Build(), nil
 }
 
 func createItemInputFromProto(userID string, req *gophkeeperv1.CreateItemRequest) (vault.CreateItemInput, error) {
@@ -354,24 +352,24 @@ func encryptedDataFromProto(data *gophkeeperv1.EncryptedData, fieldName string) 
 }
 
 func vaultItemToProto(item vault.Item) *gophkeeperv1.VaultItem {
-	return &gophkeeperv1.VaultItem{
+	return gophkeeperv1.VaultItem_builder{
 		Id:   item.ID,
 		Type: itemTypeToProto(item.Type),
-		Metadata: &gophkeeperv1.EncryptedData{
+		Metadata: gophkeeperv1.EncryptedData_builder{
 			Ciphertext: item.Metadata.Ciphertext,
 			Nonce:      item.Metadata.Nonce,
-		},
-		Payload: &gophkeeperv1.EncryptedData{
+		}.Build(),
+		Payload: gophkeeperv1.EncryptedData_builder{
 			Ciphertext: item.Payload.Ciphertext,
 			Nonce:      item.Payload.Nonce,
-		},
+		}.Build(),
 		EncryptionAlg:        item.EncryptionAlg,
 		PayloadSchemaVersion: item.PayloadSchemaVersion,
 		Version:              item.Version,
 		CreatedAt:            timestamppb.New(item.CreatedAt),
 		UpdatedAt:            timestamppb.New(item.UpdatedAt),
 		DeletedAt:            deletedAtToProto(item),
-	}
+	}.Build()
 }
 
 func deletedAtToProto(item vault.Item) *timestamppb.Timestamp {
@@ -392,6 +390,8 @@ func itemTypeFromProto(itemType gophkeeperv1.ItemType) vault.ItemType {
 		return vault.ItemTypeBinary
 	case gophkeeperv1.ItemType_ITEM_TYPE_BANK_CARD:
 		return vault.ItemTypeBankCard
+	case gophkeeperv1.ItemType_ITEM_TYPE_OTP:
+		return vault.ItemTypeOTP
 	default:
 		return ""
 	}
@@ -407,6 +407,8 @@ func itemTypeToProto(itemType vault.ItemType) gophkeeperv1.ItemType {
 		return gophkeeperv1.ItemType_ITEM_TYPE_BINARY
 	case vault.ItemTypeBankCard:
 		return gophkeeperv1.ItemType_ITEM_TYPE_BANK_CARD
+	case vault.ItemTypeOTP:
+		return gophkeeperv1.ItemType_ITEM_TYPE_OTP
 	default:
 		return gophkeeperv1.ItemType_ITEM_TYPE_UNSPECIFIED
 	}

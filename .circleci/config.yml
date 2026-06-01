@@ -1,0 +1,152 @@
+version: 2.1
+
+orbs:
+  codecov: codecov/codecov@5.4.3
+
+executors:
+  go:
+    docker:
+      - image: cimg/go:1.26.3
+    working_directory: ~/project
+  python:
+    docker:
+      - image: cimg/python:3.13
+    working_directory: ~/project
+
+commands:
+  restore_go_cache:
+    steps:
+      - restore_cache:
+          keys:
+            - go-v1-{{ checksum "go.sum" }}
+            - go-v1-
+  save_go_cache:
+    steps:
+      - save_cache:
+          key: go-v1-{{ checksum "go.sum" }}
+          paths:
+            - ~/go/pkg/mod
+            - ~/.cache/go-build
+
+jobs:
+  format:
+    executor: go
+    steps:
+      - checkout
+      - run:
+          name: Check gofmt
+          command: make fmt-check
+
+  lint:
+    executor: go
+    steps:
+      - checkout
+      - restore_go_cache
+      - run:
+          name: Install golangci-lint
+          command: |
+            curl -sSfL https://golangci-lint.run/install.sh \
+              | sh -s -- -b "$(go env GOPATH)/bin" v2.12.2
+      - run:
+          name: Run golangci-lint
+          command: |
+            mkdir -p artifacts/lint
+            golangci-lint run ./... | tee artifacts/lint/golangci-lint.txt
+      - store_artifacts:
+          path: artifacts/lint
+          destination: lint
+      - save_go_cache
+
+  test:
+    executor: go
+    steps:
+      - checkout
+      - restore_go_cache
+      - run:
+          name: Run tests with coverage
+          command: |
+            mkdir -p artifacts/coverage
+            COVERAGE_RAW_PROFILE=artifacts/coverage/coverage.raw.out \
+              COVERAGE_PROFILE=artifacts/coverage/coverage.out \
+              ./scripts/check_coverage.sh | tee artifacts/coverage/coverage.txt
+      - codecov/upload:
+          files: artifacts/coverage/coverage.out
+          flags: circleci-go
+      - store_artifacts:
+          path: artifacts/coverage
+          destination: coverage
+      - save_go_cache
+
+  security:
+    executor: go
+    steps:
+      - checkout
+      - restore_go_cache
+      - run:
+          name: Install govulncheck
+          command: go install golang.org/x/vuln/cmd/govulncheck@latest
+      - run:
+          name: Run govulncheck
+          command: |
+            mkdir -p artifacts/security
+            govulncheck ./... | tee artifacts/security/govulncheck.txt
+      - store_artifacts:
+          path: artifacts/security
+          destination: security
+      - save_go_cache
+
+  build:
+    executor: go
+    steps:
+      - checkout
+      - restore_go_cache
+      - run:
+          name: Build release artifacts
+          command: |
+            VERSION="${CIRCLE_TAG:-${CIRCLE_SHA1:0:7}}" OUTPUT_DIR=artifacts/packages make build-cli-all
+            OUTPUT_DIR=artifacts/packages make build-tui
+      - store_artifacts:
+          path: artifacts/packages
+          destination: packages
+      - save_go_cache
+
+  docs:
+    executor: python
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - docs-v1-{{ checksum "docs/requirements.txt" }}
+            - docs-v1-
+      - run:
+          name: Install docs dependencies
+          command: python -m pip install -r docs/requirements.txt
+      - run:
+          name: Build static docs
+          command: mkdocs build --strict --site-dir artifacts/docs
+      - store_artifacts:
+          path: artifacts/docs
+          destination: docs
+      - save_cache:
+          key: docs-v1-{{ checksum "docs/requirements.txt" }}
+          paths:
+            - ~/.cache/pip
+
+workflows:
+  ci:
+    jobs:
+      - format
+      - lint
+      - test
+      - security
+      - build:
+          requires:
+            - format
+            - lint
+            - test
+            - security
+      - docs:
+          requires:
+            - format
+            - lint
+            - test

@@ -1,0 +1,52 @@
+codecov:
+  require_ci_to_pass: true
+  notify:
+    wait_for_ci: true
+
+coverage:
+  precision: 1
+  round: down
+  range: 70..90
+  status:
+    project:
+      default:
+        target: 70%
+        threshold: 1%
+        if_ci_failed: error
+      client:
+        target: 70%
+        threshold: 2%
+        if_ci_failed: error
+        paths:
+          - "cmd/gophkeeper-cli/"
+          - "cmd/gophkeeper-tui/"
+          - "internal/client/"
+      server:
+        target: 60%
+        threshold: 2%
+        if_ci_failed: error
+        paths:
+          - "cmd/gophkeeper-server/"
+          - "internal/server/"
+    patch:
+      default:
+        target: 60%
+        threshold: 5%
+        if_ci_failed: error
+
+parsers:
+  go:
+    partials_as_hits: true
+
+comment:
+  layout: "diff, flags, files"
+  behavior: default
+  require_changes: false
+
+github_checks:
+  annotations: true
+
+ignore:
+  - "internal/gen/**"
+  - "google/**"
+  - "internal/tools/**"

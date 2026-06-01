@@ -1,0 +1,1067 @@
+{
+  "consumes": [
+    "application/json"
+  ],
+  "definitions": {
+    "VaultServiceUpdateItemBody": {
+      "properties": {
+        "encryptionAlg": {
+          "title": "encryption_alg содержит название алгоритма шифрования записи",
+          "type": "string"
+        },
+        "expectedVersion": {
+          "format": "int64",
+          "title": "expected_version содержит версию записи, которую клиент ожидает изменить",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/definitions/v1EncryptedData",
+          "title": "metadata содержит новую зашифрованную метаинформацию записи"
+        },
+        "payload": {
+          "$ref": "#/definitions/v1EncryptedData",
+          "title": "payload содержит новое зашифрованное содержимое записи"
+        },
+        "payloadSchemaVersion": {
+          "format": "int64",
+          "title": "payload_schema_version содержит версию схемы зашифрованного содержимого",
+          "type": "integer"
+        },
+        "type": {
+          "$ref": "#/definitions/v1ItemType",
+          "title": "type содержит новый тип приватных данных"
+        }
+      },
+      "title": "UpdateItemRequest содержит данные для обновления существующей записи",
+      "type": "object"
+    },
+    "gophkeeper.v1.ErrorResponse": {
+      "description": "Ошибка HTTP projection для gRPC status",
+      "properties": {
+        "code": {
+          "description": "HTTP status code",
+          "format": "int32",
+          "type": "integer"
+        },
+        "grpcCode": {
+          "description": "gRPC status code",
+          "type": "string"
+        },
+        "message": {
+          "description": "User facing error message",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "protobufAny": {
+      "additionalProperties": {},
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "rpcStatus": {
+      "properties": {
+        "code": {
+          "format": "int32",
+          "type": "integer"
+        },
+        "details": {
+          "items": {
+            "$ref": "#/definitions/protobufAny",
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "v1CreateItemRequest": {
+      "properties": {
+        "encryptionAlg": {
+          "title": "encryption_alg содержит название алгоритма шифрования записи",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/definitions/v1EncryptedData",
+          "title": "metadata содержит зашифрованную метаинформацию записи"
+        },
+        "payload": {
+          "$ref": "#/definitions/v1EncryptedData",
+          "title": "payload содержит зашифрованное содержимое записи"
+        },
+        "payloadSchemaVersion": {
+          "format": "int64",
+          "title": "payload_schema_version содержит версию схемы зашифрованного содержимого",
+          "type": "integer"
+        },
+        "type": {
+          "$ref": "#/definitions/v1ItemType",
+          "title": "type содержит тип создаваемых приватных данных"
+        }
+      },
+      "title": "CreateItemRequest содержит данные для создания новой записи хранилища",
+      "type": "object"
+    },
+    "v1CreateItemResponse": {
+      "properties": {
+        "item": {
+          "$ref": "#/definitions/v1VaultItem",
+          "title": "item содержит созданную запись с серверными полями"
+        }
+      },
+      "title": "CreateItemResponse содержит созданную запись хранилища",
+      "type": "object"
+    },
+    "v1DeleteItemResponse": {
+      "properties": {
+        "deletedAt": {
+          "format": "date-time",
+          "title": "deleted_at содержит момент мягкого удаления записи",
+          "type": "string"
+        },
+        "id": {
+          "title": "id содержит идентификатор удаленной записи",
+          "type": "string"
+        },
+        "version": {
+          "format": "int64",
+          "title": "version содержит новую версию удаленной записи",
+          "type": "string"
+        }
+      },
+      "title": "DeleteItemResponse содержит результат мягкого удаления записи",
+      "type": "object"
+    },
+    "v1EncryptedData": {
+      "properties": {
+        "ciphertext": {
+          "format": "byte",
+          "title": "ciphertext содержит зашифрованные данные",
+          "type": "string"
+        },
+        "nonce": {
+          "format": "byte",
+          "title": "nonce содержит одноразовое значение для расшифровки данных",
+          "type": "string"
+        }
+      },
+      "title": "EncryptedData описывает зашифрованный блок данных",
+      "type": "object"
+    },
+    "v1GetItemResponse": {
+      "properties": {
+        "item": {
+          "$ref": "#/definitions/v1VaultItem",
+          "title": "item содержит найденную запись"
+        }
+      },
+      "title": "GetItemResponse содержит найденную запись хранилища",
+      "type": "object"
+    },
+    "v1ItemType": {
+      "default": "ITEM_TYPE_UNSPECIFIED",
+      "description": "- ITEM_TYPE_UNSPECIFIED: ITEM_TYPE_UNSPECIFIED используется, когда тип записи не задан\n - ITEM_TYPE_LOGIN_PASSWORD: ITEM_TYPE_LOGIN_PASSWORD хранит пару логин и пароль\n - ITEM_TYPE_TEXT: ITEM_TYPE_TEXT хранит произвольные текстовые данные\n - ITEM_TYPE_BINARY: ITEM_TYPE_BINARY хранит произвольные бинарные данные\n - ITEM_TYPE_BANK_CARD: ITEM_TYPE_BANK_CARD хранит данные банковской карты\n - ITEM_TYPE_OTP: ITEM_TYPE_OTP хранит данные одноразовых паролей",
+      "enum": [
+        "ITEM_TYPE_UNSPECIFIED",
+        "ITEM_TYPE_LOGIN_PASSWORD",
+        "ITEM_TYPE_TEXT",
+        "ITEM_TYPE_BINARY",
+        "ITEM_TYPE_BANK_CARD",
+        "ITEM_TYPE_OTP"
+      ],
+      "title": "ItemType задает тип приватных данных в хранилище",
+      "type": "string"
+    },
+    "v1KDFParams": {
+      "properties": {
+        "algorithm": {
+          "title": "algorithm содержит название алгоритма KDF",
+          "type": "string"
+        },
+        "keyLength": {
+          "format": "int64",
+          "title": "key_length задает длину результирующего ключа в байтах",
+          "type": "integer"
+        },
+        "memoryKib": {
+          "format": "int64",
+          "title": "memory_kib задает объем памяти для KDF в KiB",
+          "type": "integer"
+        },
+        "parallelism": {
+          "format": "int64",
+          "title": "parallelism задает уровень параллелизма KDF",
+          "type": "integer"
+        },
+        "salt": {
+          "format": "byte",
+          "title": "salt содержит соль для формирования ключа",
+          "type": "string"
+        },
+        "timeCost": {
+          "format": "int64",
+          "title": "time_cost задает вычислительную стоимость KDF",
+          "type": "integer"
+        }
+      },
+      "title": "KDFParams описывает параметры функции формирования ключа из мастер-пароля",
+      "type": "object"
+    },
+    "v1ListItemsResponse": {
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/definitions/v1VaultItem",
+            "type": "object"
+          },
+          "title": "items содержит записи текущей страницы",
+          "type": "array"
+        },
+        "nextPageToken": {
+          "title": "next_page_token содержит токен следующей страницы",
+          "type": "string"
+        }
+      },
+      "title": "ListItemsResponse содержит страницу записей хранилища",
+      "type": "object"
+    },
+    "v1LoginRequest": {
+      "properties": {
+        "login": {
+          "title": "login содержит логин пользователя",
+          "type": "string"
+        },
+        "loginPassword": {
+          "title": "login_password содержит пароль входа пользователя",
+          "type": "string"
+        }
+      },
+      "title": "LoginRequest содержит данные для аутентификации пользователя",
+      "type": "object"
+    },
+    "v1LoginResponse": {
+      "properties": {
+        "accessToken": {
+          "title": "access_token содержит токен доступа к API",
+          "type": "string"
+        },
+        "accessTokenExpiresAt": {
+          "format": "date-time",
+          "title": "access_token_expires_at содержит момент истечения токена доступа",
+          "type": "string"
+        },
+        "vaultKey": {
+          "$ref": "#/definitions/v1VaultKeyEnvelope",
+          "title": "vault_key содержит зашифрованный ключ хранилища пользователя"
+        }
+      },
+      "title": "LoginResponse содержит результат успешной аутентификации пользователя",
+      "type": "object"
+    },
+    "v1RegisterRequest": {
+      "properties": {
+        "login": {
+          "title": "login содержит уникальный логин пользователя",
+          "type": "string"
+        },
+        "loginPassword": {
+          "title": "login_password содержит пароль входа, который не используется для шифрования секретов",
+          "type": "string"
+        },
+        "vaultKey": {
+          "$ref": "#/definitions/v1VaultKeyEnvelope",
+          "title": "vault_key содержит зашифрованный ключ хранилища, подготовленный клиентом"
+        }
+      },
+      "title": "RegisterRequest содержит данные для регистрации нового пользователя",
+      "type": "object"
+    },
+    "v1RegisterResponse": {
+      "properties": {
+        "accessToken": {
+          "title": "access_token содержит токен доступа к API",
+          "type": "string"
+        },
+        "accessTokenExpiresAt": {
+          "format": "date-time",
+          "title": "access_token_expires_at содержит момент истечения токена доступа",
+          "type": "string"
+        },
+        "vaultKey": {
+          "$ref": "#/definitions/v1VaultKeyEnvelope",
+          "title": "vault_key содержит зашифрованный ключ хранилища пользователя"
+        }
+      },
+      "title": "RegisterResponse содержит результат успешной регистрации пользователя",
+      "type": "object"
+    },
+    "v1SyncRequest": {
+      "properties": {
+        "changedAfter": {
+          "format": "date-time",
+          "title": "changed_after задает нижнюю границу времени изменения записей",
+          "type": "string"
+        },
+        "pageSize": {
+          "format": "int32",
+          "title": "page_size задает максимальное количество изменений в ответе",
+          "type": "integer"
+        },
+        "pageToken": {
+          "title": "page_token содержит токен следующей страницы изменений",
+          "type": "string"
+        }
+      },
+      "title": "SyncRequest содержит параметры синхронизации клиентского хранилища",
+      "type": "object"
+    },
+    "v1SyncResponse": {
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/definitions/v1VaultItem",
+            "type": "object"
+          },
+          "title": "items содержит измененные записи, включая мягко удаленные",
+          "type": "array"
+        },
+        "nextChangedAfter": {
+          "format": "date-time",
+          "title": "next_changed_after содержит новую границу времени для следующей синхронизации",
+          "type": "string"
+        },
+        "nextPageToken": {
+          "title": "next_page_token содержит токен следующей страницы изменений",
+          "type": "string"
+        }
+      },
+      "title": "SyncResponse содержит страницу изменений для синхронизации клиента",
+      "type": "object"
+    },
+    "v1UpdateItemResponse": {
+      "properties": {
+        "item": {
+          "$ref": "#/definitions/v1VaultItem",
+          "title": "item содержит обновленную запись с новой версией"
+        }
+      },
+      "title": "UpdateItemResponse содержит обновленную запись хранилища",
+      "type": "object"
+    },
+    "v1VaultItem": {
+      "properties": {
+        "createdAt": {
+          "format": "date-time",
+          "title": "created_at содержит момент создания записи на сервере",
+          "type": "string"
+        },
+        "deletedAt": {
+          "format": "date-time",
+          "title": "deleted_at содержит момент мягкого удаления записи, если запись удалена",
+          "type": "string"
+        },
+        "encryptionAlg": {
+          "title": "encryption_alg содержит название алгоритма шифрования записи",
+          "type": "string"
+        },
+        "id": {
+          "title": "id содержит уникальный идентификатор записи",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/definitions/v1EncryptedData",
+          "title": "metadata содержит зашифрованную произвольную метаинформацию записи"
+        },
+        "payload": {
+          "$ref": "#/definitions/v1EncryptedData",
+          "title": "payload содержит зашифрованное содержимое записи"
+        },
+        "payloadSchemaVersion": {
+          "format": "int64",
+          "title": "payload_schema_version содержит версию схемы зашифрованного содержимого",
+          "type": "integer"
+        },
+        "type": {
+          "$ref": "#/definitions/v1ItemType",
+          "title": "type содержит тип приватных данных"
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "title": "updated_at содержит момент последнего обновления записи на сервере",
+          "type": "string"
+        },
+        "version": {
+          "format": "int64",
+          "title": "version содержит версию записи для оптимистичной блокировки",
+          "type": "string"
+        }
+      },
+      "title": "VaultItem описывает одну запись зашифрованного хранилища пользователя",
+      "type": "object"
+    },
+    "v1VaultKeyEnvelope": {
+      "properties": {
+        "encryptedVaultKey": {
+          "format": "byte",
+          "title": "encrypted_vault_key содержит ключ хранилища, зашифрованный ключом из мастер-пароля",
+          "type": "string"
+        },
+        "encryptionAlg": {
+          "title": "encryption_alg содержит название алгоритма шифрования ключа хранилища",
+          "type": "string"
+        },
+        "kdfParams": {
+          "$ref": "#/definitions/v1KDFParams",
+          "title": "kdf_params содержит параметры получения ключа из мастер-пароля"
+        },
+        "nonce": {
+          "format": "byte",
+          "title": "nonce содержит одноразовое значение для расшифровки ключа хранилища",
+          "type": "string"
+        }
+      },
+      "title": "VaultKeyEnvelope хранит зашифрованный ключ пользовательского хранилища",
+      "type": "object"
+    }
+  },
+  "info": {
+    "description": "Runtime transport remains gRPC. This Swagger file documents the HTTP projection of the protobuf contract",
+    "title": "GophKeeper gRPC HTTP projection",
+    "version": "v1"
+  },
+  "paths": {
+    "/v1/auth/login": {
+      "post": {
+        "operationId": "AuthService_Login",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1LoginRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1LoginResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "Permission denied",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "409": {
+            "description": "Version conflict",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "summary": "Login аутентифицирует существующего пользователя и возвращает данные авторизованной сессии",
+        "tags": [
+          "AuthService"
+        ]
+      }
+    },
+    "/v1/auth/register": {
+      "post": {
+        "operationId": "AuthService_Register",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1RegisterRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1RegisterResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "Permission denied",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "409": {
+            "description": "Version conflict",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "summary": "Register создает нового пользователя и возвращает данные авторизованной сессии",
+        "tags": [
+          "AuthService"
+        ]
+      }
+    },
+    "/v1/vault/items": {
+      "get": {
+        "operationId": "VaultService_ListItems",
+        "parameters": [
+          {
+            "description": "page_size задает максимальное количество записей в ответе",
+            "format": "int32",
+            "in": "query",
+            "name": "pageSize",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "description": "page_token содержит токен следующей страницы",
+            "in": "query",
+            "name": "pageToken",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "description": "include_deleted указывает, нужно ли возвращать мягко удаленные записи",
+            "in": "query",
+            "name": "includeDeleted",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListItemsResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "Permission denied",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "409": {
+            "description": "Version conflict",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "ListItems возвращает страницу записей хранилища пользователя",
+        "tags": [
+          "VaultService"
+        ]
+      },
+      "post": {
+        "operationId": "VaultService_CreateItem",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1CreateItemRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1CreateItemResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "Permission denied",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "409": {
+            "description": "Version conflict",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "CreateItem создает новую запись в хранилище пользователя",
+        "tags": [
+          "VaultService"
+        ]
+      }
+    },
+    "/v1/vault/items/{id}": {
+      "delete": {
+        "operationId": "VaultService_DeleteItem",
+        "parameters": [
+          {
+            "description": "id содержит идентификатор удаляемой записи",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "expected_version содержит версию записи, которую клиент ожидает удалить",
+            "format": "int64",
+            "in": "query",
+            "name": "expectedVersion",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1DeleteItemResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "Permission denied",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "409": {
+            "description": "Version conflict",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "DeleteItem помечает запись как удаленную с проверкой ожидаемой версии",
+        "tags": [
+          "VaultService"
+        ]
+      },
+      "get": {
+        "operationId": "VaultService_GetItem",
+        "parameters": [
+          {
+            "description": "id содержит идентификатор запрашиваемой записи",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1GetItemResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "Permission denied",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "409": {
+            "description": "Version conflict",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "GetItem возвращает одну запись хранилища по идентификатору",
+        "tags": [
+          "VaultService"
+        ]
+      },
+      "put": {
+        "operationId": "VaultService_UpdateItem",
+        "parameters": [
+          {
+            "description": "id содержит идентификатор обновляемой записи",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/VaultServiceUpdateItemBody"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1UpdateItemResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "Permission denied",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "409": {
+            "description": "Version conflict",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "UpdateItem обновляет существующую запись с проверкой ожидаемой версии",
+        "tags": [
+          "VaultService"
+        ]
+      }
+    },
+    "/v1/vault/sync": {
+      "post": {
+        "operationId": "VaultService_Sync",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1SyncRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1SyncResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "403": {
+            "description": "Permission denied",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "409": {
+            "description": "Version conflict",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "schema": {
+              "$ref": "#/definitions/gophkeeper.v1.ErrorResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Sync возвращает изменения хранилища для синхронизации клиента",
+        "tags": [
+          "VaultService"
+        ]
+      }
+    }
+  },
+  "produces": [
+    "application/json"
+  ],
+  "securityDefinitions": {
+    "BearerAuth": {
+      "description": "JWT access token in format Bearer \u003ctoken\u003e",
+      "in": "header",
+      "name": "Authorization",
+      "type": "apiKey"
+    }
+  },
+  "swagger": "2.0",
+  "tags": [
+    {
+      "name": "AuthService"
+    },
+    {
+      "name": "VaultService"
+    },
+    {
+      "name": "BlobService"
+    }
+  ]
+}

@@ -93,11 +93,11 @@ func (a *AuthService) Register(ctx context.Context, input RegisterInput) (Sessio
 		return Session{}, fmt.Errorf("could not encrypt vault key: %w", err)
 	}
 
-	response, err := a.authClient.Register(ctx, &gophkeeperv1.RegisterRequest{
+	response, err := a.authClient.Register(ctx, gophkeeperv1.RegisterRequest_builder{
 		Login:         strings.TrimSpace(input.Login),
 		LoginPassword: input.LoginPassword,
 		VaultKey:      vaultKeyEnvelopeToProto(envelope),
-	})
+	}.Build())
 	if err != nil {
 		return Session{}, fmt.Errorf("could not register user: %w", err)
 	}
@@ -134,17 +134,17 @@ func (a *AuthService) Login(ctx context.Context, input LoginInput) (Session, err
 		return Session{}, fmt.Errorf("token store is required")
 	}
 
-	response, err := a.authClient.Login(ctx, &gophkeeperv1.LoginRequest{
+	response, err := a.authClient.Login(ctx, gophkeeperv1.LoginRequest_builder{
 		Login:         strings.TrimSpace(input.Login),
 		LoginPassword: input.LoginPassword,
-	})
+	}.Build())
 	if err != nil {
 		return Session{}, fmt.Errorf("could not login: %w", err)
 	}
 
 	rawVaultKey, err := vaultkey.Decrypt(input.MasterPassword, vaultKeyEnvelopeFromProto(response.GetVaultKey()))
 	if err != nil {
-		return Session{}, fmt.Errorf("could not decrypt vault key: %w", err)
+		return Session{}, fmt.Errorf("%w: %w", ErrInvalidMasterPassword, err)
 	}
 
 	session, err := sessionFromAuthResponse(authResponse{
@@ -214,19 +214,19 @@ func sessionFromAuthResponse(response authResponse, rawVaultKey []byte) (Session
 }
 
 func vaultKeyEnvelopeToProto(envelope vaultkey.Envelope) *gophkeeperv1.VaultKeyEnvelope {
-	return &gophkeeperv1.VaultKeyEnvelope{
+	return gophkeeperv1.VaultKeyEnvelope_builder{
 		EncryptedVaultKey: envelope.EncryptedVaultKey,
 		Nonce:             envelope.Nonce,
 		EncryptionAlg:     envelope.EncryptionAlg,
-		KdfParams: &gophkeeperv1.KDFParams{
+		KdfParams: gophkeeperv1.KDFParams_builder{
 			Algorithm:   envelope.KDFParams.Algorithm,
 			Salt:        envelope.KDFParams.Salt,
 			TimeCost:    envelope.KDFParams.TimeCost,
 			MemoryKib:   envelope.KDFParams.MemoryKiB,
 			Parallelism: uint32(envelope.KDFParams.Parallelism),
 			KeyLength:   envelope.KDFParams.KeyLength,
-		},
-	}
+		}.Build(),
+	}.Build()
 }
 
 func vaultKeyEnvelopeFromProto(envelope *gophkeeperv1.VaultKeyEnvelope) vaultkey.Envelope {

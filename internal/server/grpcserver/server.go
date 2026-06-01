@@ -9,6 +9,7 @@ import (
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/server/auth/login"
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/server/auth/register"
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/server/auth/token"
+	serverblob "github.com/squaredbusinessman/gophkeeper-authenticator/internal/server/blob"
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/server/vault"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -29,23 +30,23 @@ type Server struct {
 }
 
 // New создает и настраивает gRPC-сервер
-func New(cfg *config.Config, logger *zap.Logger, db *sql.DB) (*Server, error) {
+func New(cfg *config.Config, logger *zap.Logger, db *sql.DB, blobStore serverblob.ObjectStore) (*Server, error) {
 	tokenIssuer := token.NewIssuer(cfg.AccessTokenSecret, cfg.AccessTokenTTL)
 	serverOptions := []grpc.ServerOption{
 		grpc.ChainUnaryInterceptor(
 			AuthUnaryInterceptor(tokenIssuer),
 			LoggingUnaryInterceptor(logger),
 		),
+		grpc.ChainStreamInterceptor(
+			AuthStreamInterceptor(tokenIssuer),
+		),
 	}
 
-	if cfg.GRPCTLSEnabled {
-		creds, err := credentials.NewServerTLSFromFile(cfg.GRPCTLSCertFile, cfg.GRPCTLSKeyFile)
-		if err != nil {
-			return nil, fmt.Errorf("load grpc TLS credentials: %w", err)
-		}
-
-		serverOptions = append(serverOptions, grpc.Creds(creds))
+	creds, err := credentials.NewServerTLSFromFile(cfg.GRPCTLSCertFile, cfg.GRPCTLSKeyFile)
+	if err != nil {
+		return nil, fmt.Errorf("load grpc TLS credentials: %w", err)
 	}
+	serverOptions = append(serverOptions, grpc.Creds(creds))
 
 	listener, err := net.Listen("tcp", cfg.GRPCAddress)
 	if err != nil {
@@ -72,13 +73,29 @@ func New(cfg *config.Config, logger *zap.Logger, db *sql.DB) (*Server, error) {
 	gophkeeperv1.RegisterAuthServiceServer(grpcServer, handler.NewAuthHandler(registerUseCase, loginUseCase))
 	gophkeeperv1.RegisterVaultServiceServer(grpcServer, handler.NewVaultHandler(vaultUseCase))
 
+	if cfg.BlobStorageEnabled {
+		if blobStore == nil {
+			return nil, fmt.Errorf("blob storage is enabled but object store is not configured")
+		}
+
+		blobRepository := serverblob.NewPostgresRepository(db)
+		blobUseCase := serverblob.NewService(blobRepository, blobStore, serverblob.IDGeneratorFunc(serverblob.NewUUID), serverblob.Config{
+			Bucket:    cfg.MinIOBucket,
+			ChunkSize: cfg.BlobChunkSize,
+			MaxSize:   cfg.BlobMaxSize,
+			UploadTTL: cfg.BlobUploadTTL,
+		})
+
+		gophkeeperv1.RegisterBlobServiceServer(grpcServer, handler.NewBlobHandler(blobUseCase))
+	}
+
 	listenerOwned = false
 	return &Server{
 		grpcServer: grpcServer,
 		listener:   listener,
 		logger:     logger,
 		address:    cfg.GRPCAddress,
-		tlsEnabled: cfg.GRPCTLSEnabled,
+		tlsEnabled: true,
 	}, nil
 }
 

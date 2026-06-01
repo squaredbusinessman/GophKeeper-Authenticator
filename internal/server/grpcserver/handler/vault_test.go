@@ -122,19 +122,19 @@ func validVaultItem() vault.Item {
 }
 
 func validCreateItemRequest() *gophkeeperv1.CreateItemRequest {
-	return &gophkeeperv1.CreateItemRequest{
+	return gophkeeperv1.CreateItemRequest_builder{
 		Type: gophkeeperv1.ItemType_ITEM_TYPE_LOGIN_PASSWORD,
-		Metadata: &gophkeeperv1.EncryptedData{
+		Metadata: gophkeeperv1.EncryptedData_builder{
 			Ciphertext: []byte("encrypted-metadata"),
 			Nonce:      []byte("metadata-nonce"),
-		},
-		Payload: &gophkeeperv1.EncryptedData{
+		}.Build(),
+		Payload: gophkeeperv1.EncryptedData_builder{
 			Ciphertext: []byte("encrypted-payload"),
 			Nonce:      []byte("payload-nonce"),
-		},
+		}.Build(),
 		EncryptionAlg:        "aes-256-gcm",
 		PayloadSchemaVersion: 1,
-	}
+	}.Build()
 }
 
 func vaultContext() context.Context {
@@ -150,31 +150,31 @@ func TestVaultHandlerCreateItemCallsUseCaseAndReturnsItem(t *testing.T) {
 		t.Fatalf("CreateItem() error = %v", err)
 	}
 
-	if response == nil || response.Item == nil {
+	if response == nil || response.GetItem() == nil {
 		t.Fatalf("CreateItem() response item = nil")
 	}
 
-	if response.Item.Id != "item-id-1" {
-		t.Fatalf("Item.Id = %q, want item-id-1", response.Item.Id)
+	if response.GetItem().GetId() != "item-id-1" {
+		t.Fatalf("Item.Id = %q, want item-id-1", response.GetItem().GetId())
 	}
 
-	if response.Item.Type != gophkeeperv1.ItemType_ITEM_TYPE_LOGIN_PASSWORD {
-		t.Fatalf("Item.Type = %s, want ITEM_TYPE_LOGIN_PASSWORD", response.Item.Type)
+	if response.GetItem().GetType() != gophkeeperv1.ItemType_ITEM_TYPE_LOGIN_PASSWORD {
+		t.Fatalf("Item.Type = %s, want ITEM_TYPE_LOGIN_PASSWORD", response.GetItem().GetType())
 	}
 
-	if string(response.Item.Metadata.GetCiphertext()) != "encrypted-metadata" {
-		t.Fatalf("metadata ciphertext = %q, want encrypted-metadata", string(response.Item.Metadata.GetCiphertext()))
+	if string(response.GetItem().GetMetadata().GetCiphertext()) != "encrypted-metadata" {
+		t.Fatalf("metadata ciphertext = %q, want encrypted-metadata", string(response.GetItem().GetMetadata().GetCiphertext()))
 	}
 
-	if string(response.Item.Payload.GetCiphertext()) != "encrypted-payload" {
-		t.Fatalf("payload ciphertext = %q, want encrypted-payload", string(response.Item.Payload.GetCiphertext()))
+	if string(response.GetItem().GetPayload().GetCiphertext()) != "encrypted-payload" {
+		t.Fatalf("payload ciphertext = %q, want encrypted-payload", string(response.GetItem().GetPayload().GetCiphertext()))
 	}
 
-	if response.Item.Version != 7 {
-		t.Fatalf("Item.Version = %d, want 7", response.Item.Version)
+	if response.GetItem().GetVersion() != 7 {
+		t.Fatalf("Item.Version = %d, want 7", response.GetItem().GetVersion())
 	}
 
-	if response.Item.CreatedAt == nil {
+	if response.GetItem().GetCreatedAt() == nil {
 		t.Fatalf("Item.CreatedAt = nil")
 	}
 
@@ -204,17 +204,17 @@ func TestVaultHandlerGetItemCallsUseCaseAndReturnsItem(t *testing.T) {
 	useCase := &fakeVaultUseCase{}
 	handler := NewVaultHandler(useCase)
 
-	response, err := handler.GetItem(vaultContext(), &gophkeeperv1.GetItemRequest{Id: "item-id-1"})
+	response, err := handler.GetItem(vaultContext(), gophkeeperv1.GetItemRequest_builder{Id: "item-id-1"}.Build())
 	if err != nil {
 		t.Fatalf("GetItem() error = %v", err)
 	}
 
-	if response == nil || response.Item == nil {
+	if response == nil || response.GetItem() == nil {
 		t.Fatalf("GetItem() response item = nil")
 	}
 
-	if response.Item.Id != "item-id-1" {
-		t.Fatalf("Item.Id = %q, want item-id-1", response.Item.Id)
+	if response.GetItem().GetId() != "item-id-1" {
+		t.Fatalf("Item.Id = %q, want item-id-1", response.GetItem().GetId())
 	}
 
 	if len(useCase.getCalls) != 1 {
@@ -235,7 +235,7 @@ func TestVaultHandlerListItemsCallsUseCaseAndReturnsItems(t *testing.T) {
 	useCase := &fakeVaultUseCase{}
 	handler := NewVaultHandler(useCase)
 
-	response, err := handler.ListItems(vaultContext(), &gophkeeperv1.ListItemsRequest{})
+	response, err := handler.ListItems(vaultContext(), gophkeeperv1.ListItemsRequest_builder{}.Build())
 	if err != nil {
 		t.Fatalf("ListItems() error = %v", err)
 	}
@@ -275,12 +275,12 @@ func TestVaultHandlerUpdateItemCallsUseCaseAndReturnsItem(t *testing.T) {
 		t.Fatalf("UpdateItem() error = %v", err)
 	}
 
-	if response == nil || response.Item == nil {
+	if response == nil || response.GetItem() == nil {
 		t.Fatalf("UpdateItem() response item = nil")
 	}
 
-	if response.Item.GetVersion() != 8 {
-		t.Fatalf("version = %d, want 8", response.Item.GetVersion())
+	if response.GetItem().GetVersion() != 8 {
+		t.Fatalf("version = %d, want 8", response.GetItem().GetVersion())
 	}
 
 	if len(useCase.updateCalls) != 1 {
@@ -309,10 +309,10 @@ func TestVaultHandlerDeleteItemCallsUseCaseAndReturnsResult(t *testing.T) {
 	useCase := &fakeVaultUseCase{}
 	handler := NewVaultHandler(useCase)
 
-	response, err := handler.DeleteItem(vaultContext(), &gophkeeperv1.DeleteItemRequest{
+	response, err := handler.DeleteItem(vaultContext(), gophkeeperv1.DeleteItemRequest_builder{
 		Id:              "item-id-1",
 		ExpectedVersion: 7,
-	})
+	}.Build())
 	if err != nil {
 		t.Fatalf("DeleteItem() error = %v", err)
 	}
@@ -373,9 +373,9 @@ func TestVaultHandlerSyncCallsUseCaseAndReturnsChangedItems(t *testing.T) {
 	}
 	handler := NewVaultHandler(useCase)
 
-	response, err := handler.Sync(vaultContext(), &gophkeeperv1.SyncRequest{
+	response, err := handler.Sync(vaultContext(), gophkeeperv1.SyncRequest_builder{
 		ChangedAfter: timestamppb.New(changedAfter),
-	})
+	}.Build())
 	if err != nil {
 		t.Fatalf("Sync() error = %v", err)
 	}
@@ -423,12 +423,12 @@ func TestVaultHandlerReturnsUnauthenticatedWhenUserIDMissing(t *testing.T) {
 		t.Fatalf("CreateItem() code = %s, want %s", status.Code(err), codes.Unauthenticated)
 	}
 
-	_, err = handler.GetItem(context.Background(), &gophkeeperv1.GetItemRequest{Id: "item-id-1"})
+	_, err = handler.GetItem(context.Background(), gophkeeperv1.GetItemRequest_builder{Id: "item-id-1"}.Build())
 	if status.Code(err) != codes.Unauthenticated {
 		t.Fatalf("GetItem() code = %s, want %s", status.Code(err), codes.Unauthenticated)
 	}
 
-	_, err = handler.ListItems(context.Background(), &gophkeeperv1.ListItemsRequest{})
+	_, err = handler.ListItems(context.Background(), gophkeeperv1.ListItemsRequest_builder{}.Build())
 	if status.Code(err) != codes.Unauthenticated {
 		t.Fatalf("ListItems() code = %s, want %s", status.Code(err), codes.Unauthenticated)
 	}
@@ -438,12 +438,12 @@ func TestVaultHandlerReturnsUnauthenticatedWhenUserIDMissing(t *testing.T) {
 		t.Fatalf("UpdateItem() code = %s, want %s", status.Code(err), codes.Unauthenticated)
 	}
 
-	_, err = handler.DeleteItem(context.Background(), &gophkeeperv1.DeleteItemRequest{Id: "item-id-1", ExpectedVersion: 7})
+	_, err = handler.DeleteItem(context.Background(), gophkeeperv1.DeleteItemRequest_builder{Id: "item-id-1", ExpectedVersion: 7}.Build())
 	if status.Code(err) != codes.Unauthenticated {
 		t.Fatalf("DeleteItem() code = %s, want %s", status.Code(err), codes.Unauthenticated)
 	}
 
-	_, err = handler.Sync(context.Background(), &gophkeeperv1.SyncRequest{})
+	_, err = handler.Sync(context.Background(), gophkeeperv1.SyncRequest_builder{}.Build())
 	if status.Code(err) != codes.Unauthenticated {
 		t.Fatalf("Sync() code = %s, want %s", status.Code(err), codes.Unauthenticated)
 	}
@@ -486,7 +486,7 @@ func TestVaultHandlerCreateItemReturnsInvalidArgumentForInvalidRequest(t *testin
 			name: "unspecified type",
 			request: func() *gophkeeperv1.CreateItemRequest {
 				request := validCreateItemRequest()
-				request.Type = gophkeeperv1.ItemType_ITEM_TYPE_UNSPECIFIED
+				request.SetType(gophkeeperv1.ItemType_ITEM_TYPE_UNSPECIFIED)
 				return request
 			}(),
 		},
@@ -494,7 +494,7 @@ func TestVaultHandlerCreateItemReturnsInvalidArgumentForInvalidRequest(t *testin
 			name: "nil metadata",
 			request: func() *gophkeeperv1.CreateItemRequest {
 				request := validCreateItemRequest()
-				request.Metadata = nil
+				request.SetMetadata(nil)
 				return request
 			}(),
 		},
@@ -502,7 +502,7 @@ func TestVaultHandlerCreateItemReturnsInvalidArgumentForInvalidRequest(t *testin
 			name: "empty metadata ciphertext",
 			request: func() *gophkeeperv1.CreateItemRequest {
 				request := validCreateItemRequest()
-				request.Metadata.Ciphertext = nil
+				request.GetMetadata().SetCiphertext(nil)
 				return request
 			}(),
 		},
@@ -510,7 +510,7 @@ func TestVaultHandlerCreateItemReturnsInvalidArgumentForInvalidRequest(t *testin
 			name: "nil payload",
 			request: func() *gophkeeperv1.CreateItemRequest {
 				request := validCreateItemRequest()
-				request.Payload = nil
+				request.SetPayload(nil)
 				return request
 			}(),
 		},
@@ -518,7 +518,7 @@ func TestVaultHandlerCreateItemReturnsInvalidArgumentForInvalidRequest(t *testin
 			name: "empty payload nonce",
 			request: func() *gophkeeperv1.CreateItemRequest {
 				request := validCreateItemRequest()
-				request.Payload.Nonce = nil
+				request.GetPayload().SetNonce(nil)
 				return request
 			}(),
 		},
@@ -526,7 +526,7 @@ func TestVaultHandlerCreateItemReturnsInvalidArgumentForInvalidRequest(t *testin
 			name: "empty encryption alg",
 			request: func() *gophkeeperv1.CreateItemRequest {
 				request := validCreateItemRequest()
-				request.EncryptionAlg = " "
+				request.SetEncryptionAlg(" ")
 				return request
 			}(),
 		},
@@ -534,7 +534,7 @@ func TestVaultHandlerCreateItemReturnsInvalidArgumentForInvalidRequest(t *testin
 			name: "zero payload schema version",
 			request: func() *gophkeeperv1.CreateItemRequest {
 				request := validCreateItemRequest()
-				request.PayloadSchemaVersion = 0
+				request.SetPayloadSchemaVersion(0)
 				return request
 			}(),
 		},
@@ -568,7 +568,7 @@ func TestVaultHandlerGetItemReturnsInvalidArgumentForInvalidRequest(t *testing.T
 		},
 		{
 			name:    "empty id",
-			request: &gophkeeperv1.GetItemRequest{Id: " "},
+			request: gophkeeperv1.GetItemRequest_builder{Id: " "}.Build(),
 		},
 	}
 
@@ -602,7 +602,7 @@ func TestVaultHandlerUpdateItemReturnsInvalidArgumentForInvalidRequest(t *testin
 			name: "empty id",
 			request: func() *gophkeeperv1.UpdateItemRequest {
 				request := validUpdateItemRequest()
-				request.Id = " "
+				request.SetId(" ")
 				return request
 			}(),
 		},
@@ -610,7 +610,7 @@ func TestVaultHandlerUpdateItemReturnsInvalidArgumentForInvalidRequest(t *testin
 			name: "zero expected version",
 			request: func() *gophkeeperv1.UpdateItemRequest {
 				request := validUpdateItemRequest()
-				request.ExpectedVersion = 0
+				request.SetExpectedVersion(0)
 				return request
 			}(),
 		},
@@ -618,7 +618,7 @@ func TestVaultHandlerUpdateItemReturnsInvalidArgumentForInvalidRequest(t *testin
 			name: "unspecified type",
 			request: func() *gophkeeperv1.UpdateItemRequest {
 				request := validUpdateItemRequest()
-				request.Type = gophkeeperv1.ItemType_ITEM_TYPE_UNSPECIFIED
+				request.SetType(gophkeeperv1.ItemType_ITEM_TYPE_UNSPECIFIED)
 				return request
 			}(),
 		},
@@ -626,7 +626,7 @@ func TestVaultHandlerUpdateItemReturnsInvalidArgumentForInvalidRequest(t *testin
 			name: "nil metadata",
 			request: func() *gophkeeperv1.UpdateItemRequest {
 				request := validUpdateItemRequest()
-				request.Metadata = nil
+				request.SetMetadata(nil)
 				return request
 			}(),
 		},
@@ -634,7 +634,7 @@ func TestVaultHandlerUpdateItemReturnsInvalidArgumentForInvalidRequest(t *testin
 			name: "nil payload",
 			request: func() *gophkeeperv1.UpdateItemRequest {
 				request := validUpdateItemRequest()
-				request.Payload = nil
+				request.SetPayload(nil)
 				return request
 			}(),
 		},
@@ -642,7 +642,7 @@ func TestVaultHandlerUpdateItemReturnsInvalidArgumentForInvalidRequest(t *testin
 			name: "empty encryption alg",
 			request: func() *gophkeeperv1.UpdateItemRequest {
 				request := validUpdateItemRequest()
-				request.EncryptionAlg = " "
+				request.SetEncryptionAlg(" ")
 				return request
 			}(),
 		},
@@ -650,7 +650,7 @@ func TestVaultHandlerUpdateItemReturnsInvalidArgumentForInvalidRequest(t *testin
 			name: "zero payload schema version",
 			request: func() *gophkeeperv1.UpdateItemRequest {
 				request := validUpdateItemRequest()
-				request.PayloadSchemaVersion = 0
+				request.SetPayloadSchemaVersion(0)
 				return request
 			}(),
 		},
@@ -684,16 +684,16 @@ func TestVaultHandlerDeleteItemReturnsInvalidArgumentForInvalidRequest(t *testin
 		},
 		{
 			name: "empty id",
-			request: &gophkeeperv1.DeleteItemRequest{
+			request: gophkeeperv1.DeleteItemRequest_builder{
 				Id:              " ",
 				ExpectedVersion: 7,
-			},
+			}.Build(),
 		},
 		{
 			name: "zero expected version",
-			request: &gophkeeperv1.DeleteItemRequest{
+			request: gophkeeperv1.DeleteItemRequest_builder{
 				Id: "item-id-1",
-			},
+			}.Build(),
 		},
 	}
 
@@ -770,7 +770,7 @@ func TestVaultHandlerMapsUseCaseErrors(t *testing.T) {
 			}
 			handler := NewVaultHandler(useCase)
 
-			_, err := handler.GetItem(vaultContext(), &gophkeeperv1.GetItemRequest{Id: "item-id-1"})
+			_, err := handler.GetItem(vaultContext(), gophkeeperv1.GetItemRequest_builder{Id: "item-id-1"}.Build())
 			if status.Code(err) != tt.code {
 				t.Fatalf("GetItem() code = %s, want %s, err = %v", status.Code(err), tt.code, err)
 			}
@@ -784,7 +784,7 @@ func TestVaultHandlerMapsUseCaseErrors(t *testing.T) {
 			}
 			handler := NewVaultHandler(useCase)
 
-			_, err := handler.ListItems(vaultContext(), &gophkeeperv1.ListItemsRequest{})
+			_, err := handler.ListItems(vaultContext(), gophkeeperv1.ListItemsRequest_builder{}.Build())
 			if status.Code(err) != tt.code {
 				t.Fatalf("ListItems() code = %s, want %s, err = %v", status.Code(err), tt.code, err)
 			}
@@ -812,7 +812,7 @@ func TestVaultHandlerMapsUseCaseErrors(t *testing.T) {
 			}
 			handler := NewVaultHandler(useCase)
 
-			_, err := handler.DeleteItem(vaultContext(), &gophkeeperv1.DeleteItemRequest{Id: "item-id-1", ExpectedVersion: 7})
+			_, err := handler.DeleteItem(vaultContext(), gophkeeperv1.DeleteItemRequest_builder{Id: "item-id-1", ExpectedVersion: 7}.Build())
 			if status.Code(err) != tt.code {
 				t.Fatalf("DeleteItem() code = %s, want %s, err = %v", status.Code(err), tt.code, err)
 			}
@@ -826,7 +826,7 @@ func TestVaultHandlerMapsUseCaseErrors(t *testing.T) {
 			}
 			handler := NewVaultHandler(useCase)
 
-			_, err := handler.Sync(vaultContext(), &gophkeeperv1.SyncRequest{})
+			_, err := handler.Sync(vaultContext(), gophkeeperv1.SyncRequest_builder{}.Build())
 			if status.Code(err) != tt.code {
 				t.Fatalf("Sync() code = %s, want %s, err = %v", status.Code(err), tt.code, err)
 			}
@@ -834,20 +834,30 @@ func TestVaultHandlerMapsUseCaseErrors(t *testing.T) {
 	}
 }
 
+func TestVaultHandlerMapsOTPItemType(t *testing.T) {
+	if itemTypeFromProto(gophkeeperv1.ItemType_ITEM_TYPE_OTP) != vault.ItemTypeOTP {
+		t.Fatalf("itemTypeFromProto() = %q, want %q", itemTypeFromProto(gophkeeperv1.ItemType_ITEM_TYPE_OTP), vault.ItemTypeOTP)
+	}
+
+	if itemTypeToProto(vault.ItemTypeOTP) != gophkeeperv1.ItemType_ITEM_TYPE_OTP {
+		t.Fatalf("itemTypeToProto() = %s, want ITEM_TYPE_OTP", itemTypeToProto(vault.ItemTypeOTP))
+	}
+}
+
 func validUpdateItemRequest() *gophkeeperv1.UpdateItemRequest {
-	return &gophkeeperv1.UpdateItemRequest{
+	return gophkeeperv1.UpdateItemRequest_builder{
 		Id:              "item-id-1",
 		ExpectedVersion: 7,
 		Type:            gophkeeperv1.ItemType_ITEM_TYPE_TEXT,
-		Metadata: &gophkeeperv1.EncryptedData{
+		Metadata: gophkeeperv1.EncryptedData_builder{
 			Ciphertext: []byte("updated-encrypted-metadata"),
 			Nonce:      []byte("updated-metadata-nonce"),
-		},
-		Payload: &gophkeeperv1.EncryptedData{
+		}.Build(),
+		Payload: gophkeeperv1.EncryptedData_builder{
 			Ciphertext: []byte("updated-encrypted-payload"),
 			Nonce:      []byte("updated-payload-nonce"),
-		},
+		}.Build(),
 		EncryptionAlg:        "aes-256-gcm",
 		PayloadSchemaVersion: 2,
-	}
+	}.Build()
 }

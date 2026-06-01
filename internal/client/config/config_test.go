@@ -17,8 +17,8 @@ func TestLoadReturnsClientConfigWithDefaults(t *testing.T) {
 		t.Fatalf("ServerAddress = %q, want %q", cfg.ServerAddress, "localhost:9090")
 	}
 
-	if cfg.ServerTLSEnabled {
-		t.Fatalf("ServerTLSEnabled = true, want false")
+	if cfg.ServerTLSCertFile != "certs/server.crt" {
+		t.Fatalf("ServerTLSCertFile = %q, want default cert path", cfg.ServerTLSCertFile)
 	}
 
 	if cfg.TokenFile == "" {
@@ -28,7 +28,6 @@ func TestLoadReturnsClientConfigWithDefaults(t *testing.T) {
 
 func TestLoadReturnsClientConfigFromEnv(t *testing.T) {
 	t.Setenv("GOPHKEEPER_SERVER_ADDRESS", "127.0.0.1:9091")
-	t.Setenv("GOPHKEEPER_SERVER_TLS_ENABLED", "true")
 	t.Setenv("GOPHKEEPER_SERVER_TLS_CERT_FILE", "/tmp/server.crt")
 	t.Setenv("GOPHKEEPER_TOKEN_FILE", "/tmp/token.json")
 
@@ -39,10 +38,6 @@ func TestLoadReturnsClientConfigFromEnv(t *testing.T) {
 
 	if cfg.ServerAddress != "127.0.0.1:9091" {
 		t.Fatalf("ServerAddress = %q, want %q", cfg.ServerAddress, "127.0.0.1:9091")
-	}
-
-	if !cfg.ServerTLSEnabled {
-		t.Fatalf("ServerTLSEnabled = false, want true")
 	}
 
 	if cfg.ServerTLSCertFile != "/tmp/server.crt" {
@@ -71,21 +66,8 @@ func TestLoadUsesDefaultTokenFileWhenEnvMissing(t *testing.T) {
 	}
 }
 
-func TestLoadReturnsErrorWhenBoolInvalid(t *testing.T) {
-	t.Setenv("GOPHKEEPER_SERVER_TLS_ENABLED", "not-bool")
-
-	_, err := Load()
-	if err == nil {
-		t.Fatalf("Load() error = nil, want error")
-	}
-
-	if !strings.Contains(err.Error(), "GOPHKEEPER_SERVER_TLS_ENABLED") {
-		t.Fatalf("Load() error = %q, want mention GOPHKEEPER_SERVER_TLS_ENABLED", err.Error())
-	}
-}
-
 func TestLoadReturnsErrorWhenTLSCertFileMissing(t *testing.T) {
-	t.Setenv("GOPHKEEPER_SERVER_TLS_ENABLED", "true")
+	t.Setenv("GOPHKEEPER_SERVER_TLS_CERT_FILE", " ")
 
 	_, err := Load()
 	if err == nil {
@@ -131,9 +113,9 @@ func TestValidateReturnsErrorWhenTokenFileEmpty(t *testing.T) {
 
 func TestValidateReturnsErrorWhenTLSCertFileMissing(t *testing.T) {
 	cfg := Config{
-		ServerAddress:    "localhost:9090",
-		ServerTLSEnabled: true,
-		TokenFile:        "/tmp/token.json",
+		ServerAddress:     "localhost:9090",
+		ServerTLSCertFile: " ",
+		TokenFile:         "/tmp/token.json",
 	}
 
 	err := cfg.Validate()

@@ -1,11 +1,7 @@
 package core
 
 import (
-	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"testing"
 )
 
@@ -98,13 +94,13 @@ func TestSecretPayloadSchemasRoundTrip(t *testing.T) {
 		}
 	})
 
-	t.Run("binary preserves raw bytes", func(t *testing.T) {
-		rawData := []byte{0x00, 0x01, 0x02, 0xff}
-
+	t.Run("binary preserves blob metadata", func(t *testing.T) {
 		payloadBytes, version, err := EncodeBinaryPayload(BinaryPayload{
-			FileName:    "token.bin",
-			ContentType: "application/octet-stream",
-			Data:        rawData,
+			FileName:       "token.bin",
+			ContentType:    "application/octet-stream",
+			SizeBytes:      4,
+			ChecksumSHA256: "checksum",
+			BlobID:         "blob-id",
 		})
 		if err != nil {
 			t.Fatalf("EncodeBinaryPayload() error = %v", err)
@@ -125,20 +121,64 @@ func TestSecretPayloadSchemasRoundTrip(t *testing.T) {
 			t.Fatalf("decoded file name = %q, want token.bin", decoded.FileName)
 		}
 
-		if !bytes.Equal(decoded.Data, rawData) {
-			t.Fatalf("decoded data = %v, want %v", decoded.Data, rawData)
+		if decoded.BlobID != "blob-id" {
+			t.Fatalf("decoded blob id = %q, want blob-id", decoded.BlobID)
+		}
+	})
+
+	t.Run("otp normalizes algorithm and default period", func(t *testing.T) {
+		payloadBytes, version, err := EncodeOTPPayload(OTPPayload{
+			Issuer:      " Example ",
+			AccountName: " user@example.com ",
+			Secret:      " BASE32SECRET ",
+			Algorithm:   "sha1",
+			Digits:      6,
+			Notes:       " work account ",
+		})
+		if err != nil {
+			t.Fatalf("EncodeOTPPayload() error = %v", err)
+		}
+
+		if version != OTPPayloadSchemaVersion {
+			t.Fatalf("schema version = %d, want %d", version, OTPPayloadSchemaVersion)
+		}
+
+		assertJSONPayload(t, payloadBytes)
+
+		decoded, err := DecodeOTPPayload(payloadBytes, version)
+		if err != nil {
+			t.Fatalf("DecodeOTPPayload() error = %v", err)
+		}
+
+		if decoded.Issuer != "Example" {
+			t.Fatalf("issuer = %q, want Example", decoded.Issuer)
+		}
+
+		if decoded.AccountName != "user@example.com" {
+			t.Fatalf("account name = %q, want user@example.com", decoded.AccountName)
+		}
+
+		if decoded.Secret != "BASE32SECRET" {
+			t.Fatalf("secret = %q, want BASE32SECRET", decoded.Secret)
+		}
+
+		if decoded.Algorithm != "SHA1" {
+			t.Fatalf("algorithm = %q, want SHA1", decoded.Algorithm)
+		}
+
+		if decoded.PeriodSeconds != DefaultOTPPeriodSeconds {
+			t.Fatalf("period seconds = %d, want %d", decoded.PeriodSeconds, DefaultOTPPeriodSeconds)
 		}
 	})
 }
 
-func TestBinaryPayloadSchemaAddsFileMetadataAndChecksum(t *testing.T) {
-	rawData := []byte("binary file content")
-	wantChecksum := sha256.Sum256(rawData)
-
+func TestBinaryPayloadSchemaAddsBlobMetadata(t *testing.T) {
 	payloadBytes, version, err := EncodeBinaryPayload(BinaryPayload{
-		FileName:    "document.pdf",
-		ContentType: "application/pdf",
-		Data:        rawData,
+		FileName:       "document.pdf",
+		ContentType:    "application/pdf",
+		SizeBytes:      19,
+		ChecksumSHA256: "plaintext-checksum",
+		BlobID:         "blob-id",
 	})
 	if err != nil {
 		t.Fatalf("EncodeBinaryPayload() error = %v", err)
@@ -161,56 +201,21 @@ func TestBinaryPayloadSchemaAddsFileMetadataAndChecksum(t *testing.T) {
 		t.Fatalf("content type = %q, want application/pdf", decoded.ContentType)
 	}
 
-	if decoded.SizeBytes != int64(len(rawData)) {
-		t.Fatalf("size bytes = %d, want %d", decoded.SizeBytes, len(rawData))
+	if decoded.SizeBytes != 19 {
+		t.Fatalf("size bytes = %d, want 19", decoded.SizeBytes)
 	}
 
-	if decoded.ChecksumSHA256 != hex.EncodeToString(wantChecksum[:]) {
-		t.Fatalf("checksum = %q, want %q", decoded.ChecksumSHA256, hex.EncodeToString(wantChecksum[:]))
-	}
-}
-
-func TestBinaryPayloadSchemaRejectsTooLargeFile(t *testing.T) {
-	tooLargeData := bytes.Repeat([]byte{1}, MaxInlineBinaryPayloadSize+1)
-
-	_, _, err := EncodeBinaryPayload(BinaryPayload{
-		FileName: "large.bin",
-		Data:     tooLargeData,
-	})
-	if err == nil {
-		t.Fatalf("EncodeBinaryPayload() error = nil, want file too large error")
-	}
-
-	if !errors.Is(err, ErrBinaryFileTooLarge) {
-		t.Fatalf("EncodeBinaryPayload() error = %v, want ErrBinaryFileTooLarge", err)
+	if decoded.ChecksumSHA256 != "plaintext-checksum" {
+		t.Fatalf("checksum = %q, want plaintext-checksum", decoded.ChecksumSHA256)
 	}
 }
 
-func TestBinaryPayloadSchemaAllowsMaxInlineFileSize(t *testing.T) {
-	maxData := bytes.Repeat([]byte{1}, MaxInlineBinaryPayloadSize)
-
+func TestBinaryPayloadSchemaRejectsMissingBlobID(t *testing.T) {
 	payloadBytes, version, err := EncodeBinaryPayload(BinaryPayload{
-		FileName: "max.bin",
-		Data:     maxData,
-	})
-	if err != nil {
-		t.Fatalf("EncodeBinaryPayload() error = %v", err)
-	}
-
-	decoded, err := DecodeBinaryPayload(payloadBytes, version)
-	if err != nil {
-		t.Fatalf("DecodeBinaryPayload() error = %v", err)
-	}
-
-	if decoded.SizeBytes != int64(MaxInlineBinaryPayloadSize) {
-		t.Fatalf("size bytes = %d, want %d", decoded.SizeBytes, MaxInlineBinaryPayloadSize)
-	}
-}
-
-func TestBinaryPayloadSchemaRejectsDamagedChecksum(t *testing.T) {
-	payloadBytes, version, err := EncodeBinaryPayload(BinaryPayload{
-		FileName: "document.pdf",
-		Data:     []byte("original file content"),
+		FileName:       "document.pdf",
+		SizeBytes:      19,
+		ChecksumSHA256: "checksum",
+		BlobID:         "blob-id",
 	})
 	if err != nil {
 		t.Fatalf("EncodeBinaryPayload() error = %v", err)
@@ -221,7 +226,7 @@ func TestBinaryPayloadSchemaRejectsDamagedChecksum(t *testing.T) {
 		t.Fatalf("unmarshal payload: %v", err)
 	}
 
-	raw["checksum_sha256"] = "wrong-checksum"
+	delete(raw, "blob_id")
 	damagedPayload, err := json.Marshal(raw)
 	if err != nil {
 		t.Fatalf("marshal damaged payload: %v", err)
@@ -229,7 +234,7 @@ func TestBinaryPayloadSchemaRejectsDamagedChecksum(t *testing.T) {
 
 	_, err = DecodeBinaryPayload(damagedPayload, version)
 	if err == nil {
-		t.Fatalf("DecodeBinaryPayload() error = nil, want checksum error")
+		t.Fatalf("DecodeBinaryPayload() error = nil, want blob id error")
 	}
 }
 
@@ -271,16 +276,67 @@ func TestSecretPayloadSchemasValidateRequiredFields(t *testing.T) {
 			},
 		},
 		{
-			name: "binary without data",
+			name: "binary without size",
 			run: func() error {
-				_, _, err := EncodeBinaryPayload(BinaryPayload{FileName: "empty.bin"})
+				_, _, err := EncodeBinaryPayload(BinaryPayload{
+					FileName:       "empty.bin",
+					ChecksumSHA256: "checksum",
+					BlobID:         "blob-id",
+				})
 				return err
 			},
 		},
 		{
 			name: "binary without file name",
 			run: func() error {
-				_, _, err := EncodeBinaryPayload(BinaryPayload{Data: []byte("content")})
+				_, _, err := EncodeBinaryPayload(BinaryPayload{
+					SizeBytes:      1,
+					ChecksumSHA256: "checksum",
+					BlobID:         "blob-id",
+				})
+				return err
+			},
+		},
+		{
+			name: "binary without blob id",
+			run: func() error {
+				_, _, err := EncodeBinaryPayload(BinaryPayload{
+					FileName:       "file.bin",
+					SizeBytes:      1,
+					ChecksumSHA256: "checksum",
+				})
+				return err
+			},
+		},
+		{
+			name: "otp without secret",
+			run: func() error {
+				_, _, err := EncodeOTPPayload(OTPPayload{
+					Algorithm: "SHA1",
+					Digits:    6,
+				})
+				return err
+			},
+		},
+		{
+			name: "otp with unsupported algorithm",
+			run: func() error {
+				_, _, err := EncodeOTPPayload(OTPPayload{
+					Secret:    "BASE32SECRET",
+					Algorithm: "MD5",
+					Digits:    6,
+				})
+				return err
+			},
+		},
+		{
+			name: "otp with unsupported digits",
+			run: func() error {
+				_, _, err := EncodeOTPPayload(OTPPayload{
+					Secret:    "BASE32SECRET",
+					Algorithm: "SHA1",
+					Digits:    7,
+				})
 				return err
 			},
 		},
@@ -335,9 +391,11 @@ func TestSecretPayloadSchemasRejectUnsupportedVersion(t *testing.T) {
 	}
 
 	binaryPayload, _, err := EncodeBinaryPayload(BinaryPayload{
-		FileName:    "token.bin",
-		ContentType: "application/octet-stream",
-		Data:        []byte{1, 2, 3},
+		FileName:       "token.bin",
+		ContentType:    "application/octet-stream",
+		SizeBytes:      3,
+		ChecksumSHA256: "checksum",
+		BlobID:         "blob-id",
 	})
 	if err != nil {
 		t.Fatalf("EncodeBinaryPayload() error = %v", err)
@@ -346,6 +404,20 @@ func TestSecretPayloadSchemasRejectUnsupportedVersion(t *testing.T) {
 	_, err = DecodeBinaryPayload(binaryPayload, BinaryPayloadSchemaVersion+1)
 	if err == nil {
 		t.Fatalf("DecodeBinaryPayload() error = nil, want unsupported version error")
+	}
+
+	otpPayload, _, err := EncodeOTPPayload(OTPPayload{
+		Secret:    "BASE32SECRET",
+		Algorithm: "SHA1",
+		Digits:    6,
+	})
+	if err != nil {
+		t.Fatalf("EncodeOTPPayload() error = %v", err)
+	}
+
+	_, err = DecodeOTPPayload(otpPayload, OTPPayloadSchemaVersion+1)
+	if err == nil {
+		t.Fatalf("DecodeOTPPayload() error = nil, want unsupported version error")
 	}
 }
 

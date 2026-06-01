@@ -2,6 +2,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,11 +11,19 @@ import (
 	"github.com/ilyakaznacheev/cleanenv"
 )
 
+var (
+	// ErrServerAddressRequired означает пустой адрес сервера клиента
+	ErrServerAddressRequired = errors.New("server address is required")
+	// ErrTokenFileRequired означает пустой путь к файлу токена
+	ErrTokenFileRequired = errors.New("token file is required")
+	// ErrServerTLSCertFileRequired означает пустой путь к TLS-сертификату сервера
+	ErrServerTLSCertFileRequired = errors.New("server TLS cert file is required")
+)
+
 // Config описывает настройки клиента
 type Config struct {
 	ServerAddress     string `env:"GOPHKEEPER_SERVER_ADDRESS" env-default:"localhost:9090"`
-	ServerTLSEnabled  bool   `env:"GOPHKEEPER_SERVER_TLS_ENABLED" env-default:"false"`
-	ServerTLSCertFile string `env:"GOPHKEEPER_SERVER_TLS_CERT_FILE"`
+	ServerTLSCertFile string `env:"GOPHKEEPER_SERVER_TLS_CERT_FILE" env-default:"certs/server.crt"`
 	TokenFile         string `env:"GOPHKEEPER_TOKEN_FILE"`
 }
 
@@ -40,15 +49,15 @@ func Load() (*Config, error) {
 // Validate проверяет корректность конфигурации клиента
 func (c *Config) Validate() error {
 	if strings.TrimSpace(c.ServerAddress) == "" {
-		return fmt.Errorf("server address is required")
+		return ErrServerAddressRequired
 	}
 
 	if strings.TrimSpace(c.TokenFile) == "" {
-		return fmt.Errorf("token file is required")
+		return ErrTokenFileRequired
 	}
 
-	if c.ServerTLSEnabled && strings.TrimSpace(c.ServerTLSCertFile) == "" {
-		return fmt.Errorf("server TLS cert file is required when tls is enabled")
+	if strings.TrimSpace(c.ServerTLSCertFile) == "" {
+		return ErrServerTLSCertFileRequired
 	}
 
 	return nil

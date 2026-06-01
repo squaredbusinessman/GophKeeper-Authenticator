@@ -57,11 +57,11 @@ func (h *AuthHandler) Register(ctx context.Context, req *gophkeeperv1.RegisterRe
 		return nil, registerStatusError(err)
 	}
 
-	return &gophkeeperv1.RegisterResponse{
+	return gophkeeperv1.RegisterResponse_builder{
 		AccessToken:          result.AccessToken,
 		AccessTokenExpiresAt: timestamppb.New(result.AccessTokenExpiresAt),
 		VaultKey:             registerVaultKeyToProto(result.VaultKey),
-	}, nil
+	}.Build(), nil
 }
 
 // Login выполняет вход пользователя через gRPC API
@@ -80,11 +80,11 @@ func (h *AuthHandler) Login(ctx context.Context, req *gophkeeperv1.LoginRequest)
 		return nil, loginStatusError(err)
 	}
 
-	return &gophkeeperv1.LoginResponse{
+	return gophkeeperv1.LoginResponse_builder{
 		AccessToken:          result.AccessToken,
 		AccessTokenExpiresAt: timestamppb.New(result.AccessTokenExpiresAt),
 		VaultKey:             vaultKeyToProto(result.VaultKey),
-	}, nil
+	}.Build(), nil
 }
 
 func registerInputFromProto(req *gophkeeperv1.RegisterRequest) (register.Input, error) {
@@ -155,35 +155,35 @@ func loginInputFromProto(req *gophkeeperv1.LoginRequest) (login.Input, error) {
 }
 
 func vaultKeyToProto(vaultKey login.VaultKeyEnvelope) *gophkeeperv1.VaultKeyEnvelope {
-	return &gophkeeperv1.VaultKeyEnvelope{
+	return gophkeeperv1.VaultKeyEnvelope_builder{
 		EncryptedVaultKey: vaultKey.EncryptedVaultKey,
 		Nonce:             vaultKey.Nonce,
 		EncryptionAlg:     vaultKey.EncryptionAlg,
-		KdfParams: &gophkeeperv1.KDFParams{
+		KdfParams: gophkeeperv1.KDFParams_builder{
 			Algorithm:   vaultKey.KDFParams.Algorithm,
 			Salt:        vaultKey.KDFParams.Salt,
 			TimeCost:    vaultKey.KDFParams.TimeCost,
 			MemoryKib:   vaultKey.KDFParams.MemoryKiB,
 			Parallelism: vaultKey.KDFParams.Parallelism,
 			KeyLength:   vaultKey.KDFParams.KeyLength,
-		},
-	}
+		}.Build(),
+	}.Build()
 }
 
 func registerVaultKeyToProto(vaultKey register.VaultKeyEnvelope) *gophkeeperv1.VaultKeyEnvelope {
-	return &gophkeeperv1.VaultKeyEnvelope{
+	return gophkeeperv1.VaultKeyEnvelope_builder{
 		EncryptedVaultKey: vaultKey.EncryptedVaultKey,
 		Nonce:             vaultKey.Nonce,
 		EncryptionAlg:     vaultKey.EncryptionAlg,
-		KdfParams: &gophkeeperv1.KDFParams{
+		KdfParams: gophkeeperv1.KDFParams_builder{
 			Algorithm:   vaultKey.KDFParams.Algorithm,
 			Salt:        vaultKey.KDFParams.Salt,
 			TimeCost:    vaultKey.KDFParams.TimeCost,
 			MemoryKib:   vaultKey.KDFParams.MemoryKiB,
 			Parallelism: vaultKey.KDFParams.Parallelism,
 			KeyLength:   vaultKey.KDFParams.KeyLength,
-		},
-	}
+		}.Build(),
+	}.Build()
 }
 
 func loginStatusError(err error) error {

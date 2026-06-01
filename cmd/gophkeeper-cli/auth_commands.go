@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 
+	clientapp "github.com/squaredbusinessman/gophkeeper-authenticator/internal/client/app"
 	"github.com/squaredbusinessman/gophkeeper-authenticator/internal/client/core"
 )
 
@@ -65,7 +66,7 @@ func runRegister(ctx context.Context, authService CLIAuthService, prompter Promp
 	}
 
 	if masterPassword != masterPasswordRepeat {
-		return fmt.Errorf("master passwords do not match")
+		return clientapp.ErrMasterPasswordsMismatch
 	}
 
 	_, err = authService.Register(ctx, core.RegisterInput{
@@ -131,6 +132,19 @@ func runCLI(
 	stdout io.Writer,
 	stderr io.Writer,
 ) error {
+	return runCLIWithBlob(ctx, args, authService, vaultService, nil, prompter, stdout, stderr)
+}
+
+func runCLIWithBlob(
+	ctx context.Context,
+	args []string,
+	authService CLIAuthService,
+	vaultService CLIVaultService,
+	blobService CLIBlobService,
+	prompter Prompter,
+	stdout io.Writer,
+	stderr io.Writer,
+) error {
 	if len(args) == 0 {
 		printUsageTo(stdout)
 		return nil
@@ -142,13 +156,13 @@ func runCLI(
 	case "login":
 		return runLogin(ctx, authService, prompter, stdout)
 	case "create":
-		return runCreateSecret(ctx, args[1:], authService, vaultService, prompter, stdout)
+		return runCreateSecret(ctx, args[1:], authService, vaultService, blobService, prompter, stdout)
 	case "get":
-		return runGetSecret(ctx, authService, vaultService, prompter, stdout)
+		return runGetSecret(ctx, authService, vaultService, blobService, prompter, stdout)
 	case "list":
 		return runListSecrets(ctx, authService, vaultService, prompter, stdout)
 	case "update":
-		return runUpdateSecret(ctx, args[1:], authService, vaultService, prompter, stdout)
+		return runUpdateSecret(ctx, args[1:], authService, vaultService, blobService, prompter, stdout)
 	case "delete":
 		return runDeleteSecret(ctx, authService, vaultService, prompter, stdout)
 	case "sync":

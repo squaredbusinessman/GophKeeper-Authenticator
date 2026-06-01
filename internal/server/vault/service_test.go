@@ -222,6 +222,30 @@ func TestServiceCreateItemStoresEncryptedItem(t *testing.T) {
 	}
 }
 
+func TestServiceCreateItemStoresOTPItemType(t *testing.T) {
+	repository := &fakeRepository{}
+	service := newTestService(repository)
+	input := validCreateInput()
+	input.Type = ItemTypeOTP
+
+	item, err := service.CreateItem(context.Background(), input)
+	if err != nil {
+		t.Fatalf("CreateItem() error = %v", err)
+	}
+
+	if item.Type != ItemTypeOTP {
+		t.Fatalf("Type = %q, want %q", item.Type, ItemTypeOTP)
+	}
+
+	if len(repository.createCalls) != 1 {
+		t.Fatalf("repository create calls = %d, want 1", len(repository.createCalls))
+	}
+
+	if repository.createCalls[0].Type != ItemTypeOTP {
+		t.Fatalf("created Type = %q, want %q", repository.createCalls[0].Type, ItemTypeOTP)
+	}
+}
+
 func TestServiceCreateItemReturnsErrorForInvalidInput(t *testing.T) {
 	tests := []struct {
 		name  string

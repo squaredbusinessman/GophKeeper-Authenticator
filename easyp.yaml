@@ -10,6 +10,7 @@ generate:
       out: .
       opts:
         module: github.com/squaredbusinessman/gophkeeper-authenticator
+        default_api_level: API_OPAQUE
     - name: go-grpc
       out: .
       opts:
